@@ -2,7 +2,7 @@
 
 [English](README.en.md) · [下载客户端](https://github.com/xxx-holic/wishtoken-desktop/releases) · [WishToken 官网](https://wishtoken.team/?utm_source=github&utm_medium=readme) · [公告与邀请码](https://github.com/xxx-holic/wishtoken-desktop/discussions/categories/announcements)
 
-WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子号 JSON，查看额度、切换主 Codex App 账号，继续原有项目和已保存会话。也支持独立实例和 CLI。Windows 与 macOS 使用同一套界面和本地服务。
+WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子号 JSON，查看额度、切换主 Codex App 账号，继续原有项目和已保存会话。也支持独立实例和 CLI。Windows、macOS 与 Linux 使用同一套界面和本地服务。
 
 **[加入 Telegram 官方群](https://t.me/shouhouqun) · [开源赠送 10 个邀请码（2026-09-30）](https://github.com/xxx-holic/wishtoken-desktop/discussions/6)**
 
@@ -32,11 +32,14 @@ WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子
 | Windows x64 | `WishToken-Desktop-<版本>-win-x64.exe` 或 `.zip` | 安装包 / 便携包，未签名 |
 | macOS Apple Silicon | `WishToken-Desktop-<版本>-mac-arm64.zip` | macOS 13+，未签名、未公证测试包 |
 | macOS Intel | `WishToken-Desktop-<版本>-mac-x64.zip` | macOS 13+，未签名、未公证测试包 |
+| Linux x64 | `WishToken-Desktop-<版本>-linux-x64.AppImage`、`.deb`、`.tar.gz` | Ubuntu 24.04 原生构建；CLI 联动，GUI App 需另行安装兼容版本 |
 
 1. 安装客户端，并另外安装官方 Codex App 或 CLI。客户端不会捆绑官方 Codex。
 2. 导入自己的账号 JSON，点击刷新额度。
 3. 选择账号、通道、模型与推理档位，点击“切换并启动”。App 无需填写目录。
 4. 遇到 BPS 403 时查看错误；额度正常不代表 BPS 权限正常。可手动选择原生通道测试。
+
+Linux 安装和系统终端要求见 [Linux 说明](docs/LINUX.md)。本项目提供 WishToken 客户端，不捆绑或承诺各平台的官方 Codex 图形应用。
 
 详细操作、升级及平台限制见 [使用说明](docs/QUICKSTART.md)。Apple Silicon/Intel 的包结构和核心交叉编译可检查，但不等于已通过所有 Mac 实机场景；以每个版本的发布说明为准。
 
@@ -57,6 +60,7 @@ go vet ./...
 go test ./...
 cd desktop
 npm ci
+npm run backend
 npm test
 # Windows
 npm run backend -- win32 x64
@@ -64,6 +68,8 @@ npm start
 npm run dist:win
 # macOS，在 Mac 上构建两种架构
 npm run dist:mac
+# Linux x64，在 Linux 上构建
+npm run dist:linux
 ```
 
 发布构建使用 GitHub Actions，生成独立平台产物和 `SHA256SUMS.txt`。版本发布和验证步骤见 [维护指南](CONTRIBUTING.md)。

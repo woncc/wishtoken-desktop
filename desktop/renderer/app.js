@@ -170,7 +170,7 @@ function applyInitial(data) {
   $('usage-probe').checked = data.settings.usage_probe;
   $('theme').value = preferences.theme || 'system'; applyTheme($('theme').value);
   $('data-home').textContent = data.status.home;
-  $('platform').textContent = data.platform === 'darwin' ? 'macOS' : 'Windows';
+  $('platform').textContent = {darwin:'macOS',win32:'Windows',linux:'Linux'}[data.platform] || data.platform;
   $('version').textContent = `v${data.version}`;
   updateContextLabel();
 }

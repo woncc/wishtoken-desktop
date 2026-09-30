@@ -11,6 +11,7 @@ function appExecutable(candidate, platform = process.platform) {
   if (!candidate || !path.isAbsolute(candidate)) return null;
   if (platform === 'darwin' && candidate.endsWith('.app')) candidate = ['Codex', 'ChatGPT'].map(name => path.join(candidate, 'Contents/MacOS', name)).find(p => fs.existsSync(p)) || '';
   if (platform === 'win32' && (!/^(codex|chatgpt)\.exe$/i.test(path.basename(candidate)) || !fs.existsSync(path.join(path.dirname(candidate), 'resources', 'app.asar')))) return null;
+  if (platform === 'linux' && (!/^(codex|chatgpt)$/i.test(path.basename(candidate)) || !fs.existsSync(path.join(path.dirname(candidate), 'resources', 'app.asar')))) return null;
   // Recent Store builds use a small Codex.exe compatibility launcher. The
   // registered ChatGPT.exe is the actual GUI and inherits our isolated env.
   if (platform === 'win32' && /^codex\.exe$/i.test(path.basename(candidate)) && fs.existsSync(path.join(path.dirname(candidate), 'ChatGPT.exe'))) candidate = path.join(path.dirname(candidate), 'ChatGPT.exe');
@@ -21,7 +22,9 @@ async function discoverApp(preferred) {
   if (executable && !/[\\/]WindowsApps[\\/]/i.test(executable)) return { installed: true, binary: executable };
   const candidates = process.platform === 'darwin'
     ? ['/Applications/Codex.app', '/Applications/ChatGPT.app', path.join(os.homedir(), 'Applications/Codex.app'), path.join(os.homedir(), 'Applications/ChatGPT.app')]
-    : [path.join(process.env.LOCALAPPDATA || os.homedir(), 'Programs/Codex/Codex.exe'), path.join(process.env.LOCALAPPDATA || os.homedir(), 'Codex/Codex.exe')];
+    : process.platform === 'linux'
+      ? ['/opt/Codex/codex','/opt/codex/codex',path.join(os.homedir(),'.local/share/Codex/codex')]
+      : [path.join(process.env.LOCALAPPDATA || os.homedir(), 'Programs/Codex/Codex.exe'), path.join(process.env.LOCALAPPDATA || os.homedir(), 'Codex/Codex.exe')];
   if (process.platform === 'win32') {
     try {
       const { stdout } = await run('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending | ForEach-Object { Join-Path $_.InstallLocation "app/Codex.exe" }'], { windowsHide: true, timeout: 7000, encoding: 'utf8' });
@@ -30,7 +33,7 @@ async function discoverApp(preferred) {
   }
   if (preferred) candidates.push(preferred);
   for (const candidate of candidates) if ((executable = appExecutable(candidate))) return { installed: true, binary: executable };
-  return { installed: false, binary: '', error: '未找到 Codex App，请安装官方客户端或手动选择应用路径' };
+  return { installed: false, binary: '', error: process.platform === 'linux' ? '未检测到兼容的 Codex 图形程序；Linux 可使用 Codex CLI，或手动指定已有图形客户端' : '未找到 Codex App，请安装官方客户端或手动选择应用路径' };
 }
 function launchEnvironment(home, key, env = process.env, mode = 'isolated') {
   const clean = Object.fromEntries(Object.entries(env).filter(([k]) => !/^(CODEX_|GPTBRIDGE_|ELECTRON_|NODE_OPTIONS$|OPENAI_API_KEY$|OPENAI_BASE_URL$)/i.test(k)));
@@ -97,7 +100,7 @@ function isMainProcess(command, platform=process.platform, env=process.env) {
   const match = command.match(/"--user-data-dir=([^"]+)"|--user-data-dir="([^"]+)"|--user-data-dir(?:=|\s+)([^\s"]+)/);
   if (!match) return true;
   const value=match[1]||match[2]||match[3];
-  const base=platform==='win32' ? env.APPDATA : path.join(os.homedir(),'Library/Application Support');
+  const base=platform==='win32' ? env.APPDATA : platform==='linux' ? (env.XDG_CONFIG_HOME || path.join(os.homedir(),'.config')) : path.join(os.homedir(),'Library/Application Support');
   if (!base) return false;
   const normalize=v=>platform==='win32' ? path.win32.normalize(v).toLowerCase() : path.posix.normalize(v);
   const join=platform==='win32' ? path.win32.join : path.posix.join;

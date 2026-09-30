@@ -114,6 +114,7 @@ const root = path.resolve(__dirname, '../..');
  } finally {
   const config=JSON.parse(await fs.readFile(path.join(home,'config.json'),'utf8'));
   const {BridgeService}=require('../lib/service.cjs'); const service=new BridgeService({home,binary:''});service.config=config;await service.stop();
-  require('node:child_process').execFileSync('taskkill.exe',['/PID',String(client.process().pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+  if(process.platform==='win32') require('node:child_process').execFileSync('taskkill.exe',['/PID',String(client.process().pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+  else client.process().kill('SIGKILL');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;});

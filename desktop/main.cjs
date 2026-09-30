@@ -160,7 +160,7 @@ async function handle(method, input) {
       prefs.account_id = account_id; savePrefs(); return result;
     }
     case 'chooseApp': {
-      const result = await dialog.showOpenDialog(window, { title: '选择官方 Codex App', properties: ['openFile'], filters: [{ name: 'Codex App', extensions: process.platform === 'darwin' ? ['app'] : ['exe'] }] });
+      const result = await dialog.showOpenDialog(window, { title: '选择 Codex App', properties: ['openFile'], ...(process.platform === 'linux' ? {} : {filters: [{ name: 'Codex App', extensions: process.platform === 'darwin' ? ['app'] : ['exe'] }]}) });
       if (result.canceled) return null;
       const binary = appRuntime.appExecutable(result.filePaths[0]); if (!binary) throw new Error('请选择 Codex/ChatGPT 应用，或其完整安装目录内的图形主程序');
       prefs.app_path = binary; savePrefs(); codexApp = await appRuntime.discoverApp(binary); return codexApp;
@@ -218,7 +218,8 @@ if (lock) {
     readPrefs();
     codexApp = await appRuntime.discoverApp(prefs.app_path);
     nativeTheme.themeSource = prefs.theme || 'system';
-    const platformFolder = process.platform === 'win32' ? 'win' : 'mac';
+    const platformFolder = {win32:'win',darwin:'mac',linux:'linux'}[process.platform];
+    if (!platformFolder) throw new Error('当前系统暂不支持桌面客户端');
     const executable = process.platform === 'win32' ? 'gptbridge.exe' : 'gptbridge';
     const binary = app.isPackaged ? path.join(process.resourcesPath, 'backend', executable) : path.join(__dirname, 'backend', `${platformFolder}-${process.arch}`, executable);
     service = new BridgeService({ home: dataHome, binary });

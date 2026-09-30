@@ -1,6 +1,6 @@
 {
   "name": "wishtoken-desktop",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "WishToken companion for local Codex accounts, explicit channels and existing workspaces",
   "main": "main.cjs",
@@ -13,6 +13,7 @@
     "pack:win": "npm run backend -- win32 x64 && electron-builder --win dir --x64",
     "dist:win": "npm run backend -- win32 x64 && electron-builder --win zip nsis --x64",
     "dist:mac": "npm run backend -- darwin arm64 && npm run backend -- darwin x64 && electron-builder --mac zip --arm64 --x64",
+    "dist:linux": "npm run backend -- linux x64 && electron-builder --linux AppImage deb tar.gz --x64",
     "pack:mac:cross": "npm run backend -- darwin arm64 && npm run backend -- darwin x64 && node scripts/package-mac.cjs",
     "smoke": "node test/features-smoke.cjs"
   },

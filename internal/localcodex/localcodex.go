@@ -94,7 +94,7 @@ func Binary() (string, error) {
 	}
 	p, err := exec.LookPath("codex")
 	if err != nil {
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 			home, _ := os.UserHomeDir()
 			for _, candidate := range []string{"/opt/homebrew/bin/codex", "/usr/local/bin/codex", filepath.Join(home, ".local", "bin", "codex"), filepath.Join(home, ".npm-global", "bin", "codex")} {
 				if st, e := os.Stat(candidate); e == nil && !st.IsDir() && st.Mode()&0111 != 0 {

@@ -38,3 +38,10 @@ mac:
   hardenedRuntime: false
   extendInfo:
     NSHighResolutionCapable: true
+linux:
+  target: [AppImage, deb, tar.gz]
+  category: Development
+  executableName: wishtoken-desktop
+  maintainer: WishToken Desktop contributors
+  synopsis: Local Codex account and workspace companion
+  icon: assets/icon.png

@@ -4,6 +4,8 @@
 
 只从本仓库 Releases 下载客户端，并按发布页 `SHA256SUMS.txt` 校验。Windows 提供安装程序与便携 ZIP；macOS 提供 Apple Silicon / Intel ZIP。安装客户端无需自行安装 Go 或 Node.js。
 
+Linux x64 提供 AppImage、deb 与 tar.gz，安装及桌面环境要求见 [Linux 使用说明](LINUX.md)。
+
 macOS 13+：解压并将 WishToken Desktop.app 拖入“应用程序”。当前测试包没有 Developer ID 签名或 Apple 公证。系统阻止打开时，先确认下载来源和校验值，再通过系统“隐私与安全性”中的“仍要打开”批准这个应用。不要关闭系统整体安全检查。若系统不提供该操作，请保留错误信息，等待签名版本或自行从源码构建。
 
 官方 Codex App / CLI 需另行安装。在“选择 Codex App 路径”中可指定安装位置。Windows 商店版使用应用包启动上下文；Mac 使用应用包内部程序。

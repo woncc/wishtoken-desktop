@@ -26,14 +26,14 @@ npm test
 npm run smoke
 ```
 
-`smoke` 是 Windows 上使用合成账号的真实 Electron/IPC/Go 集成检查，不访问真实账号。截图只写入忽略的 `build/validation/`。Mac 原生联动应在 Mac 实机验收，不能用交叉编译代替。
+`smoke` 使用合成账号运行真实 Electron/IPC/Go 集成检查，不访问真实账号，也不关闭开发者的主 Codex App。Windows 直接运行；Linux 使用 `dbus-run-session -- xvfb-run -a npm run smoke`。截图只写入忽略的 `build/validation/`。Mac 原生联动应在 Mac 实机验收，不能用交叉编译代替。
 
 ## 版本发布
 
 1. 同步修改 `desktop/package.json`、`desktop/package-lock.json` 的版本，更新 `CHANGELOG.md`。
 2. 运行源码检查、Go vet/test 和桌面测试，核对发布范围。
-3. 为验证过的 main 提交打 `v<版本>` 标签。发布 workflow 验证标签与包版本一致，分别构建 Windows、Mac arm64、Mac x64。
-4. 工作流生成校验和并创建 **草稿** Release。维护者检查三平台产物、签名状态和验收结果后再发布。未完成 Mac 实机验收的版本注明开发测试状态，不声称已签名或已公证。
+3. 为验证过的 main 提交打 `v<版本>` 标签。发布 workflow 验证标签与包版本一致，分别构建 Windows x64、Mac arm64、Mac x64 和 Linux x64。Linux 三种包需通过源码一致性、ELF 和包结构校验，以及打包版 Xvfb GUI smoke。
+4. 工作流生成校验和并创建 **草稿** Release。维护者检查所有产物、签名状态和验收结果后再发布。未完成 Mac 实机验收的版本注明开发测试状态；Linux Xvfb 不代表全部发行版和真实显卡验收，不声称已签名或已公证。
 5. 发布页只保留该版本安装/便携包、校验和及必要说明。源码由 Git 标签管理，不上传账号、内部报告、交接或本地会话。
 
 依赖升级由 Dependabot 提 PR；自动检查通过不等于应自动合并。邀请码由维护者不定期发布公告，代码、CI 和安装包不嵌入有效邀请码或运营密钥。
