@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanSettings, cleanLaunch, cleanProbe, redactPublic, requireID, safeError } = require('../lib/policy.cjs');
+const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError } = require('../lib/policy.cjs');
 test('renderer cannot change local key, listener, route or fallback', () => {
   assert.deepEqual(cleanSettings({ api_key: 'attacker', listen: '0.0.0.0:1', native_fallback: true, route_policy: 'codex_only', desktop_mode: false, auto_refresh: false, proxy_url: ' http://127.0.0.1:7890 ' }), { auto_refresh: false, proxy_url: 'http://127.0.0.1:7890' });
   assert.throws(() => cleanSettings({ usage_probe: 'false' }));
@@ -45,4 +45,45 @@ test('renderer payloads drop oauth fields and embedded JWTs', () => {
   assert.equal(account.email, 'a@example.test');
   assert.match(account.usage.note, /凭据已隐藏/);
   assert.equal(redactPublic('plain'), 'plain');
+});
+
+test('renderer payloads drop camelCase oauth fields and credential-shaped text', () => {
+  const jwt = 'eyJaaaaaaaaaa.bbbbbbbbbb.cccccccccc';
+  assert.equal(redactPublic('prefix ' + jwt + ' suffix'), 'prefix [凭据已隐藏] suffix');
+  const value = redactPublic({
+    accessToken: 'not-a-jwt-but-secret',
+    personal_access_token: 'pat-value',
+    note: 'Authorization: Bearer ' + 'a'.repeat(24) + ' rt_refreshvalue',
+    url: 'http://127.0.0.1:8792/cockpit-auth/' + 'ab'.repeat(20) + '/whoami',
+    email: 'member@example.test',
+    model: 'gpt-5.6-terra'
+  });
+  assert.equal(value.accessToken, undefined);
+  assert.equal(value.personal_access_token, undefined);
+  assert.match(value.note, /Bearer \[凭据已隐藏\]/);
+  assert.doesNotMatch(value.note, /rt_refresh/);
+  assert.match(value.url, /cockpit-auth\/\[凭据已隐藏\]/);
+  assert.equal(value.email, 'member@example.test');
+  assert.equal(value.model, 'gpt-5.6-terra');
+  const clean = redactPublic(JSON.parse('{"__proto__":{"polluted":true},"ok":1}'));
+  assert.equal(clean.ok, 1);
+  assert.equal(clean.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(safeError(new Error('bad ' + jwt + ' and rt_refreshvalue')), 'bad [凭据已隐藏] and [凭据已隐藏]');
+});
+test('preference updates cannot clear an explicit channel or smuggle secrets', () => {
+  const applied = applyPreferences({ channel: 'codex', api_key: 'local-key', account_speeds: { 'acc-a': 'fast' } }, { pelican_channel: 'bps', pelican_model: 'gpt-5.6-sol', pelican_effort: 'low', api_key: 'attacker', theme: 'dark' });
+  assert.equal(applied.prefs.channel, 'codex');
+  assert.equal(applied.prefs.pelican_channel, 'bps');
+  assert.equal(applied.prefs.pelican_model, 'gpt-5.6-sol');
+  assert.equal(applied.prefs.pelican_effort, 'low');
+  assert.equal(applied.prefs.api_key, undefined);
+  assert.equal(applied.prefs.account_speeds['acc-a'], 'fast');
+  assert.equal(applied.theme, 'dark');
+  assert.deepEqual(cleanPreferences({ account_speed: { id: 'acc-abcdef123', speed: 'fast' } }), { account_speed: { id: 'acc-abcdef123', speed: 'fast' } });
+  assert.throws(() => cleanPreferences({ pelican_channel: null }));
+  assert.throws(() => cleanPreferences({ pelican_model: 'not a model' }));
+  assert.throws(() => cleanPreferences({ pelican_effort: 'max' }));
+  assert.equal(withoutSecrets({ nested: { refreshToken: 'x', ok: 1 } }).nested.refreshToken, undefined);
+  assert.equal(withoutSecrets({ nested: { refreshToken: 'x', ok: 1 } }).nested.ok, 1);
 });

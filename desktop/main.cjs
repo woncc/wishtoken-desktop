@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanChannel, cleanProbe, redactPublic, safeError } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -27,7 +27,7 @@ let prefs = {};
 function readPrefs() {
   try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8')); } catch { prefs = {}; }
 }
-function savePrefs() { atomicJSON(prefsPath, prefs); }
+function savePrefs() { prefs = withoutSecrets(prefs); atomicJSON(prefsPath, prefs); }
 function show() { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } }
 function setupPath() {
   if (process.platform !== 'darwin') return;
@@ -184,16 +184,13 @@ async function handle(method, input) {
       return service.request('/api/test', 'POST', { account_id: probe.account_id, model: probe.model, effort: probe.effort, route: probe.channel, prompt: 'Reply with only: CONNECTION OK' }, 150000);
     }
     case 'saveSettings': return service.request('/api/settings', 'PUT', cleanSettings(input));
-    case 'preferences':
-      if (input?.account_speed) {
-        const { id, speed } = input.account_speed; requireID(id);
-        if (!['standard', 'fast'].includes(speed)) throw new Error('速度设置无效');
-        prefs.account_speeds = { ...prefs.account_speeds, [id]: speed }; savePrefs();
-      }
-      if (typeof input?.compact_view === 'boolean') { prefs.compact_view = input.compact_view; savePrefs(); }
-      for (const key of ['channel', 'pelican_channel']) if (input && key in input) { prefs[key] = cleanChannel(input[key]); savePrefs(); }
-      if (input && ['system', 'light', 'dark'].includes(input.theme)) { prefs.theme = input.theme; nativeTheme.themeSource = input.theme; savePrefs(); }
+    case 'preferences': {
+      const applied = applyPreferences(prefs, input);
+      prefs = applied.prefs;
+      if (applied.theme) nativeTheme.themeSource = applied.theme;
+      savePrefs();
       return prefs;
+    }
     case 'logs': return service.request('/api/logs');
     case 'openLink': await shell.openExternal(externalLink(input)); return true;
     case 'openData': {

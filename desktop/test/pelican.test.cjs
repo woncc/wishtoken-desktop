@@ -68,3 +68,44 @@ test('App launch has no directory requirement and never inherits the host Codex 
  assert.throws(()=>extractHTML('partial <html><body>'));
  assert.match(extractHTML('```html\n<html></html>\n```'),/<html>/);
 });
+
+test('compare snapshots and saved artifacts cannot carry oauth material', async t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'gptbridge-pelican-redact-'));
+  const leaked = 'Bearer ' + 'a'.repeat(24) + ' rt_refreshvalue eyJaaaaaaaaaa.bbbbbbbbbb.cccccccccc';
+  const p = new Pelican(home, async () => ({
+    text: `<!doctype html><html><body>${leaked}</body></html>`,
+    access_token: 'raw-token',
+    personal_access_token: 'pat-value',
+    response_id: 'resp-secret',
+    duration_ms: 5,
+    usage: { output_tokens: 3, access_token: 'nested-token' },
+    response_model: 'gpt-6-astra',
+    route: 'codex'
+  }));
+  t.after(async () => { await p.close(); fs.rmSync(home, { recursive: true, force: true }); });
+  await p.listen();
+  p.start({ account_ids: ['acc-test1'], model: 'gpt-6-astra', effort: 'high', channel: 'codex', concurrency: 1 }, accounts.slice(0, 1));
+  await p.running;
+  const realId = p.batches[0].items[0].id;
+  assert.equal(typeof p.snapshot()[0].items[0].preview, 'string');
+  p.batches[0].access_token = 'raw-token';
+  p.batches[0].items[0].personal_access_token = 'pat-value';
+  p.batches[0].items[0].note = 'Bearer ' + 'b'.repeat(24);
+  p.batches[0].items[0].id = 'not-a-uuid';
+  const tampered = p.snapshot()[0];
+  assert.equal(tampered.access_token, undefined);
+  assert.equal(tampered.items[0].personal_access_token, undefined);
+  assert.equal(tampered.items[0].note, undefined);
+  assert.equal(tampered.items[0].preview, null);
+  p.batches[0].items[0].id = realId;
+  const artifact = p.artifact(realId);
+  const raw = fs.readFileSync(path.join(home, 'pelican', `${realId}.json`), 'utf8');
+  assert.equal(artifact.access_token, undefined);
+  assert.equal(artifact.response_id, undefined);
+  assert.equal(artifact.usage.access_token, undefined);
+  assert.equal(artifact.usage.output_tokens, 3);
+  assert.match(artifact.html, /<html>/);
+  assert.doesNotMatch(artifact.text, /rt_refresh|Bearer a{12}|eyJaaa/);
+  assert.doesNotMatch(artifact.html, /rt_refresh|Bearer a{12}|eyJaaa/);
+  assert.doesNotMatch(raw, /raw-token|personal_access_token|resp-secret|nested-token/);
+});

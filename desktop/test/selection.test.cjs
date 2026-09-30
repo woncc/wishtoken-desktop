@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName } = require('../renderer/selection.js');
+const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults } = require('../renderer/selection.js');
 
 const catalog = {
   catalog: [
@@ -59,5 +59,22 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.equal(app.includes('selectedIndex'), false);
   assert.match(app, /resolveModelChoice/);
   assert.match(app, /resolveAccountChoice/);
+  assert.match(app, /speedLabel\(record\.speed\)/);
   assert.match(pelican, /dataset\.available/);
+  assert.match(pelican, /resolvePelicanDefaults/);
+  assert.match(pelican, /pelican_model/);
+  assert.doesNotMatch(pelican, /channelModels\(\$\('pelican-channel'\)\.value, \$\('pelican-model'\), \$\('model'\)\.value\)/);
+});
+test('a saved pelican model is not replaced by the launch-panel model', () => {
+  const saved = resolvePelicanDefaults({ pelican_channel: 'bps', pelican_model: 'gpt-5.6-sol', pelican_effort: 'low' }, { model: 'gpt-6-astra', effort: 'xhigh' });
+  assert.equal(saved.channel.value, 'bps');
+  assert.equal(saved.model, 'gpt-5.6-sol');
+  assert.equal(saved.effort.value, 'low');
+  const initial = resolvePelicanDefaults({ pelican_channel: 'codex' }, { model: 'gpt-5.6-terra', effort: 'high' });
+  assert.equal(initial.model, 'gpt-5.6-terra');
+  assert.equal(initial.effort.value, 'high');
+  const kept = resolvePelicanDefaults({ pelican_model: 'gpt-5.6-terra', pelican_effort: 'max' }, { model: 'gpt-6-astra', effort: 'xhigh' });
+  assert.equal(kept.model, 'gpt-5.6-terra');
+  assert.equal(kept.effort.value, 'max');
+  assert.equal(kept.effort.available, false);
 });
