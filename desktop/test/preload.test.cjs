@@ -18,6 +18,9 @@ test('preload exposes only named bridge methods and main keeps the renderer sand
   assert.match(main, /allowedPreview/);
   assert.match(main, /redactPublic\(await handle/);
   assert.match(main, /applyPreferences/);
+  assert.match(main, /publicSnapshot/);
+  assert.match(main, /publicProbe/);
+  assert.match(main, /publicLogs/);
   assert.match(main, /withoutSecrets\(prefs\)/);
   assert.doesNotMatch(main, /nodeIntegration: true|sandbox: false|webviewTag: true/);
 });

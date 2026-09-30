@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -62,7 +62,7 @@ async function importPaths(paths) {
       result.warnings.push(...summary.warnings.map(w => `${path.basename(file)}：${w}`));
     } catch (err) { result.warnings.push(`${path.basename(file)}：${safeError(err)}`); }
   }
-  return result;
+  return publicImport(result);
 }
 function validSender(event) { return event.sender === window?.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame?.url === page; }
 async function confirmMainRestart(restore) {
@@ -73,7 +73,7 @@ async function handle(method, input) {
   switch (method) {
     case 'snapshot': {
       const [status, accounts, codex, models, settings] = await Promise.all(['/api/status', '/api/accounts', '/api/codex/launch', '/api/models', '/api/settings'].map(route => service.request(route)));
-      return { status, accounts: accounts.accounts, codex: { ...codex, app: codexApp, main_app: mainProfile.status(dataHome, primaryHome) }, models, settings: { proxy_url: settings.proxy_url, auto_refresh: settings.auto_refresh, usage_probe: settings.usage_probe }, preferences: prefs, platform: process.platform, version: app.getVersion() };
+      return publicSnapshot({ status, accounts: accounts.accounts, codex: { ...codex, app: codexApp, main_app: mainProfile.status(dataHome, primaryHome) }, models, settings, preferences: prefs, platform: process.platform, version: app.getVersion() });
     }
     case 'importFiles': {
       const result = await dialog.showOpenDialog(window, { title: '导入 Team 子号 JSON', properties: ['openFile', 'multiSelections'], filters: [{ name: '账号 JSON', extensions: ['json'] }] });
@@ -83,7 +83,7 @@ async function handle(method, input) {
     case 'importText':
       if (typeof input !== 'string' || Buffer.byteLength(input) > 16 * 1024 * 1024) throw new Error('JSON 内容为空或过大');
       JSON.parse(input);
-      return service.request('/api/accounts/import', 'POST', input, 90000);
+      return publicImport(await service.request('/api/accounts/import', 'POST', input, 90000));
     case 'chooseFolder': {
       const result = await dialog.showOpenDialog(window, { title: '选择 Codex 项目目录', defaultPath: prefs.directory || os.homedir(), properties: ['openDirectory', 'createDirectory'] });
       if (result.canceled) return null;
@@ -181,7 +181,7 @@ async function handle(method, input) {
     }
     case 'test': {
       const probe = cleanProbe(input);
-      return service.request('/api/test', 'POST', { account_id: probe.account_id, model: probe.model, effort: probe.effort, route: probe.channel, prompt: 'Reply with only: CONNECTION OK' }, 150000);
+      return publicProbe(await service.request('/api/test', 'POST', { account_id: probe.account_id, model: probe.model, effort: probe.effort, route: probe.channel, prompt: 'Reply with only: CONNECTION OK' }, 150000));
     }
     case 'saveSettings': return service.request('/api/settings', 'PUT', cleanSettings(input));
     case 'preferences': {
@@ -191,7 +191,7 @@ async function handle(method, input) {
       savePrefs();
       return prefs;
     }
-    case 'logs': return service.request('/api/logs');
+    case 'logs': return publicLogs(await service.request('/api/logs'));
     case 'openLink': await shell.openExternal(externalLink(input)); return true;
     case 'openData': {
       const error = await shell.openPath(dataHome); if (error) throw new Error(error); return true;
