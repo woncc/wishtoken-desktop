@@ -172,7 +172,12 @@ func parseTextLines(text, source string, res *ImportResult) {
 			res.Skipped++
 			continue
 		}
+		// A proxy password or token stuffed into email must not block the JWT claim.
+		if email := strings.TrimSpace(acc.Email); scrubDisplay(email) != email {
+			acc.Email = ""
+		}
 		acc.FillFromTokens()
+		acc.Email = scrubDisplay(acc.Email)
 		res.Accounts = append(res.Accounts, acc)
 	}
 }
@@ -299,7 +304,7 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 		UserID:       getString(m, "user_id", "chatgpt_user_id", "userId"),
 		ProxyURL:     getString(m, "proxy_url", "proxyUrl", "proxy"),
 	}
-	acc.Name = displayName(acc.Name)
+	acc.Name = scrubDisplay(acc.Name)
 	if user, ok := m["user"].(map[string]any); ok {
 		if acc.Email == "" {
 			acc.Email = getString(user, "email")
@@ -349,13 +354,18 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 	if tags, ok := m["tags"].([]any); ok {
 		for _, t := range tags {
 			if s, ok := t.(string); ok {
-				if s = displayName(s); s != "" {
+				if s = scrubDisplay(s); s != "" {
 					acc.Tags = append(acc.Tags, s)
 				}
 			}
 		}
 	}
+	// A proxy password or token stuffed into email must not block the JWT claim.
+	if email := strings.TrimSpace(acc.Email); scrubDisplay(email) != email {
+		acc.Email = ""
+	}
 	acc.FillFromTokens()
+	acc.Email = scrubDisplay(acc.Email)
 	if acc.AccountID == "" && acc.RefreshToken == "" {
 		res.Warnings = append(res.Warnings, fmt.Sprintf("%s: no account id and no refresh token; the access token alone cannot be renewed", acc.Label()))
 	}

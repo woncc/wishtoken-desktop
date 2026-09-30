@@ -31,7 +31,7 @@ BACKUP_SUFFIXES = {
     '.swp', '.swo', '.swn', '.tmp',
 }
 RULES = {
-    'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
+    'private key': re.compile(rb'-----BEGIN (?:(?:RSA |DSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----'),
     'JWT literal': re.compile(rb'eyJ[A-Za-z0-9_-]{25,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{15,}'),
     'secret token literal': re.compile(rb'(?:sk-(?:proj-)?|gh[pousr]_|github_pat_|rt_)[A-Za-z0-9_-]{25,}'),
     'personal Windows path': re.compile(rb'[CD]:[/\\](?:Users|Git_Project)[/\\](?:Mayn|rain|kawang|gptbridge|WishToApp)', re.I),
@@ -40,26 +40,56 @@ RULES = {
 FOLD_PARTS = {part.casefold() for part in FORBIDDEN_PARTS}
 FOLD_NAMES = {item.casefold() for item in FORBIDDEN_NAMES}
 
-def secret_alias(name):
-    folded = name.casefold()
+NUMBERED_BACKUP = re.compile(r'\.(?:bak|old|orig|save|backup|copy|tmp)\d+$')
+EDITOR_NUMBER = re.compile(r'(?:\.~\d+|~\d+)$')
+COPY_INDEX = re.compile(r' \(\d+\)$')
+
+def forbidden_name(folded):
+    if folded in FOLD_NAMES:
+        return True
+    bare = folded[1:] if folded.startswith('.') else folded
+    return bare in FOLD_NAMES
+
+def strip_alias(folded):
     if folded.startswith('.#'):
         folded = folded[2:]
     if folded.startswith('#') and folded.endswith('#') and len(folded) > 2:
         folded = folded[1:-1]
     while folded.endswith('~'):
         folded = folded[:-1]
-    while True:
+    changed = True
+    while changed and folded:
+        changed = False
+        editor = EDITOR_NUMBER.search(folded)
+        if editor and editor.start() > 0:
+            folded = folded[:editor.start()]
+            changed = True
+            continue
         suffix = Path(folded).suffix
-        if suffix not in BACKUP_SUFFIXES:
-            break
         stem = Path(folded).stem
-        if not stem or stem == folded:
-            break
-        folded = stem
-    if folded in FOLD_NAMES:
+        if stem.endswith(' copy') and stem[:-5]:
+            folded = stem[:-5] + suffix
+            changed = True
+            continue
+        if suffix in BACKUP_SUFFIXES or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
+            if stem and stem != folded:
+                folded = stem
+                changed = True
+                continue
+        if stem and COPY_INDEX.search(stem):
+            rebuilt = COPY_INDEX.sub('', stem) + suffix
+            if rebuilt and rebuilt != folded:
+                folded = rebuilt
+                changed = True
+    return folded
+
+def secret_alias(name):
+    folded = name.casefold()
+    if folded.startswith('._') and folded[2:] and secret_alias(folded[2:]):
         return True
-    bare = folded[1:] if folded.startswith('.') else folded
-    return bare in FOLD_NAMES
+    if folded.startswith('copy of ') and secret_alias(folded[8:]):
+        return True
+    return forbidden_name(strip_alias(folded))
 
 def path_reason(rel):
     path = Path(rel)
@@ -132,12 +162,17 @@ def self_test():
         'auth.json.orig.old', 'ID_ED25519.BACKUP', '.git-credentials', 'home/.npmrc',
         '.pypirc', '.pgpass', 'aws/credentials', 'secrets.json', 'codex_instances.json',
         'cache.sqlite', 'state.sqlite3', 'app.db', 'tunnel.ovpn', 'vault.psafe3',
+        'accounts.json.bak3', 'auth.json.backup2', 'credentials.json.1', '._auth.json',
+        '._accounts.json', 'auth.json.~1~', 'auth.json~1', 'id_rsa.old2', 'tokens.json.orig2',
+        'config.json.save1', 'home/.netrc.bak3', 'Copy of auth.json', 'auth (1).json',
+        'accounts copy.json', 'nested/auth.json.bak3', 'ID_ED25519.OLD2', '._.netrc',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
         'desktop/assets/icon.png', 'README.md', 'scripts/check-public.py', 'internal/config/config.go',
         'internal/oauth/login.go', 'docs/handover-not-private.md',
         'docs/assets/accounts.png', 'internal/localcodex/models.json', 'notes.tmp', 'script.go.swp',
+        'id_rsa.pub', 'script (1).go', 'notes.bak3', 'Copy of README.md', '._script.go',
     )
     for rel in blocked:
         if not path_reason(rel):
@@ -150,8 +185,13 @@ def self_test():
     token = b'rt_' + b'a' * 25
     personal = b'C:/Users/' + b'Mayn' + b'/project'
     unrelated = b'C:/Users/' + b'other' + b'/project'
-    if content_reasons(private) != ['private key'] or content_reasons(jwt) != ['JWT literal'] or content_reasons(token) != ['secret token literal']:
+    encrypted = b'-----BEGIN ' + b'ENCRYPTED ' + b'PRIVATE KEY-----'
+    dsa = b'-----BEGIN ' + b'DSA ' + b'PRIVATE KEY-----'
+    pgp = b'-----BEGIN ' + b'PGP PRIVATE KEY BLOCK-----'
+    if content_reasons(private) != ['private key'] or content_reasons(encrypted) != ['private key'] or content_reasons(dsa) != ['private key'] or content_reasons(pgp) != ['private key'] or content_reasons(jwt) != ['JWT literal'] or content_reasons(token) != ['secret token literal']:
         raise SystemExit('self-test failed: secret content was not detected')
+    if content_reasons(b'-----BEGIN PUBLIC KEY-----') or content_reasons(b'-----BEGIN CERTIFICATE-----'):
+        raise SystemExit('self-test failed: public key material was blocked')
     if content_reasons(b'rt_' + b'short') or content_reasons(b'package server\nfunc ok() {}\n') or content_reasons(b'ordinary source text'):
         raise SystemExit('self-test failed: ordinary content was blocked')
     if 'personal Windows path' not in content_reasons(personal):
