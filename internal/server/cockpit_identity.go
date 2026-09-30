@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -23,10 +22,10 @@ import (
 // the upstream usage endpoint before returning its own token-derived metadata.
 // Complete OAuth bundles do not call this route. No ID token is manufactured.
 func (s *Server) handleCockpitIdentity(w http.ResponseWriter, r *http.Request) {
-	remote, _, _ := net.SplitHostPort(r.RemoteAddr)
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/cockpit-auth/"), "/")
 	key := s.Config().CockpitKey
-	if !config.IsLoopback(remote) || len(parts) != 4 || key == "" || subtle.ConstantTimeCompare([]byte(parts[0]), []byte(key)) != 1 || strings.Join(parts[1:], "/") != "v1/user-auth-credential/whoami" || r.Method != http.MethodGet || r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	// Empty addresses and hostnames are not proof of a loopback socket.
+	if !config.IsLoopbackPeer(r.RemoteAddr) || len(parts) != 4 || key == "" || subtle.ConstantTimeCompare([]byte(parts[0]), []byte(key)) != 1 || strings.Join(parts[1:], "/") != "v1/user-auth-credential/whoami" || r.Method != http.MethodGet || r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		writeError(w, r, 401, "identity_auth", "authentication_error", "invalid local identity request")
 		return
 	}
