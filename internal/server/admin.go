@@ -368,36 +368,9 @@ func (s *Server) adminImportCPA(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminExport(w http.ResponseWriter, r *http.Request) {
-	format := r.URL.Query().Get("format")
-	ids := map[string]bool{}
-	for _, id := range strings.Split(r.URL.Query().Get("ids"), ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			ids[id] = true
-		}
-	}
-	var selected []account.Account
-	for _, acc := range s.Store.List() {
-		if len(ids) == 0 || ids[acc.ID] {
-			selected = append(selected, acc)
-		}
-	}
-	if len(selected) == 0 {
-		writeError(w, r, http.StatusNotFound, "no_accounts", "invalid_request_error", "no matching accounts")
-		return
-	}
-	raw, err := account.ExportJSON(selected, format)
-	if err != nil {
-		writeError(w, r, http.StatusInternalServerError, "export_failed", "server_error", err.Error())
-		return
-	}
-	name := "gptbridge-accounts.json"
-	if format == "codex" && len(selected) == 1 {
-		name = "auth.json"
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write(raw)
+	// Credential files stay on the local CLI. The management response must
+	// not carry access, refresh, or ID tokens into a browser or renderer.
+	writeError(w, r, http.StatusForbidden, "credentials_not_exported", "permission_error", "管理接口不返回 OAuth 凭据。请在本机运行 `gptbridge accounts export -o FILE`。 / The management API does not return OAuth credentials. Export with the local CLI to an owner-only file.")
 }
 
 func (s *Server) adminAccountAction(w http.ResponseWriter, r *http.Request, rest string) {
@@ -704,16 +677,21 @@ func (s *Server) snippets() object {
 	cfg := s.Config()
 	base := s.baseURL()
 	key := cfg.APIKey
-	keyOrPlaceholder := key
-	if keyOrPlaceholder == "" {
-		keyOrPlaceholder = "gptbridge"
+	// Never place the local API key in a management response. Callers that
+	// already have it can substitute GPTBRIDGE_API_KEY themselves.
+	keyOrPlaceholder := "gptbridge"
+	if key != "" {
+		keyOrPlaceholder = "${GPTBRIDGE_API_KEY}"
 	}
 	models := make([]string, 0, len(basispoints.Catalog))
 	for _, m := range basispoints.Catalog {
 		models = append(models, m.ID)
 	}
 	sort.Strings(models)
-	codex := codexcfg.Snippet(codexcfg.Projection{BaseURL: base + "/v1", Model: cfg.DefaultModel, Effort: "high", APIKey: key})
+	codex := codexcfg.Snippet(codexcfg.Projection{BaseURL: base + "/v1", Model: cfg.DefaultModel, Effort: "high"})
+	if key != "" {
+		codex += "# experimental_bearer_token is required and is intentionally omitted here.\n# Use the local GPTBRIDGE_API_KEY value; this response does not include it.\n"
+	}
 	claude := fmt.Sprintf("export ANTHROPIC_BASE_URL=%s\nexport ANTHROPIC_AUTH_TOKEN=%s\nexport ANTHROPIC_MODEL=%s\nexport ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-6-astra\nexport ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.6-sol\nexport ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.6-luna\nexport CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1\nclaude", base, keyOrPlaceholder, cfg.DefaultModel)
 	claudePS := fmt.Sprintf("$env:ANTHROPIC_BASE_URL=\"%s\"\n$env:ANTHROPIC_AUTH_TOKEN=\"%s\"\n$env:ANTHROPIC_MODEL=\"%s\"\n$env:ANTHROPIC_DEFAULT_OPUS_MODEL=\"gpt-6-astra\"\n$env:ANTHROPIC_DEFAULT_SONNET_MODEL=\"gpt-5.6-sol\"\n$env:ANTHROPIC_DEFAULT_HAIKU_MODEL=\"gpt-5.6-luna\"\n$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=\"1\"\nclaude", base, keyOrPlaceholder, cfg.DefaultModel)
 	curl := fmt.Sprintf("curl %s/v1/chat/completions -H \"Content-Type: application/json\" -H \"Authorization: Bearer %s\" -d '{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"你好\"}]}'", base, keyOrPlaceholder, cfg.DefaultModel)

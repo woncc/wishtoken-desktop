@@ -290,6 +290,40 @@ func IsLoopback(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// IsLoopbackPeer reports whether remoteAddr is a loopback TCP client.
+// Hostnames and empty values are rejected. Unlike IsLoopback, an empty
+// string is not treated as the default local bind.
+func IsLoopbackPeer(remoteAddr string) bool {
+	host := strings.TrimSpace(remoteAddr)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if zone := strings.IndexByte(host, '%'); zone >= 0 {
+		host = host[:zone]
+	}
+	ip := net.ParseIP(strings.TrimSpace(host))
+	return ip != nil && ip.IsLoopback()
+}
+
+// RequireLoopbackListener rejects a bound socket that is not loopback.
+// allowRemote skips the check only when the operator explicitly exposed the
+// model API. Management routes still require a loopback peer.
+func RequireLoopbackListener(allowRemote bool, addr net.Addr) error {
+	if allowRemote {
+		return nil
+	}
+	tcp, ok := addr.(*net.TCPAddr)
+	if !ok || tcp == nil || tcp.IP == nil || !tcp.IP.IsLoopback() {
+		got := "<nil>"
+		if addr != nil {
+			got = addr.String()
+		}
+		return fmt.Errorf("resolved address %s is not loopback", got)
+	}
+	return nil
+}
+
 func splitList(v string) []string {
 	var out []string
 	for _, part := range strings.Split(v, ",") {

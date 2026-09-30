@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"path/filepath"
 	"testing"
 )
@@ -62,5 +63,41 @@ func TestIsLoopback(t *testing.T) {
 		if IsLoopback(bad) {
 			t.Fatalf("%q should not be loopback", bad)
 		}
+	}
+}
+
+func TestLoopbackPeerAndBoundSocket(t *testing.T) {
+	for _, ok := range []string{"127.0.0.1:9", "[::1]:9", "::1", "127.0.0.1", "[::ffff:127.0.0.1]:9", "[::1%lo]:9"} {
+		if !IsLoopbackPeer(ok) {
+			t.Fatalf("%q should be a loopback peer", ok)
+		}
+	}
+	for _, bad := range []string{"", "localhost:9", "localhost", "203.0.113.9:9", "203.0.113.9", "0.0.0.0:9", "[::]:9", "example.test:80"} {
+		if IsLoopbackPeer(bad) {
+			t.Fatalf("%q should not be a loopback peer", bad)
+		}
+	}
+	if err := RequireLoopbackListener(false, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RequireLoopbackListener(false, &net.TCPAddr{IP: net.ParseIP("::1"), Port: 9}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RequireLoopbackListener(false, &net.TCPAddr{IP: net.ParseIP("203.0.113.10"), Port: 9}); err == nil {
+		t.Fatal("non-loopback socket accepted")
+	}
+	if err := RequireLoopbackListener(false, nil); err == nil {
+		t.Fatal("nil socket accepted")
+	}
+	if err := RequireLoopbackListener(true, &net.TCPAddr{IP: net.ParseIP("203.0.113.10"), Port: 9}); err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	if err := RequireLoopbackListener(false, ln.Addr()); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -100,7 +101,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc(prefix+"/messages/count_tokens", s.apiAuth(s.handleCountTokens))
 		mux.HandleFunc(prefix+"/models", s.apiAuth(s.handleModels))
 	}
-	mux.HandleFunc("/api/", s.adminAuth(s.handleAdmin))
+	mux.HandleFunc("/api/", s.redactManagement(s.adminAuth(s.handleAdmin)))
 	mux.HandleFunc("/cockpit/", s.handleCockpit)
 	mux.HandleFunc("/cockpit-auth/", s.handleCockpitIdentity)
 	mux.HandleFunc("/desktop-api/", s.handleDesktopAPI)
@@ -122,6 +123,10 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
 		return err
+	}
+	if err := config.RequireLoopbackListener(cfg.AllowRemote, ln.Addr()); err != nil {
+		_ = ln.Close()
+		return fmt.Errorf("refusing to bind %q: %w", cfg.Listen, err)
 	}
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 30 * time.Second}
 	go s.Pool.RunMaintenance(ctx, s.Codex.Identity)
@@ -172,28 +177,36 @@ func (s *Server) apiAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func presentsKey(r *http.Request, key string) bool {
-	if auth := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(strings.ToLower(auth), "bearer ") {
-		if strings.TrimSpace(auth[7:]) == key {
+	if key == "" {
+		return false
+	}
+	if auth := strings.TrimSpace(r.Header.Get("Authorization")); len(auth) >= 7 && strings.EqualFold(auth[:7], "bearer ") {
+		if secretEqual(strings.TrimSpace(auth[7:]), key) {
 			return true
 		}
 	}
-	if strings.TrimSpace(r.Header.Get("x-api-key")) == key {
+	if secretEqual(strings.TrimSpace(r.Header.Get("x-api-key")), key) {
 		return true
 	}
-	return strings.TrimSpace(r.Header.Get("X-GPTBridge-Key")) == key
+	return secretEqual(strings.TrimSpace(r.Header.Get("X-GPTBridge-Key")), key)
+}
+
+func secretEqual(got, want string) bool {
+	if want == "" || len(got) != len(want) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := s.Config()
-		remoteHost, _, _ := net.SplitHostPort(r.RemoteAddr)
-		fromLoopback := config.IsLoopback(remoteHost)
-		if cfg.DesktopMode && !presentsKey(r, cfg.APIKey) {
-			writeError(w, r, http.StatusUnauthorized, "admin_unauthorized", "authentication_error", "desktop management requires the local key")
+		if !config.IsLoopbackPeer(r.RemoteAddr) {
+			writeError(w, r, http.StatusForbidden, "management_loopback_only", "permission_error", "management API accepts loopback clients only")
 			return
 		}
-		if !fromLoopback && (cfg.APIKey == "" || !presentsKey(r, cfg.APIKey)) {
-			writeError(w, r, http.StatusUnauthorized, "admin_unauthorized", "authentication_error", "management API requires loopback access or the API key")
+		if cfg.DesktopMode && !presentsKey(r, cfg.APIKey) {
+			writeError(w, r, http.StatusUnauthorized, "admin_unauthorized", "authentication_error", "desktop management requires the local key")
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
