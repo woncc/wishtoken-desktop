@@ -35,7 +35,9 @@ function updateButtons() {
   }
   const account = accountByID(state.selected);
   const appMode = $('launch-target').value === 'app';
-  const selectionReady = $('channel').dataset.available !== 'false' && $('model').dataset.available !== 'false' && state.effortAvailable !== false && Boolean($('model').value);
+  const targetReady = $('launch-target').dataset.available !== 'false';
+  const appModeReady = !appMode || $('app-mode').dataset.available !== 'false';
+  const selectionReady = targetReady && appModeReady && $('channel').dataset.available !== 'false' && $('model').dataset.available !== 'false' && state.effortAvailable !== false && Boolean($('model').value);
   const unavailable = !selectionReady || !state.connected || !account || account.disabled || (account.expired && !account.has_refresh_token) || !(appMode ? state.data?.codex.app?.installed : state.data?.codex.installed) || (!appMode && !($('directory').value.trim())) || state.busy.has('launch');
   $('launch').disabled = unavailable;
   $('resume').disabled = unavailable || !state.data?.codex.history.some(item => item.account_id === state.selected && sameDir(item.directory, $('directory').value));
@@ -132,13 +134,17 @@ function renderHistory() {
   const entries = state.data?.codex.history || [];
   $('history-list').innerHTML = entries.length ? entries.map(record => {
     const account = accountByID(record.account_id);
-    const disabled = !account || account.disabled ? 'disabled' : '';
-    const basename = record.target === 'app' ? 'Codex App' : record.directory.split(/[\\/]/).filter(Boolean).at(-1) || record.directory;
-    return `<article class="history-row"><span class="icon-box">${icon('folder')}</span><div class="history-info"><strong>${esc(basename)}</strong><p title="${esc(record.directory)}">${record.target === 'app' ? record.app_mode === 'main' ? '主应用 · 原有项目与会话' : '独立实例 · 单独工作空间' : esc(record.directory)}</p><div class="history-meta"><span>${esc(account ? label(account) : '账号已移除')}</span><span>${channelLabel(record.channel)} · ${esc(record.model)} · ${esc(record.effort)} · ${esc(speedLabel(record.speed))}</span><span>${date(record.last_used)}</span></div></div><div class="history-actions"><button class="secondary" data-history="${esc(record.id)}" data-resume="false" ${disabled}>${record.target === 'app' ? '打开 App' : '新会话'}</button>${record.target === 'app' ? '' : `<button class="primary" data-history="${esc(record.id)}" data-resume="true" ${disabled}>继续会话${icon('arrow')}</button>`}</div></article>`;
+    const replay = wishSelection.replayLaunch(record, false);
+    const disabled = !account || account.disabled || !replay.ok ? 'disabled' : '';
+    const place = wishSelection.historyPlace(record);
+    const basename = place.kind === 'directory' ? (place.text.split(/[\\/]/).filter(Boolean).at(-1) || place.text) : place.kind === 'app' ? 'Codex App' : place.text;
+    const reason = esc(replay.ok ? '' : replay.error);
+    const appTarget = place.kind === 'app';
+    return `<article class="history-row"><span class="icon-box">${icon('folder')}</span><div class="history-info"><strong>${esc(basename)}</strong><p title="${esc(place.title)}">${esc(place.text)}</p><div class="history-meta"><span>${esc(account ? label(account) : '账号已移除')}</span><span>${channelLabel(record.channel)} · ${esc(record.model)} · ${esc(record.effort)} · ${esc(speedLabel(record.speed))}</span><span>${date(record.last_used)}</span></div></div><div class="history-actions"><button class="secondary" data-history="${esc(record.id)}" data-resume="false" title="${reason}" ${disabled}>${appTarget ? '打开 App' : '新会话'}</button>${appTarget ? '' : `<button class="primary" data-history="${esc(record.id)}" data-resume="true" title="${reason}" ${disabled}>继续会话${icon('arrow')}</button>`}</div></article>`;
   }).join('') : empty('还没有最近项目', '选择账号和项目目录，首次启动后会保存在这里。');
 }
 const channelLabel = channel => wishSelection.channelName(channel) || String(channel || 'BPS');
-const speedLabel = speed => speed === 'fast' ? '快速' : '标准';
+const speedLabel = speed => wishSelection.speedName(speed) || String(speed ?? '');
 function nativeSpeed() { return $('channel').dataset.available !== 'false' && $('channel').value === 'codex'; }
 function accountSpeed(id) { return nativeSpeed() ? state.data?.preferences.account_speeds?.[id] || 'standard' : 'standard'; }
 function renderSpeed() {
@@ -158,6 +164,20 @@ function pinExplicitOption(select, choice, labelFor) {
   }
   select.value = choice.value;
   select.dataset.available = String(choice.available && select.value === choice.value);
+}
+function showChoice(select, value, allowed, fallback, labelFor) {
+  const choice = wishSelection.resolveChoice(value, allowed, fallback);
+  pinExplicitOption(select, choice, labelFor);
+  return choice;
+}
+function showTarget(value, fallback) {
+  return showChoice($('launch-target'), value, ['app', 'cli'], fallback, raw => `${raw} · 不在启动方式列表`);
+}
+function showAppMode(value) {
+  return showChoice($('app-mode'), value, ['main', 'isolated'], 'main', raw => `${raw} · 不在工作空间列表`);
+}
+function showTheme(value) {
+  return showChoice($('theme'), value, ['system', 'light', 'dark'], 'system', raw => `${raw} · 不在外观列表`);
 }
 function channelModels(channel, select, preferred) {
   const models = wishSelection.modelsForChannel(state.data?.models, channel);
@@ -181,18 +201,19 @@ function launchChannel(channel, preferred) {
 function applyInitial(data) {
   const preferences = data.preferences;
   state.selected = wishSelection.resolveAccountChoice(data.accounts, { activeId: data.codex.active_account_id, preferredId: preferences.account_id }).id;
-  $('launch-target').value = preferences.target || (data.codex.app?.installed ? 'app' : 'cli');
-  $('app-mode').value = preferences.app_mode || 'main';
+  showTarget(preferences.target, data.codex.app?.installed ? 'app' : 'cli');
+  showAppMode(preferences.app_mode);
   $('compact-view').checked = preferences.compact_view === true;
   launchChannel(preferences.channel, preferences.model || data.codex.model);
   setEffort(preferences.effort || data.codex.effort);
   $('directory').value = preferences.directory || '';
-  $('context-window').value = preferences.context_window || 272000;
-  $('compact-limit').value = preferences.compact_limit || 200000;
+  $('context-window').value = wishSelection.explicitNumber(preferences.context_window, 272000);
+  $('compact-limit').value = wishSelection.explicitNumber(preferences.compact_limit, 200000);
   $('proxy').value = data.settings.proxy_url || '';
   $('auto-refresh').checked = data.settings.auto_refresh;
   $('usage-probe').checked = data.settings.usage_probe;
-  $('theme').value = preferences.theme || 'system'; applyTheme($('theme').value);
+  const theme = showTheme(preferences.theme);
+  applyTheme(theme.available ? theme.value : 'system');
   $('data-home').textContent = data.status.home;
   $('platform').textContent = {darwin:'macOS',win32:'Windows',linux:'Linux'}[data.platform] || data.platform;
   $('version').textContent = `v${data.version}`;
@@ -285,8 +306,8 @@ async function launch(resume = false, record) {
     const result = await api.launch(options);
     if (result.cancelled) return;
     state.selected = options.account_id;
-    $('launch-target').value = options.target;
-    if (options.app_mode) $('app-mode').value = options.app_mode;
+    showTarget(options.target, options.target);
+    if (options.app_mode) showAppMode(options.app_mode);
     launchChannel(options.channel, options.model);
     $('directory').value = options.directory; $('model').value = options.model; setEffort(options.effort);
     $('context-window').value = options.context_window; $('compact-limit').value = options.compact_limit; updateContextLabel();
@@ -323,8 +344,8 @@ $('account-list').onchange = event => { if (event.target.dataset.speedId) void a
 $('quick-account').onchange = () => { state.selected = $('quick-account').value; renderAccounts(); };
 async function selectAccount(id) { await action('select', async () => { await api.selectAccount(id); state.selected = id; await refresh(true); renderAccounts(); toast('当前账号已切换；已打开的会话仍使用原账号'); }); }
 $('select-account').onclick = () => selectAccount(state.selected);
-$('launch-target').onchange = updateButtons;
-$('app-mode').onchange = updateButtons;
+$('launch-target').onchange = () => { showTarget($('launch-target').value, $('launch-target').value); updateButtons(); };
+$('app-mode').onchange = () => { showAppMode($('app-mode').value); updateButtons(); };
 $('restore-main-app').onclick = () => action('launch', async () => { const result = await api.restoreMainApp(); if (result.cancelled) return; await refresh(true); toast('已恢复接管前的主应用配置'); if (result.warning) toast(result.warning, 'error'); });
 $('choose-app').onclick = () => action('app-path', async () => { await api.chooseApp(); await refresh(true); });
 $('account-list').onclick = event => {
@@ -342,10 +363,14 @@ $('context-window').oninput = updateContextLabel; $('compact-limit').oninput = u
 $('launch').onclick = () => launch(false); $('resume').onclick = () => launch(true);
 $('history-list').onclick = event => { const button = event.target.closest('[data-history]'); if (button) { const record = state.data.codex.history.find(record => record.id === button.dataset.history); if (record) void launch(button.dataset.resume === 'true', record); } };
 $('save-settings').onclick = () => action('settings', async () => { await api.saveSettings({ proxy_url: $('proxy').value, auto_refresh: $('auto-refresh').checked, usage_probe: $('usage-probe').checked }); toast('连接设置已保存'); });
-$('theme').onchange = () => action('theme', async () => { applyTheme($('theme').value); await api.preferences({ theme: $('theme').value }); });
+$('theme').onchange = () => action('theme', async () => {
+  const choice = showTheme($('theme').value);
+  applyTheme(choice.available ? choice.value : 'system');
+  if (choice.available) await api.preferences({ theme: choice.value });
+});
 $('channel').onchange = () => action('channel', async () => { launchChannel($('channel').value, $('model').value); if ($('channel').dataset.available !== 'false') await api.preferences({ channel: $('channel').value }); renderAccounts(); });
 $('model').onchange = () => { channelModels($('channel').value, $('model'), $('model').value); updateButtons(); };
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme($('theme').value));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme($('theme').dataset.available === 'false' ? 'system' : $('theme').value));
 document.querySelectorAll('[data-link]').forEach(button => { button.onclick = () => action('link', () => api.openLink(button.dataset.link)); });
 $('open-data').onclick = () => action('data', () => api.openData());
 $('copy-install').onclick = () => action('install', async () => { await api.copyInstall(); toast('已复制安装命令，请在终端运行后重启客户端'); });

@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('../lib/policy.cjs');
+const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, appliedTheme, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('../lib/policy.cjs');
 test('renderer cannot change local key, listener, route or fallback', () => {
   assert.deepEqual(cleanSettings({ api_key: 'attacker', listen: '0.0.0.0:1', native_fallback: true, route_policy: 'codex_only', desktop_mode: false, auto_refresh: false, proxy_url: ' http://127.0.0.1:7890 ' }), { auto_refresh: false, proxy_url: 'http://127.0.0.1:7890' });
   assert.throws(() => cleanSettings({ usage_probe: 'false' }));
@@ -83,6 +83,9 @@ test('preference updates cannot clear an explicit channel or smuggle secrets', (
   assert.equal(applied.prefs.api_key, undefined);
   assert.equal(applied.prefs.account_speeds['acc-a'], 'fast');
   assert.equal(applied.theme, 'dark');
+  assert.equal(appliedTheme('dark'), 'dark');
+  assert.equal(appliedTheme(undefined), 'system');
+  assert.equal(appliedTheme('contrast'), 'system');
   assert.deepEqual(cleanPreferences({ account_speed: { id: 'acc-abcdef123', speed: 'fast' } }), { account_speed: { id: 'acc-abcdef123', speed: 'fast' } });
   assert.throws(() => cleanPreferences({ pelican_channel: null }));
   assert.throws(() => cleanPreferences({ pelican_model: 'not a model' }));
