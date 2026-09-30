@@ -20,6 +20,7 @@ test('channel persists in generation, history, retry and legacy defaults', async
  const batch=p.snapshot()[0]; assert.equal(batch.channel,'codex');
  assert.equal(p.artifact(batch.items[0].id).channel,'codex');
  assert.equal(batch.items[0].response_model,null); // never invent a returned model
+ assert.equal(batch.items[0].route,null);
  const recovered=new Pelican(home,async()=>result); assert.equal(recovered.snapshot()[0].channel,'codex');
  recovered.start({...batch,account_ids:accounts.map(a=>a.id)},accounts); await recovered.running;
  assert.equal(recovered.snapshot()[0].channel,'codex');
@@ -80,13 +81,15 @@ test('compare snapshots and saved artifacts cannot carry oauth material', async 
     duration_ms: 5,
     usage: { output_tokens: 3, access_token: 'nested-token' },
     response_model: 'gpt-6-astra',
-    route: 'codex'
+    route: 'bps'
   }));
   t.after(async () => { await p.close(); fs.rmSync(home, { recursive: true, force: true }); });
   await p.listen();
   p.start({ account_ids: ['acc-test1'], model: 'gpt-6-astra', effort: 'high', channel: 'codex', concurrency: 1 }, accounts.slice(0, 1));
   await p.running;
   const realId = p.batches[0].items[0].id;
+  assert.equal(p.snapshot()[0].channel, 'codex');
+  assert.equal(p.snapshot()[0].items[0].route, 'bps');
   assert.equal(typeof p.snapshot()[0].items[0].preview, 'string');
   p.batches[0].access_token = 'raw-token';
   p.batches[0].items[0].personal_access_token = 'pat-value';

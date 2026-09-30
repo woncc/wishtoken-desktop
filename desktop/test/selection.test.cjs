@@ -64,6 +64,11 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.match(pelican, /resolvePelicanDefaults/);
   assert.match(pelican, /pelican_model/);
   assert.doesNotMatch(pelican, /channelModels\(\$\('pelican-channel'\)\.value, \$\('pelican-model'\), \$\('model'\)\.value\)/);
+  assert.doesNotMatch(pelican, /item\.route \|\| b\.channel/);
+  assert.match(pelican, /返回通道/);
+  assert.doesNotMatch(app, /service_tier \|\| 'standard'/);
+  assert.match(app, /service_tier \|\| '未报告'/);
+  assert.match(app, /record\.route \|\| '未报告'/);
 });
 test('a saved pelican model is not replaced by the launch-panel model', () => {
   const saved = resolvePelicanDefaults({ pelican_channel: 'bps', pelican_model: 'gpt-5.6-sol', pelican_effort: 'low' }, { model: 'gpt-6-astra', effort: 'xhigh' });

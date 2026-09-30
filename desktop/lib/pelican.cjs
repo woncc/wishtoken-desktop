@@ -118,7 +118,7 @@ class Pelican {
           if (typeof result.text !== 'string' || Buffer.byteLength(result.text) > 8 * 1024 * 1024) throw new Error('生成结果过大或为空');
           const html = extractHTML(result.text);
           atomicJSON(path.join(this.home, `${item.id}.json`), publicArtifact({ ...result, channel: batch.channel, html }));
-          item.status = 'completed'; item.usage = usageView(result.usage); item.duration_ms = result.duration_ms; item.response_model = typeof result.response_model === 'string' ? result.response_model : null; item.route = typeof result.route === 'string' && result.route ? result.route : batch.channel;
+          item.status = 'completed'; item.usage = usageView(result.usage); item.duration_ms = result.duration_ms; item.response_model = typeof result.response_model === 'string' ? result.response_model : null; item.route = typeof result.route === 'string' && result.route ? result.route : null;
         } catch (error) { item.status = controller.signal.aborted ? 'cancelled' : 'failed'; item.error = safeError(error); }
         finally { item.finished_at = new Date().toISOString(); this.controllers.delete(item.id); this.save(); }
       }
