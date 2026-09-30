@@ -57,12 +57,12 @@ func TestLoadSaveRoundTrip(t *testing.T) {
 }
 
 func TestIsLoopback(t *testing.T) {
-	for _, ok := range []string{"127.0.0.1:1", "localhost:8790", "localhost.:8790", "[::1]:8790", "[::1%lo]:8790", "127.0.0.1", ""} {
+	for _, ok := range []string{"127.0.0.1:1", "localhost:8790", "localhost.:8790", "[::1]:8790", "[::1%lo]:8790", "::1%lo", "127.0.0.1", ""} {
 		if !IsLoopback(ok) {
 			t.Fatalf("%q should be loopback", ok)
 		}
 	}
-	for _, bad := range []string{":8791", "0.0.0.0:8790", "192.168.1.2:80", "example.com:443", "evil.localhost", "evil.localhost:8790", "localhost.example:8790"} {
+	for _, bad := range []string{":8791", "0.0.0.0:8790", "192.168.1.2:80", "example.com:443", "evil.localhost", "evil.localhost:8790", "localhost.example:8790", "localhost%evil", "localhost%evil:8790", "127.0.0.1%lo", "127.0.0.1%lo:8791"} {
 		if IsLoopback(bad) {
 			t.Fatalf("%q should not be loopback", bad)
 		}
@@ -75,7 +75,7 @@ func TestLoopbackPeerAndBoundSocket(t *testing.T) {
 			t.Fatalf("%q should be a loopback peer", ok)
 		}
 	}
-	for _, bad := range []string{"", "localhost:9", "localhost", "203.0.113.9:9", "203.0.113.9", "0.0.0.0:9", "[::]:9", "example.test:80"} {
+	for _, bad := range []string{"", "localhost:9", "localhost", "203.0.113.9:9", "203.0.113.9", "0.0.0.0:9", "[::]:9", "example.test:80", "127.0.0.1%lo:9", "localhost%evil:9"} {
 		if IsLoopbackPeer(bad) {
 			t.Fatalf("%q should not be a loopback peer", bad)
 		}
@@ -173,10 +173,16 @@ func TestRefuseNonLoopbackListen(t *testing.T) {
 	if err := RefuseNonLoopbackListen("203.0.113.10:1"); err == nil || !strings.Contains(err.Error(), "203.0.113.10") {
 		t.Fatalf("public ip: %v", err)
 	}
-	for _, ok := range []string{"127.0.0.1:8791", "[::1]:8791", "[::ffff:127.0.0.1]:8791"} {
+	for _, ok := range []string{"127.0.0.1:8791", "[::1]:8791", "[::1%lo]:8791", "[::ffff:127.0.0.1]:8791"} {
 		if err := RefuseNonLoopbackListen(ok); err != nil {
 			t.Fatalf("%s: %v", ok, err)
 		}
+	}
+	if err := RefuseNonLoopbackListen("localhost%evil:8791"); err == nil {
+		t.Fatal("hostname with a percent sign was treated as loopback")
+	}
+	if err := RefuseNonLoopbackListen("127.0.0.1%lo:8791"); err == nil {
+		t.Fatal("IPv4 zone suffix was treated as loopback")
 	}
 	previous := lookupIP
 	t.Cleanup(func() { lookupIP = previous })
