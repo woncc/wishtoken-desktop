@@ -57,12 +57,12 @@ func TestLoadSaveRoundTrip(t *testing.T) {
 }
 
 func TestIsLoopback(t *testing.T) {
-	for _, ok := range []string{"127.0.0.1:1", "localhost:8790", "[::1]:8790", "127.0.0.1", ""} {
+	for _, ok := range []string{"127.0.0.1:1", "localhost:8790", "localhost.:8790", "[::1]:8790", "[::1%lo]:8790", "127.0.0.1", ""} {
 		if !IsLoopback(ok) {
 			t.Fatalf("%q should be loopback", ok)
 		}
 	}
-	for _, bad := range []string{":8791", "0.0.0.0:8790", "192.168.1.2:80", "example.com:443"} {
+	for _, bad := range []string{":8791", "0.0.0.0:8790", "192.168.1.2:80", "example.com:443", "evil.localhost", "evil.localhost:8790", "localhost.example:8790"} {
 		if IsLoopback(bad) {
 			t.Fatalf("%q should not be loopback", bad)
 		}

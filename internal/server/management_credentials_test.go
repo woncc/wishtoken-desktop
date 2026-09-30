@@ -83,6 +83,64 @@ func TestManagementOmitsOAuthAndRejectsRemote(t *testing.T) {
 	}
 }
 
+func TestReboundLoopbackHostCannotReachManagement(t *testing.T) {
+	cfg := config.Default()
+	cfg.AllowRemote = true
+	cfg.Listen = "0.0.0.0:8791"
+	cfg.APIKey = "synthetic-local-management-key"
+	f := newFixture(t, cfg, testAccount("acct_one", "one@example.test"))
+	token := f.srv.Store.List()[0].AccessToken
+
+	rebound := httptest.NewRequest(http.MethodPost, "/api/shutdown", nil)
+	rebound.RemoteAddr = "127.0.0.1:9"
+	rebound.Host = "rebind.example:8791"
+	rebound.Header.Set("Origin", "http://rebind.example:8791")
+	rebound.Header.Set("Sec-Fetch-Site", "same-origin")
+	reboundRec := httptest.NewRecorder()
+	f.srv.Handler().ServeHTTP(reboundRec, rebound)
+	if reboundRec.Code != http.StatusForbidden || strings.Contains(reboundRec.Body.String(), token) {
+		t.Fatalf("rebound shutdown: %d %s", reboundRec.Code, reboundRec.Body.String())
+	}
+
+	for _, host := range []string{"evil.localhost:8791", "127.0.0.1.rebind.example:8791", "localhost.example:8791"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/accounts", nil)
+		req.RemoteAddr = "[::1]:9"
+		req.Host = host
+		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		got := httptest.NewRecorder()
+		f.srv.Handler().ServeHTTP(got, req)
+		if got.Code != http.StatusForbidden || strings.Contains(got.Body.String(), token) {
+			t.Fatalf("host %q status %d body %s", host, got.Code, got.Body.String())
+		}
+	}
+
+	for _, tc := range []struct{ remote, host string }{
+		{"127.0.0.1:9", "localhost:8791"},
+		{"[::1]:9", "localhost.:8791"},
+		{"[::1%lo]:9", "[::1%lo]:8791"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/accounts", nil)
+		req.RemoteAddr = tc.remote
+		req.Host = tc.host
+		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		got := httptest.NewRecorder()
+		f.srv.Handler().ServeHTTP(got, req)
+		if got.Code != http.StatusOK || strings.Contains(got.Body.String(), token) {
+			t.Fatalf("loopback %s host %s: %d %s", tc.remote, tc.host, got.Code, got.Body.String())
+		}
+	}
+
+	spoof := httptest.NewRequest(http.MethodGet, "/api/accounts", nil)
+	spoof.RemoteAddr = "203.0.113.9:9"
+	spoof.Host = "127.0.0.1:8791"
+	spoof.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	spoofRec := httptest.NewRecorder()
+	f.srv.Handler().ServeHTTP(spoofRec, spoof)
+	if spoofRec.Code != http.StatusForbidden || strings.Contains(spoofRec.Body.String(), token) {
+		t.Fatalf("remote peer with loopback host: %d %s", spoofRec.Code, spoofRec.Body.String())
+	}
+}
+
 func TestRedactKeepsProxyWhenAPIKeyIsSeparate(t *testing.T) {
 	cfg := config.Default()
 	cfg.APIKey = "synthetic-local-management-key"
