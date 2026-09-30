@@ -364,8 +364,12 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 	if email := strings.TrimSpace(acc.Email); scrubDisplay(email) != email {
 		acc.Email = ""
 	}
+	if plan := strings.TrimSpace(acc.PlanType); scrubDisplay(plan) != plan {
+		acc.PlanType = ""
+	}
 	acc.FillFromTokens()
 	acc.Email = scrubDisplay(acc.Email)
+	acc.PlanType = scrubDisplay(acc.PlanType)
 	if acc.AccountID == "" && acc.RefreshToken == "" {
 		res.Warnings = append(res.Warnings, fmt.Sprintf("%s: no account id and no refresh token; the access token alone cannot be renewed", acc.Label()))
 	}
