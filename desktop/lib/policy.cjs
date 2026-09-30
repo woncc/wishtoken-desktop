@@ -37,6 +37,10 @@ function cleanLaunch(input) {
   if (!['standard', 'fast'].includes(speed)) throw new Error('请选择标准或快速模式');
   if (channel === 'bps' && speed !== 'standard') throw new Error('BPS 暂不支持快速模式，请选择标准速度或原生通道');
   const out = { account_id: input.account_id, directory: target === 'app' ? '' : input.directory, model: input.model, effort: input.effort, resume: target === 'cli' && input.resume === true, target, channel, speed };
+  if (target === 'app') {
+    out.app_mode = input.app_mode ?? 'main';
+    if (!['main', 'isolated'].includes(out.app_mode)) throw new Error('请选择主应用或独立实例');
+  }
   for (const k of ['context_window', 'compact_limit']) {
     if (input[k] != null) {
       if (!Number.isSafeInteger(input[k])) throw new Error('上下文设置必须为整数');

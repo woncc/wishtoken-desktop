@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('bridge', Object.freeze({
   usage: id => invoke('usage', id),
   account: data => invoke('account', data),
   launch: data => invoke('launch', data),
+  restoreMainApp: () => invoke('restoreMainApp'),
   selectAccount: id => invoke('selectAccount', id),
   chooseApp: () => invoke('chooseApp'),
   pelicanHistory: () => invoke('pelicanHistory'),

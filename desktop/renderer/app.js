@@ -41,6 +41,10 @@ function updateButtons() {
   $('launch').innerHTML = state.busy.has('launch') ? '正在启动…' : `切换并启动 ${appMode ? 'App' : 'CLI'}${icon('arrow')}`;
   $('resume').hidden = appMode; $('directory-field').hidden = appMode; $('app-directory-note').hidden = !appMode;
   $('choose-app').hidden = !appMode;
+  $('app-mode-field').hidden = !appMode;
+  $('app-directory-note').textContent = $('app-mode').value === 'main' ? '默认切换主 Codex App，沿用原有项目和已保存会话。重启前请保存正在运行的任务。' : '独立实例使用单独工作空间，不显示主应用项目与会话。';
+  $('restore-main-app').disabled = !state.data?.codex.main_app?.active || state.busy.has('launch');
+  $('main-app-home').textContent = state.data?.codex.main_app?.home || '—';
   $('select-account').disabled = !account || account.disabled || state.busy.has('select') || !state.connected;
   if (state.data) {
     const ready = appMode ? state.data.codex.app?.installed : state.data.codex.installed;
@@ -125,7 +129,7 @@ function renderHistory() {
     const account = accountByID(record.account_id);
     const disabled = !account || account.disabled ? 'disabled' : '';
     const basename = record.target === 'app' ? 'Codex App' : record.directory.split(/[\\/]/).filter(Boolean).at(-1) || record.directory;
-    return `<article class="history-row"><span class="icon-box">${icon('folder')}</span><div class="history-info"><strong>${esc(basename)}</strong><p title="${esc(record.directory)}">${record.target === 'app' ? '账号独立图形客户端' : esc(record.directory)}</p><div class="history-meta"><span>${esc(account ? label(account) : '账号已移除')}</span><span>${channelLabel(record.channel)} · ${esc(record.model)} · ${esc(record.effort)}</span><span>${date(record.last_used)}</span></div></div><div class="history-actions"><button class="secondary" data-history="${esc(record.id)}" data-resume="false" ${disabled}>${record.target === 'app' ? '打开 App' : '新会话'}</button>${record.target === 'app' ? '' : `<button class="primary" data-history="${esc(record.id)}" data-resume="true" ${disabled}>继续会话${icon('arrow')}</button>`}</div></article>`;
+    return `<article class="history-row"><span class="icon-box">${icon('folder')}</span><div class="history-info"><strong>${esc(basename)}</strong><p title="${esc(record.directory)}">${record.target === 'app' ? record.app_mode === 'main' ? '主应用 · 原有项目与会话' : '独立实例 · 单独工作空间' : esc(record.directory)}</p><div class="history-meta"><span>${esc(account ? label(account) : '账号已移除')}</span><span>${channelLabel(record.channel)} · ${esc(record.model)} · ${esc(record.effort)}</span><span>${date(record.last_used)}</span></div></div><div class="history-actions"><button class="secondary" data-history="${esc(record.id)}" data-resume="false" ${disabled}>${record.target === 'app' ? '打开 App' : '新会话'}</button>${record.target === 'app' ? '' : `<button class="primary" data-history="${esc(record.id)}" data-resume="true" ${disabled}>继续会话${icon('arrow')}</button>`}</div></article>`;
   }).join('') : empty('还没有最近项目', '选择账号和项目目录，首次启动后会保存在这里。');
 }
 const channelLabel = channel => channel === 'codex' ? '原生 Codex' : 'BPS';
@@ -154,6 +158,7 @@ function applyInitial(data) {
   const preferences = data.preferences;
   state.selected = data.codex.active_account_id || accountByID(preferences.account_id)?.id || data.accounts.find(account => !account.disabled)?.id || '';
   $('launch-target').value = preferences.target || (data.codex.app?.installed ? 'app' : 'cli');
+  $('app-mode').value = preferences.app_mode || 'main';
   $('compact-view').checked = preferences.compact_view === true;
   launchChannel(preferences.channel || 'bps', preferences.model || data.codex.model);
   setEffort(preferences.effort || data.codex.effort || 'xhigh');
@@ -244,18 +249,20 @@ function editDialog(id) {
     $('confirm-remove').onclick = () => action('edit', async () => { await api.account({ id, action: 'delete' }); closeModal(); state.usageErrors.delete(id); await refresh(true); toast('账号已移除'); });
   };
 }
-function launchOptions() { return { account_id: state.selected, channel: $('channel').value, speed: $('speed').value, directory: $('directory').value.trim(), target: $('launch-target').value, model: $('model').value, effort: state.effort, context_window: Number($('context-window').value), compact_limit: Number($('compact-limit').value) }; }
+function launchOptions() { return { account_id: state.selected, app_mode: $('app-mode').value, channel: $('channel').value, speed: $('speed').value, directory: $('directory').value.trim(), target: $('launch-target').value, model: $('model').value, effort: state.effort, context_window: Number($('context-window').value), compact_limit: Number($('compact-limit').value) }; }
 async function launch(resume = false, record) {
   await action('launch', async () => {
-    const options = record ? { account_id: record.account_id, channel: record.channel || 'bps', speed:record.speed || 'standard', directory: record.directory, target: record.target || 'cli', model: record.model, effort: record.effort, context_window: record.context_window, compact_limit: record.compact_limit, resume } : { ...launchOptions(), resume };
+    const options = record ? { account_id: record.account_id, app_mode: record.app_mode || 'isolated', channel: record.channel || 'bps', speed:record.speed || 'standard', directory: record.directory, target: record.target || 'cli', model: record.model, effort: record.effort, context_window: record.context_window, compact_limit: record.compact_limit, resume } : { ...launchOptions(), resume };
     const result = await api.launch(options);
+    if (result.cancelled) return;
     state.selected = options.account_id;
     $('launch-target').value = options.target;
+    $('app-mode').value = options.app_mode || 'main';
     launchChannel(options.channel, options.model);
     $('directory').value = options.directory; $('model').value = options.model; setEffort(options.effort);
     $('context-window').value = options.context_window; $('compact-limit').value = options.compact_limit; updateContextLabel();
     await refresh(true); renderAccounts();
-    toast(options.target === 'app' ? '已为该子号打开独立 Codex App' : resume ? '已打开终端，继续该项目上次的 Codex 会话' : '已切换账号并打开 Codex 终端');
+    toast(options.target === 'app' ? result.app_mode === 'main' ? '已切换主 Codex App，可继续原有项目和会话' : '已为该子号打开独立 Codex App' : resume ? '已打开终端，继续该项目上次的 Codex 会话' : '已切换账号并打开 Codex 终端');
     if (result.warning) toast(result.warning, 'error');
   });
 }
@@ -288,6 +295,8 @@ $('quick-account').onchange = () => { state.selected = $('quick-account').value;
 async function selectAccount(id) { await action('select', async () => { await api.selectAccount(id); state.selected = id; await refresh(true); renderAccounts(); toast('当前账号已切换；已打开的会话仍使用原账号'); }); }
 $('select-account').onclick = () => selectAccount(state.selected);
 $('launch-target').onchange = updateButtons;
+$('app-mode').onchange = updateButtons;
+$('restore-main-app').onclick = () => action('launch', async () => { const result = await api.restoreMainApp(); if (result.cancelled) return; await refresh(true); toast('已恢复接管前的主应用配置'); if (result.warning) toast(result.warning, 'error'); });
 $('choose-app').onclick = () => action('app-path', async () => { await api.chooseApp(); await refresh(true); });
 $('account-list').onclick = event => {
   if (event.target.closest('[data-speed-id]')) return;

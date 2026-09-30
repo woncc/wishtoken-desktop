@@ -103,6 +103,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/", s.adminAuth(s.handleAdmin))
 	mux.HandleFunc("/cockpit/", s.handleCockpit)
 	mux.HandleFunc("/cockpit-auth/", s.handleCockpitIdentity)
+	mux.HandleFunc("/desktop-api/", s.handleDesktopAPI)
 	mux.HandleFunc("/", s.handleUI)
 	return s.hostGuard(mux)
 }

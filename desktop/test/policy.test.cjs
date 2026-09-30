@@ -19,6 +19,9 @@ test('launch cannot select arbitrary homes or prepare-only from renderer', () =>
   assert.throws(() => cleanLaunch({ ...request, channel: 'automatic' }));
   assert.equal(result.home, undefined);
   assert.equal(result.prepare_only, undefined);
+  assert.equal(cleanLaunch({ ...request, target: 'app', directory: '' }).app_mode, 'main');
+  assert.equal(cleanLaunch({ ...request, target: 'app', app_mode: 'isolated' }).app_mode, 'isolated');
+  assert.throws(() => cleanLaunch({ ...request, target: 'app', app_mode: '../../' }));
   assert.throws(() => cleanLaunch({ ...request, effort: 'max' }));
   assert.throws(() => cleanLaunch({ ...request, directory: '' }));
   assert.throws(() => cleanLaunch({ ...request, compact_limit: NaN }));

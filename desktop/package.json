@@ -1,8 +1,8 @@
 {
   "name": "wishtoken-desktop",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
-  "description": "WishToken companion for local Codex accounts, explicit channels and isolated workspaces",
+  "description": "WishToken companion for local Codex accounts, explicit channels and existing workspaces",
   "main": "main.cjs",
   "author": "WishToken Desktop contributors",
   "license": "MIT",

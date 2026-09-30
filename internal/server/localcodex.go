@@ -35,6 +35,7 @@ type launchRecord struct {
 	Target        string    `json:"target,omitempty"`
 	Channel       string    `json:"channel,omitempty"`
 	Speed         string    `json:"speed,omitempty"`
+	AppMode       string    `json:"app_mode,omitempty"`
 }
 
 func launchHistory() []launchRecord {
@@ -106,6 +107,7 @@ func (s *Server) adminLocalCodex(w http.ResponseWriter, r *http.Request) {
 		Target        string `json:"target"`
 		Channel       string `json:"channel"`
 		Speed         string `json:"speed"`
+		AppMode       string `json:"app_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, r, 400, "invalid_json", "invalid_request_error", "invalid launch request")
@@ -159,6 +161,15 @@ func (s *Server) adminLocalCodex(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, 400, "invalid_target", "invalid_request_error", "App 由桌面客户端启动")
 		return
 	}
+	if req.Target == "app" {
+		if req.AppMode == "" {
+			req.AppMode = "main"
+		}
+		if req.AppMode != "main" && req.AppMode != "isolated" {
+			writeError(w, r, 400, "invalid_app_mode", "invalid_request_error", "App 工作空间无效")
+			return
+		}
+	}
 	if req.Target == "cli" && strings.TrimSpace(req.Directory) == "" {
 		writeError(w, r, 400, "directory_required", "invalid_request_error", "请先选择项目目录")
 		return
@@ -176,6 +187,9 @@ func (s *Server) adminLocalCodex(w http.ResponseWriter, r *http.Request) {
 	identityDir := filepath.Clean(dir)
 	if req.Target == "app" {
 		identityDir = "desktop-app"
+		if req.AppMode == "main" {
+			identityDir += "-main"
+		}
 	}
 	if runtime.GOOS == "windows" {
 		identityDir = strings.ToLower(identityDir)
@@ -227,6 +241,7 @@ func (s *Server) adminLocalCodex(w http.ResponseWriter, r *http.Request) {
 	rec := launchRecord{ID: instanceID, AccountID: o.AccountID, Directory: dir, Home: o.Home, Model: o.Model, Effort: o.Effort, ContextWindow: o.ContextWindow, CompactLimit: o.CompactLimit, LastUsed: time.Now().UTC(), PID: pid, Target: req.Target}
 	rec.Channel = channel
 	rec.Speed = o.Speed
+	rec.AppMode = req.AppMode
 	warning := ""
 	if err := saveLaunch(rec); err != nil {
 		warning = "无法保存最近启动记录：" + err.Error()

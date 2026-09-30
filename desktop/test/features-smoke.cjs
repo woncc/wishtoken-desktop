@@ -7,9 +7,12 @@ const net = require('node:net');
 const root = path.resolve(__dirname, '../..');
 (async()=>{
  const home=await fs.mkdtemp(path.join(os.tmpdir(),'gptbridge-feature-ui-'));
+ const primary=path.join(home,'main-codex-fixture');await fs.mkdir(primary);
+ const originalConfig='model_provider = "existing"\n[projects."/fixture/project"]\ntrust_level = "trusted"\n[model_providers.existing]\nname = "Fixture"\nbase_url = "https://example.test/v1"\n';
+ await fs.writeFile(path.join(primary,'config.toml'),originalConfig);await fs.writeFile(path.join(primary,'fixture-session.jsonl'),'saved conversation fixture');
  const socket=net.createServer(); await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
  await fs.writeFile(path.join(home,'config.json'),JSON.stringify({listen:`127.0.0.1:${port}`,api_key:'feature-ui-test-key',auto_refresh:false,usage_probe:false}));
- const client=await electron.launch({executablePath:process.env.GPTBRIDGE_TEST_APP || require('electron'),args:process.env.GPTBRIDGE_TEST_APP ? [] : [path.join(root,'desktop')],env:{...process.env,GPTBRIDGE_DESKTOP_HOME:home}});
+ const client=await electron.launch({executablePath:process.env.GPTBRIDGE_TEST_APP || require('electron'),args:process.env.GPTBRIDGE_TEST_APP ? [] : [path.join(root,'desktop')],env:{...process.env,GPTBRIDGE_DESKTOP_HOME:home,GPTBRIDGE_MAIN_CODEX_HOME:primary}});
  await fs.mkdir(path.join(root,'build/validation'),{recursive:true});const errors=[];
  try {
   const page=await client.firstWindow();page.on('pageerror',e=>errors.push(e.message));
@@ -19,7 +22,7 @@ const root = path.resolve(__dirname, '../..');
   await expect(page.locator('#model option')).toHaveCount(5);
   await page.locator('#model').selectOption('gpt-5.6-terra');
   await expect.poll(async()=> (await page.evaluate(()=>window.bridge.snapshot())).preferences.channel).toBe('codex');
-  const imported=await page.evaluate(()=>window.bridge.importText(JSON.stringify([1,2,3].map(n=>({access_token:'fake-local-only-'+n,account_id:'test-team',email:`member${n}@example.test`,name:`Team 子号 ${n}`})))));
+  const imported=await page.evaluate(()=>window.bridge.importText(JSON.stringify([1,2,3].map(n=>({access_token:[btoa(JSON.stringify({alg:'none'})),btoa(JSON.stringify({exp:4102444800,email:'member'+n+'@example.test',sub:'fixture-'+n})),btoa('synthetic-signature')].join('.'),account_id:'test-team',email:`member${n}@example.test`,name:`Team 子号 ${n}`})))));
   await page.evaluate(()=>refresh());
   await expect(page.locator('.account-card')).toHaveCount(3);
   await page.locator(`#quick-account`).selectOption(imported.ids[1]);await page.locator('#select-account').click();
@@ -36,6 +39,40 @@ const root = path.resolve(__dirname, '../..');
   await page.locator('#launch-target').selectOption('cli');await page.locator('#directory').fill('');await page.locator('#launch-target').selectOption('app');
   await expect(page.locator('#directory-field')).toBeHidden(); if(snapshot.codex.app.installed) await expect(page.locator('#launch')).toBeEnabled();
   await page.locator('#launch-target').selectOption('cli');await expect(page.locator('#directory-field')).toBeVisible();await expect(page.locator('#launch')).toBeDisabled();
+  // Keep production IPC, profile merging and the real bridge, but never close
+  // or launch the developer's official Codex application during a smoke test.
+  await client.evaluate(({app,dialog})=>{
+   const require=process.mainModule.require.bind(process.mainModule), runtime=require(require('node:path').join(app.getAppPath(),'lib/codex-app.cjs'));
+   globalThis.launchCalls=[];globalThis.mockRunning=false;globalThis.mockCancel=false;globalThis.mockFailure=false;
+   runtime.discoverApp=async()=>({installed:true,binary:'synthetic-codex-app'});
+   runtime.mainProcesses=async()=>globalThis.mockRunning?[{pid:123}]:[];
+   runtime.closeMainProcesses=async()=>{};
+   runtime.launchApp=async(binary,home,key,config,mode)=>{ if(globalThis.mockFailure)throw new Error('synthetic launch failure');globalThis.launchCalls.push({home,mode});return {pid:123,app_mode:mode}; };
+   dialog.showMessageBox=async()=>({response:globalThis.mockCancel?0:1});
+  });
+  await page.locator('#launch-target').selectOption('app');await expect(page.locator('#app-mode')).toHaveValue('main');
+  const opts=await page.evaluate(()=>launchOptions());
+  const switched=await page.evaluate(o=>window.bridge.launch(o),opts);
+  if(switched.home!==primary || switched.app_mode!=='main')throw new Error('Did not project into main home');
+  const merged=await fs.readFile(path.join(primary,'config.toml'),'utf8');
+  if(!merged.includes('model_provider = "existing"')||!merged.includes('[projects."/fixture/project"]'))throw new Error('Original provider/project lost');
+  if(await fs.readFile(path.join(primary,'fixture-session.jsonl'),'utf8')!=='saved conversation fixture')throw new Error('Original session changed');
+  await client.evaluate(()=>{globalThis.mockRunning=true;globalThis.mockCancel=true;});
+  const cancelled=await page.evaluate(o=>window.bridge.launch(o),{...opts,account_id:imported.ids[0]});
+  if(!cancelled.cancelled || await fs.readFile(path.join(primary,'config.toml'),'utf8')!==merged)throw new Error('Cancel changed main profile');
+  await client.evaluate(()=>{globalThis.mockRunning=false;globalThis.mockCancel=false;globalThis.mockFailure=true;});
+  const failed=await page.evaluate(async o=>{try{await window.bridge.launch(o);return false;}catch{return true;}},{...opts,account_id:imported.ids[0]});
+  if(!failed || await fs.readFile(path.join(primary,'config.toml'),'utf8')!==merged)throw new Error('Launch failure did not roll back');
+  await client.evaluate(()=>{globalThis.mockFailure=false;});
+  const isolated=await page.evaluate(o=>window.bridge.launch(o),{...opts,app_mode:'isolated'});
+  if(isolated.home===primary || isolated.app_mode!=='isolated')throw new Error('Explicit isolation failed');
+  await page.evaluate(()=>window.bridge.restoreMainApp());
+  if(await fs.readFile(path.join(primary,'config.toml'),'utf8')!==originalConfig)throw new Error('Original configuration not restored');
+  await page.evaluate(()=>refresh());
+  await page.locator('#app-mode').selectOption('main');await page.locator('#launch').click();
+  await expect.poll(async()=>(await page.evaluate(()=>window.bridge.snapshot())).codex.main_app.active).toBe(true);
+  await expect.poll(async()=>(await client.evaluate(()=>globalThis.launchCalls)).at(-1).home).toBe(primary);
+  await page.evaluate(()=>window.bridge.restoreMainApp());await page.evaluate(()=>refresh());
   // Substitute only upstream generation; renderer, IPC, queue, preview and
   // account switch still use production code and the real sidecar.
   await client.evaluate(({app}, root)=>{
@@ -73,7 +110,7 @@ const root = path.resolve(__dirname, '../..');
   const launchBox=await page.locator('#launch').boundingBox();if(launchBox.y+launchBox.height>900)throw new Error('Primary launch action is below the initial viewport');
   await fs.mkdir(path.join(root,'build/validation'),{recursive:true});await page.screenshot({path:path.join(root,'build/validation/accounts.png'),fullPage:true});
   if(errors.length) throw new Error(errors.join('\n'));
-  console.log(JSON.stringify({ok:true,accounts:3,appWithoutDirectory:true,persistedSwitch:true,previews:3,previewScripts:true,networkBlocked:true,preloadIsolated:true,cancelled:true,rendererErrors:0}));
+  console.log(JSON.stringify({ok:true,accounts:3,appWithoutDirectory:true,persistedSwitch:true,mainAppSwitch:true,originalProjectAndSessionPreserved:true,restartCancelled:true,failedLaunchRolledBack:true,originalConfigRestored:true,explicitIsolation:true,previews:3,previewScripts:true,networkBlocked:true,preloadIsolated:true,cancelled:true,rendererErrors:0}));
  } finally {
   const config=JSON.parse(await fs.readFile(path.join(home,'config.json'),'utf8'));
   const {BridgeService}=require('../lib/service.cjs'); const service=new BridgeService({home,binary:''});service.config=config;await service.stop();

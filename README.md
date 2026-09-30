@@ -2,7 +2,9 @@
 
 [English](README.en.md) · [下载客户端](https://github.com/xxx-holic/wishtoken-desktop/releases) · [WishToken 官网](https://wishtoken.team/?utm_source=github&utm_medium=readme) · [公告与邀请码](https://github.com/xxx-holic/wishtoken-desktop/discussions/categories/announcements)
 
-WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子号 JSON，查看额度、切换账号，并启动该账号的独立 Codex App 或 CLI。Windows 与 macOS 使用同一套界面和本地服务。
+WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子号 JSON，查看额度、切换主 Codex App 账号，继续原有项目和已保存会话。也支持独立实例和 CLI。Windows 与 macOS 使用同一套界面和本地服务。
+
+**[加入 Telegram 官方群](https://t.me/shouhouqun) · [开源赠送 10 个邀请码（2026-09-30）](https://github.com/xxx-holic/wishtoken-desktop/discussions/6)**
 
 **账号留在本机。通道由你选择。请求结果可以核对。**
 
@@ -14,7 +16,7 @@ WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子
 
 - 多账号导入：支持 Sub2API 导出、Codex auth JSON 及兼容的账号 JSON；搜索、备注、排序、额度进度和重置时间。
 - 选择 BPS 或原生 Codex 通道，默认 BPS；会话固定账号与通道，失败不会静默改用另一通道。
-- 一键切换并启动：Codex App 不要求项目目录；CLI 按账号和项目隔离，支持继续上次会话。
+- 一键切换并启动：默认切换主 Codex App，沿用原有项目、会话和应用数据；无需项目目录。首次接管备份配置，设置中可恢复；独立实例可手动选择。CLI 按账号和项目隔离。
 - 原生通道可保存每个账号的标准／快速偏好。运行记录分别展示请求与上游返回的服务等级；请求快速不等于上游已分配快速。
 - 鹈鹕作品对比：同提示词、模型和推理档位的多账号批测，支持取消、重试、历史、隔离预览及导出。
 - 本地管理 API 鉴权、固定回环监听、受限 IPC、外部链接白名单、模型 HTML 预览隔离。
@@ -40,7 +42,7 @@ WishToken 的开源 Codex 桌面配套工具。导入你有权使用的 Team 子
 
 ## WishToken 与邀请码
 
-这是 [wishtoken.team](https://wishtoken.team/?utm_source=github&utm_medium=readme) 的专属开源配套客户端。站点服务、使用入口和支持信息见官网。邀请码不定期发放，以 [项目公告](https://github.com/xxx-holic/wishtoken-desktop/discussions/categories/announcements) 与官网为准；目前仓库不包含有效邀请码，也不承诺发放日期。
+这是 [wishtoken.team](https://wishtoken.team/?utm_source=github&utm_medium=readme) 的专属开源配套客户端。[Telegram 官方群](https://t.me/shouhouqun) 用于交流与反馈。首批 [10 个赠送邀请码](https://github.com/xxx-holic/wishtoken-desktop/discussions/6) 已于 2026-09-30 发布，领取状态及使用规则以站点为准。后续不定期发放，以 [项目公告](https://github.com/xxx-holic/wishtoken-desktop/discussions/categories/announcements) 和官网为准。
 
 客户端包含官网、邀请码公告、下载更新和 GitHub 入口。它不要求登录 WishToken 才能管理本地账号，不会自动把导入凭据发送给 WishToken。
 

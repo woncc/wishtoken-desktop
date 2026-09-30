@@ -8,11 +8,14 @@ const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
 const { requireID, cleanLaunch, cleanSettings, cleanChannel, safeError } = require('./lib/policy.cjs');
-const { discoverApp, appExecutable, launchApp } = require('./lib/codex-app.cjs');
+const appRuntime = require('./lib/codex-app.cjs');
+const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
 const { externalLink } = require('./lib/links.cjs');
 
 const dataHome = process.env.GPTBRIDGE_DESKTOP_HOME || path.join(os.homedir(), '.gptbridge-desktop');
+const primaryHome = mainProfile.mainHome();
+let switchingApp = false;
 app.setPath('userData', path.join(dataHome, 'shell'));
 app.setAppUserModelId('app.gptbridge.team');
 const lock = app.requestSingleInstanceLock();
@@ -62,11 +65,15 @@ async function importPaths(paths) {
   return result;
 }
 function validSender(event) { return event.sender === window?.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame?.url === page; }
+async function confirmMainRestart(restore) {
+  const result = await dialog.showMessageBox(window, { type: 'question', title: restore ? '恢复主应用配置' : '切换主 Codex App', message: restore ? '恢复首次接管前的配置并重新打开 Codex？' : '切换账号需要重启主 Codex App', detail: '请先保存正在运行的任务，重启会中断进行中的请求。原有项目、已保存的会话和应用数据目录会继续保留。' + (restore ? '' : '\n首次切换会备份原配置，可在设置中恢复。'), buttons: ['取消', restore ? '恢复并打开' : '切换并重启'], defaultId: 0, cancelId: 0 });
+  return result.response === 1;
+}
 async function handle(method, input) {
   switch (method) {
     case 'snapshot': {
       const [status, accounts, codex, models, settings] = await Promise.all(['/api/status', '/api/accounts', '/api/codex/launch', '/api/models', '/api/settings'].map(route => service.request(route)));
-      return { status, accounts: accounts.accounts, codex: { ...codex, app: codexApp }, models, settings: { proxy_url: settings.proxy_url, auto_refresh: settings.auto_refresh, usage_probe: settings.usage_probe }, preferences: prefs, platform: process.platform, version: app.getVersion() };
+      return { status, accounts: accounts.accounts, codex: { ...codex, app: codexApp, main_app: mainProfile.status(dataHome, primaryHome) }, models, settings: { proxy_url: settings.proxy_url, auto_refresh: settings.auto_refresh, usage_probe: settings.usage_probe }, preferences: prefs, platform: process.platform, version: app.getVersion() };
     }
     case 'importFiles': {
       const result = await dialog.showOpenDialog(window, { title: '导入 Team 子号 JSON', properties: ['openFile', 'multiSelections'], filters: [{ name: '账号 JSON', extensions: ['json'] }] });
@@ -97,13 +104,55 @@ async function handle(method, input) {
       throw new Error('未知账号操作');
     }
     case 'launch': {
+      if (switchingApp) throw new Error('正在切换 Codex，请等待完成');
       const options = cleanLaunch(input);
-      if (options.target === 'app') { codexApp = await discoverApp(prefs.app_path); if (!codexApp.installed) throw new Error(codexApp.error); }
-      const result = await service.request('/api/codex/launch', 'POST', { ...options, prepare_only: options.target === 'app' }, 25000);
-      if (options.channel === 'codex') prefs.account_speeds = { ...prefs.account_speeds, [options.account_id]: options.speed };
-      if (options.target === 'app') Object.assign(result, await launchApp(codexApp.binary, result.home, service.config.api_key));
-      prefs = { ...prefs, directory: options.target === 'cli' ? options.directory : prefs.directory, target: options.target, channel: options.channel, account_id: options.account_id, model: options.model, effort: options.effort, context_window: options.context_window, compact_limit: options.compact_limit }; savePrefs();
-      return result;
+      switchingApp = true;
+      try {
+        let processes = [];
+        if (options.target === 'app') {
+          codexApp = await appRuntime.discoverApp(prefs.app_path);
+          if (!codexApp.installed) throw new Error(codexApp.error);
+          if (options.app_mode === 'main') {
+            processes = await appRuntime.mainProcesses(codexApp.binary);
+            if (processes.length && !(await confirmMainRestart(false))) return { cancelled: true };
+          }
+        }
+        const result = await service.request('/api/codex/launch', 'POST', { ...options, prepare_only: options.target === 'app' }, 25000);
+        if (options.target === 'app' && options.app_mode === 'main') {
+          const input = { dataHome, home: primaryHome, profileHome: result.home, key: service.config.api_key, accountID: options.account_id, channel: options.channel };
+          mainProfile.prepare(input); // Validate before closing the existing application.
+          await appRuntime.closeMainProcesses(codexApp.binary, processes);
+          const projection = mainProfile.apply(mainProfile.prepare(input));
+          try {
+            Object.assign(result, await appRuntime.launchApp(codexApp.binary, primaryHome, service.config.api_key, path.join(dataHome, 'config.json'), 'main'));
+          } catch (error) {
+            projection.rollback();
+            throw new Error('启动失败，已恢复切换前配置：' + safeError(error));
+          }
+          Object.assign(result, { home: primaryHome, backup: projection.backup });
+        } else if (options.target === 'app') {
+          Object.assign(result, await appRuntime.launchApp(codexApp.binary, result.home, service.config.api_key, path.join(dataHome, 'config.json'), 'isolated'));
+        }
+        if (options.channel === 'codex') prefs.account_speeds = { ...prefs.account_speeds, [options.account_id]: options.speed };
+        prefs = { ...prefs, directory: options.target === 'cli' ? options.directory : prefs.directory, target: options.target, app_mode: options.app_mode || prefs.app_mode, channel: options.channel, account_id: options.account_id, model: options.model, effort: options.effort, context_window: options.context_window, compact_limit: options.compact_limit }; savePrefs();
+        return result;
+      } finally { switchingApp = false; }
+    }
+    case 'restoreMainApp': {
+      if (switchingApp) throw new Error('正在切换 Codex，请等待完成');
+      switchingApp = true;
+      try {
+        mainProfile.checkRestore(dataHome, primaryHome);
+        codexApp = await appRuntime.discoverApp(prefs.app_path);
+        if (!codexApp.installed) throw new Error(codexApp.error);
+        const processes = await appRuntime.mainProcesses(codexApp.binary);
+        if (!(await confirmMainRestart(true))) return { cancelled: true };
+        await appRuntime.closeMainProcesses(codexApp.binary, processes);
+        const result = mainProfile.restore(dataHome, primaryHome);
+        try { await appRuntime.launchApp(codexApp.binary, primaryHome, service.config.api_key, path.join(dataHome, 'config.json'), 'main'); }
+        catch (error) { result.warning = '原配置已恢复，请手动打开 Codex App：' + safeError(error); }
+        return result;
+      } finally { switchingApp = false; }
     }
     case 'selectAccount': {
       const account_id = requireID(input);
@@ -113,8 +162,8 @@ async function handle(method, input) {
     case 'chooseApp': {
       const result = await dialog.showOpenDialog(window, { title: '选择官方 Codex App', properties: ['openFile'], filters: [{ name: 'Codex App', extensions: process.platform === 'darwin' ? ['app'] : ['exe'] }] });
       if (result.canceled) return null;
-      const binary = appExecutable(result.filePaths[0]); if (!binary) throw new Error('请选择 Codex/ChatGPT 应用，或其完整安装目录内的图形主程序');
-      prefs.app_path = binary; savePrefs(); codexApp = await discoverApp(binary); return codexApp;
+      const binary = appRuntime.appExecutable(result.filePaths[0]); if (!binary) throw new Error('请选择 Codex/ChatGPT 应用，或其完整安装目录内的图形主程序');
+      prefs.app_path = binary; savePrefs(); codexApp = await appRuntime.discoverApp(binary); return codexApp;
     }
     case 'pelicanHistory': return { batches: pelican.snapshot(), default_prompt: DEFAULT_PROMPT };
     case 'pelicanStart': {
@@ -167,7 +216,7 @@ if (lock) {
     setupPath();
     await fsp.mkdir(dataHome, { recursive: true, mode: 0o700 });
     readPrefs();
-    codexApp = await discoverApp(prefs.app_path);
+    codexApp = await appRuntime.discoverApp(prefs.app_path);
     nativeTheme.themeSource = prefs.theme || 'system';
     const platformFolder = process.platform === 'win32' ? 'win' : 'mac';
     const executable = process.platform === 'win32' ? 'gptbridge.exe' : 'gptbridge';

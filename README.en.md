@@ -2,7 +2,9 @@
 
 [中文](README.md) · [Downloads](https://github.com/xxx-holic/wishtoken-desktop/releases) · [WishToken](https://wishtoken.team/?utm_source=github&utm_medium=readme)
 
-An open-source desktop companion for WishToken and Codex. Import authorized Team account JSON, inspect quotas, switch accounts and launch isolated Codex App or CLI workspaces on Windows and macOS.
+An open-source desktop companion for WishToken and Codex. Import authorized Team account JSON, inspect quotas, switch the main Codex App account and continue existing projects and saved conversations on Windows and macOS. Separate App instances and isolated CLI workspaces remain available. Main App switching backs up the original configuration and offers restoration in Settings.
+
+**[Official Telegram community](https://t.me/shouhouqun) · [10 invitation codes released September 30, 2026](https://github.com/xxx-holic/wishtoken-desktop/discussions/6)**
 
 Select BPS or native Codex explicitly (BPS by default). Sessions remain pinned to their account and channel. Native speed preferences are recorded separately from the service tier actually reported upstream. Visual pelican comparisons support batch runs, isolated HTML previews and saved results; they are not intelligence scores or proof of the upstream model identity.
 
