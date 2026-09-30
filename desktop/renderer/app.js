@@ -1,7 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const api = window.bridge;
-const state = { data: null, selected: '', page: 'accounts', effort: 'xhigh', loading: false, initialized: false, connected: false, usageErrors: new Map(), busy: new Set(), accountSignature: '' };
+const state = { data: null, selected: '', page: 'accounts', effort: 'xhigh', effortAvailable: true, loading: false, initialized: false, connected: false, usageErrors: new Map(), busy: new Set(), accountSignature: '' };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const accountByID = id => state.data?.accounts.find(account => account.id === id);
@@ -35,7 +35,8 @@ function updateButtons() {
   }
   const account = accountByID(state.selected);
   const appMode = $('launch-target').value === 'app';
-  const unavailable = !state.connected || !account || account.disabled || (account.expired && !account.has_refresh_token) || !(appMode ? state.data?.codex.app?.installed : state.data?.codex.installed) || (!appMode && !($('directory').value.trim())) || state.busy.has('launch');
+  const selectionReady = $('channel').dataset.available !== 'false' && $('model').dataset.available !== 'false' && state.effortAvailable !== false && Boolean($('model').value);
+  const unavailable = !selectionReady || !state.connected || !account || account.disabled || (account.expired && !account.has_refresh_token) || !(appMode ? state.data?.codex.app?.installed : state.data?.codex.installed) || (!appMode && !($('directory').value.trim())) || state.busy.has('launch');
   $('launch').disabled = unavailable;
   $('resume').disabled = unavailable || !state.data?.codex.history.some(item => item.account_id === state.selected && sameDir(item.directory, $('directory').value));
   $('launch').innerHTML = state.busy.has('launch') ? '正在启动…' : `切换并启动 ${appMode ? 'App' : 'CLI'}${icon('arrow')}`;
@@ -107,7 +108,7 @@ function renderAccounts() {
       <div class="quotas">${quotaHTML(account.usage?.primary, '5 小时额度')}${!account.usage || account.usage.secondary ? quotaHTML(account.usage?.secondary, secondaryLabel) : ''}</div>
       ${warning ? `<div class="card-warning">额度查询失败：${esc(warning)}${account.usage ? '；仍显示上次快照' : ''}</div>` : ''}
       ${account.last_error && account.status !== 'cooldown' && !account.last_error.startsWith('rate limited (') ? `<div class="card-warning">${esc(account.last_error)}</div>` : ''}
-      <div class="card-speed"><span>${icon('bolt')}响应速度</span><select data-speed-id="${esc(account.id)}" aria-label="${esc(label(account))} 响应速度" ${$('channel').value === 'bps' ? 'disabled title="BPS 暂仅支持标准速度"' : ''}><option value="standard" ${accountSpeed(account.id) === 'standard' ? 'selected' : ''}>标准</option><option value="fast" ${accountSpeed(account.id) === 'fast' ? 'selected' : ''}>快速</option></select></div>
+      <div class="card-speed"><span>${icon('bolt')}响应速度</span><select data-speed-id="${esc(account.id)}" aria-label="${esc(label(account))} 响应速度" ${nativeSpeed() ? '' : 'disabled title="仅原生通道可选快速"'}><option value="standard" ${accountSpeed(account.id) === 'standard' ? 'selected' : ''}>标准</option><option value="fast" ${accountSpeed(account.id) === 'fast' ? 'selected' : ''}>快速</option></select></div>
       <div class="card-bottom"><button class="card-launch" data-action="launch" data-id="${esc(account.id)}" ${account.disabled ? 'disabled' : ''}>${icon('arrow')}切换并启动</button><button data-action="pelican" data-id="${esc(account.id)}" title="鹈鹕测智">${icon('bolt')}测智</button><button data-action="usage" data-id="${esc(account.id)}" title="刷新额度">${icon('refresh')}</button><button data-action="edit" data-id="${esc(account.id)}" aria-label="管理 ${esc(label(account))}" title="管理账号">${icon('more')}</button></div>
     </article>`;
   }).join('');
@@ -120,8 +121,12 @@ function renderSelected() {
   updateButtons();
 }
 function setEffort(effort) {
-  state.effort = effort;
-  document.querySelectorAll('[data-effort]').forEach(button => { const chosen = button.dataset.effort === effort; button.classList.toggle('chosen', chosen); button.setAttribute('aria-pressed', String(chosen)); });
+  const choice = wishSelection.resolveEffort(effort);
+  state.effort = choice.value;
+  state.effortAvailable = choice.available;
+  document.querySelectorAll('[data-effort]').forEach(button => { const chosen = choice.available && button.dataset.effort === choice.value; button.classList.toggle('chosen', chosen); button.setAttribute('aria-pressed', String(chosen)); });
+  const hint = $('effort-hint');
+  if (hint) { hint.hidden = choice.available; hint.textContent = choice.available ? '' : '当前推理档位不在可选列表中，未自动更换。'; }
 }
 function renderHistory() {
   const entries = state.data?.codex.history || [];
@@ -132,36 +137,55 @@ function renderHistory() {
     return `<article class="history-row"><span class="icon-box">${icon('folder')}</span><div class="history-info"><strong>${esc(basename)}</strong><p title="${esc(record.directory)}">${record.target === 'app' ? record.app_mode === 'main' ? '主应用 · 原有项目与会话' : '独立实例 · 单独工作空间' : esc(record.directory)}</p><div class="history-meta"><span>${esc(account ? label(account) : '账号已移除')}</span><span>${channelLabel(record.channel)} · ${esc(record.model)} · ${esc(record.effort)}</span><span>${date(record.last_used)}</span></div></div><div class="history-actions"><button class="secondary" data-history="${esc(record.id)}" data-resume="false" ${disabled}>${record.target === 'app' ? '打开 App' : '新会话'}</button>${record.target === 'app' ? '' : `<button class="primary" data-history="${esc(record.id)}" data-resume="true" ${disabled}>继续会话${icon('arrow')}</button>`}</div></article>`;
   }).join('') : empty('还没有最近项目', '选择账号和项目目录，首次启动后会保存在这里。');
 }
-const channelLabel = channel => channel === 'codex' ? '原生 Codex' : 'BPS';
+const channelLabel = channel => wishSelection.channelName(channel) || String(channel || 'BPS');
 const speedLabel = speed => speed === 'fast' ? '快速' : '标准';
-function accountSpeed(id) { return $('channel').value === 'bps' ? 'standard' : state.data?.preferences.account_speeds?.[id] || 'standard'; }
+function nativeSpeed() { return $('channel').dataset.available !== 'false' && $('channel').value === 'codex'; }
+function accountSpeed(id) { return nativeSpeed() ? state.data?.preferences.account_speeds?.[id] || 'standard' : 'standard'; }
 function renderSpeed() {
   $('speed').value = accountSpeed(state.selected);
-  $('speed').disabled = $('channel').value === 'bps' || !state.selected;
-  $('speed-hint').textContent = $('channel').value === 'bps' ? 'BPS 暂仅支持标准速度。切换到原生通道可选择快速。' : '按账号保存；快速模式会发送 priority。能否使用由账号和模型权限决定。';
+  $('speed').disabled = !nativeSpeed() || !state.selected;
+  $('speed-hint').textContent = nativeSpeed() ? '按账号保存；快速模式会发送 priority。能否使用由账号和模型权限决定。' : ($('channel').value === 'bps' ? 'BPS 暂仅支持标准速度。切换到原生通道可选择快速。' : '当前通道不可用，未更换速度。');
 }
 async function saveSpeed(id, speed) { state.data.preferences = await api.preferences({account_speed:{id,speed}}); renderAccounts(); }
+function pinExplicitOption(select, choice, labelFor) {
+  [...select.options].filter(option => option.dataset.explicit === 'missing').forEach(option => option.remove());
+  if (!choice.available && choice.value) {
+    const option = document.createElement('option');
+    option.value = choice.value;
+    option.dataset.explicit = 'missing';
+    option.textContent = labelFor(choice.value);
+    select.append(option);
+  }
+  select.value = choice.value;
+  select.dataset.available = String(choice.available && select.value === choice.value);
+}
 function channelModels(channel, select, preferred) {
-  const data = state.data;
-  const models = channel === 'codex' ? data.models.native_catalog : data.models.catalog.filter(model => data.models.bps_models.includes(model.id));
-  select.innerHTML = (models || []).map(model => `<option value="${esc(model.id)}">${esc(model.display_name)}</option>`).join('');
-  select.value = preferred || '';
-  if (!select.value) select.selectedIndex = 0;
+  const models = wishSelection.modelsForChannel(state.data?.models, channel);
+  const choice = wishSelection.resolveModelChoice(models, preferred);
+  const options = models.map(model => `<option value="${esc(model.id)}">${esc(model.display_name || model.id)}</option>`);
+  if (choice.explicit && !choice.available) options.unshift(`<option value="${esc(choice.value)}" data-explicit="missing">${esc(choice.value)} · 不在此通道</option>`);
+  select.innerHTML = options.join('');
+  select.value = choice.value;
+  select.dataset.available = String(choice.available && select.value === choice.value);
+  const hint = select.id === 'model' ? $('model-hint') : select.id === 'pelican-model' ? $('pelican-model-hint') : null;
+  if (hint) { hint.hidden = choice.available; hint.textContent = choice.available ? '' : '此模型不在当前通道中，未自动更换。'; }
+  return choice;
 }
 function launchChannel(channel, preferred) {
-  $('channel').value = channel || 'bps';
+  const choice = wishSelection.resolveChannel(channel);
+  pinExplicitOption($('channel'), choice, value => `${value} · 不在通道列表`);
   channelModels($('channel').value, $('model'), preferred);
-  $('route-label').textContent = `${channelLabel(channel)} 通道`;
+  $('route-label').textContent = choice.available ? `${channelLabel(choice.value)} 通道` : '未选择有效通道';
   renderSpeed();
 }
 function applyInitial(data) {
   const preferences = data.preferences;
-  state.selected = data.codex.active_account_id || accountByID(preferences.account_id)?.id || data.accounts.find(account => !account.disabled)?.id || '';
+  state.selected = wishSelection.resolveAccountChoice(data.accounts, { activeId: data.codex.active_account_id, preferredId: preferences.account_id }).id;
   $('launch-target').value = preferences.target || (data.codex.app?.installed ? 'app' : 'cli');
   $('app-mode').value = preferences.app_mode || 'main';
   $('compact-view').checked = preferences.compact_view === true;
-  launchChannel(preferences.channel || 'bps', preferences.model || data.codex.model);
-  setEffort(preferences.effort || data.codex.effort || 'xhigh');
+  launchChannel(preferences.channel, preferences.model || data.codex.model);
+  setEffort(preferences.effort || data.codex.effort);
   $('directory').value = preferences.directory || '';
   $('context-window').value = preferences.context_window || 272000;
   $('compact-limit').value = preferences.compact_limit || 200000;
@@ -180,7 +204,7 @@ async function refresh(quiet = false) {
   try {
     const data = await api.snapshot(); state.data = data; state.connected = true;
     if (!state.initialized) { applyInitial(data); state.initialized = true; }
-    if (!accountByID(state.selected)) state.selected = data.accounts.find(account => !account.disabled)?.id || '';
+    if (!accountByID(state.selected)) state.selected = '';
     $('connection-error').hidden = true; $('service-label').textContent = '本地服务运行中'; $('service-dot').classList.remove('danger-text');
     $('cli-status').innerHTML = data.codex.installed ? `${icon('check')}已检测到 Codex CLI` : '未检测到 Codex CLI';
     $('cli-status').title = data.codex.binary || data.codex.error;
@@ -314,7 +338,8 @@ $('launch').onclick = () => launch(false); $('resume').onclick = () => launch(tr
 $('history-list').onclick = event => { const button = event.target.closest('[data-history]'); if (button) { const record = state.data.codex.history.find(record => record.id === button.dataset.history); if (record) void launch(button.dataset.resume === 'true', record); } };
 $('save-settings').onclick = () => action('settings', async () => { await api.saveSettings({ proxy_url: $('proxy').value, auto_refresh: $('auto-refresh').checked, usage_probe: $('usage-probe').checked }); toast('连接设置已保存'); });
 $('theme').onchange = () => action('theme', async () => { applyTheme($('theme').value); await api.preferences({ theme: $('theme').value }); });
-$('channel').onchange = () => action('channel', async () => { launchChannel($('channel').value, $('model').value); await api.preferences({ channel: $('channel').value }); renderAccounts(); });
+$('channel').onchange = () => action('channel', async () => { launchChannel($('channel').value, $('model').value); if ($('channel').dataset.available !== 'false') await api.preferences({ channel: $('channel').value }); renderAccounts(); });
+$('model').onchange = () => { channelModels($('channel').value, $('model'), $('model').value); updateButtons(); };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme($('theme').value));
 document.querySelectorAll('[data-link]').forEach(button => { button.onclick = () => action('link', () => api.openLink(button.dataset.link)); });
 $('open-data').onclick = () => action('data', () => api.openData());

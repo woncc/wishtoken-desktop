@@ -11,9 +11,11 @@ async function loadPelican() {
   try {
     const data = await api.pelicanHistory(); pelicanState.batches = data.batches;
     if (!pelicanState.initialized) {
-      $('pelican-channel').value = state.data.preferences.pelican_channel || 'bps';
+      const channel = wishSelection.resolveChannel(state.data.preferences.pelican_channel);
+      pinExplicitOption($('pelican-channel'), channel, value => `${value} · 不在通道列表`);
       channelModels($('pelican-channel').value, $('pelican-model'), $('model').value);
-      $('pelican-effort').value = state.effort; $('pelican-prompt').value = data.default_prompt;
+      pinExplicitOption($('pelican-effort'), wishSelection.resolveEffort(state.effort), value => `${value} · 不在档位列表`);
+      $('pelican-prompt').value = data.default_prompt;
       if (!pelicanState.selected.size && state.selected) pelicanState.selected.add(state.selected);
       pelicanState.initialized = true;
     }
@@ -25,7 +27,8 @@ async function loadPelican() {
 function renderPelican() {
   const batches = pelicanState.batches;
   const running = batches.find(b => ['running', 'cancelling'].includes(b.status));
-  $('pelican-start').disabled = !!running || !pelicanState.selected.size;
+  const compareReady = $('pelican-channel').dataset.available !== 'false' && $('pelican-model').dataset.available !== 'false' && $('pelican-effort').dataset.available !== 'false' && Boolean($('pelican-model').value);
+  $('pelican-start').disabled = !!running || !pelicanState.selected.size || !compareReady;
   $('pelican-cancel').hidden = !running; $('pelican-cancel').disabled = running?.status === 'cancelling';
   const b = batches.find(b => b.id === pelicanState.batch);
   $('pelican-progress').textContent = running ? `${running.items.filter(i => !['queued','running'].includes(i.status)).length} / ${running.items.length} 已结束 · ${pelicanStatus[running.status]}` : b ? `${b.items.filter(i => i.status === 'completed').length} / ${b.items.length} 成功` : '';
@@ -48,7 +51,9 @@ function renderPelican() {
 async function startPelican(input) {
   await action('pelican-start', async () => { $('pelican-start').disabled = true; pelicanState.batch = await api.pelicanStart(input || { account_ids: [...pelicanState.selected], channel: $('pelican-channel').value, model: $('pelican-model').value, effort: $('pelican-effort').value, prompt: $('pelican-prompt').value, concurrency: Number($('pelican-concurrency').value) }); await loadPelican(); });
 }
-$('pelican-channel').onchange = () => action('pelican-channel', async () => { channelModels($('pelican-channel').value, $('pelican-model'), $('pelican-model').value); await api.preferences({ pelican_channel: $('pelican-channel').value }); });
+$('pelican-channel').onchange = () => action('pelican-channel', async () => { const channel = wishSelection.resolveChannel($('pelican-channel').value); channelModels(channel.value, $('pelican-model'), $('pelican-model').value); if (channel.available) await api.preferences({ pelican_channel: channel.value }); renderPelican(); });
+$('pelican-model').onchange = () => { channelModels($('pelican-channel').value, $('pelican-model'), $('pelican-model').value); renderPelican(); };
+$('pelican-effort').onchange = () => { pinExplicitOption($('pelican-effort'), wishSelection.resolveEffort($('pelican-effort').value), value => `${value} · 不在档位列表`); renderPelican(); };
 $('pelican-accounts').onchange = event => { const id = event.target.value; event.target.checked ? pelicanState.selected.add(id) : pelicanState.selected.delete(id); renderPelican(); };
 $('pelican-current').onclick = () => { pelicanState.selected = new Set([state.data?.codex.active_account_id || state.selected].filter(Boolean)); pelicanAccounts(); renderPelican(); };
 $('pelican-all').onclick = () => { pelicanState.selected = new Set((state.data?.accounts || []).filter(a => !a.disabled && !(a.expired && !a.has_refresh_token)).map(a => a.id)); pelicanAccounts(); renderPelican(); };

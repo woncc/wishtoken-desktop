@@ -7,6 +7,7 @@
   <title>WishToken Desktop</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="workspace.css">
+  <script src="selection.js" defer></script>
   <script src="app.js" defer></script>
   <script src="pelican.js" defer></script>
 </head>
@@ -62,9 +63,9 @@
           <label class="field-label" for="launch-target">启动方式</label><select id="launch-target" class="full"><option value="app">Codex App · 图形客户端</option><option value="cli">Codex CLI · 系统终端</option></select>
           <div id="app-mode-field"><label class="field-label" for="app-mode">App 工作空间</label><select id="app-mode" class="full"><option value="main">主应用 · 继续原有项目与会话</option><option value="isolated">独立实例 · 隔离工作空间</option></select></div>
           <label class="field-label" for="channel">服务通道</label><select id="channel" class="full"><option value="bps">BPS（默认）</option><option value="codex">原生 Codex</option></select>
-          <label class="field-label" for="model">模型</label><select id="model" class="full"><option value="gpt-6-astra">GPT-6 Astra</option></select>
+          <label class="field-label" for="model">模型</label><select id="model" class="full"><option value="gpt-6-astra">GPT-6 Astra</option></select><p id="model-hint" class="small" hidden></p>
           <label class="field-label" for="speed">响应速度</label><select id="speed" class="full"><option value="standard">标准 · 常规用量</option><option value="fast">快速 · 用量可能增加</option></select><p id="speed-hint" class="small"></p>
-          <div class="field-label">推理强度</div><div class="efforts" id="efforts" role="group" aria-label="推理强度"><button data-effort="low">Low</button><button data-effort="medium">Medium</button><button data-effort="high">High</button><button data-effort="xhigh" class="chosen" aria-pressed="true">Xhigh</button></div>
+          <div class="field-label">推理强度</div><div class="efforts" id="efforts" role="group" aria-label="推理强度"><button data-effort="low">Low</button><button data-effort="medium">Medium</button><button data-effort="high">High</button><button data-effort="xhigh" class="chosen" aria-pressed="true">Xhigh</button></div><p id="effort-hint" class="small" hidden></p>
           <div id="directory-field"><label class="field-label" for="directory">项目目录</label><div class="directory-input"><input id="directory" placeholder="选择要工作的文件夹" spellcheck="false"><button id="choose-folder" title="浏览项目目录" aria-label="浏览项目目录"><svg><use href="#i-folder"/></svg></button></div></div>
           <p id="app-directory-note" class="small">默认切换主 Codex App，沿用原有项目和已保存会话，无需填写目录。</p>
           <details class="advanced"><summary>上下文设置<span>272k / 200k</span></summary><div class="advanced-fields"><label>上下文窗口<input id="context-window" type="number" min="32000" max="272000" step="1000" value="272000"></label><label>自动压缩阈值<input id="compact-limit" type="number" min="8000" max="271999" step="1000" value="200000"></label></div></details>
@@ -79,6 +80,7 @@
       <div class="section-intro"><h2>让每个子号画一只骑自行车的鹈鹕</h2><p>同一提示词、模型和推理强度，直接对比动画细节。这是作品对比，不是标准化智商评分；测试会消耗账号额度。</p></div>
       <div class="pelican-setup settings-card">
         <div class="pelican-config"><label>服务通道<select id="pelican-channel" class="full"><option value="bps">BPS（默认）</option><option value="codex">原生 Codex</option></select></label><label>模型<select id="pelican-model" class="full"></select></label><label>推理强度<select id="pelican-effort" class="full"><option>low</option><option>medium</option><option>high</option><option selected>xhigh</option></select></label><label>同时测试<select id="pelican-concurrency" class="full"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+        <p id="pelican-model-hint" class="small" hidden></p>
         <label class="field-label" for="pelican-prompt">提示词</label><textarea id="pelican-prompt" class="full" rows="3" maxlength="10000"></textarea>
         <div class="horizontal pelican-account-heading"><strong>测试账号</strong><div><button id="pelican-current" class="text-button">只选当前</button><button id="pelican-all" class="text-button">全选可用</button></div></div>
         <div id="pelican-accounts" class="pelican-accounts"></div>

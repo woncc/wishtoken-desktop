@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanChannel, safeError } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanChannel, cleanProbe, redactPublic, safeError } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -180,9 +180,8 @@ async function handle(method, input) {
       await fsp.writeFile(result.filePath, artifact.html, { encoding: 'utf8', mode: 0o600 }); return true;
     }
     case 'test': {
-      requireID(input?.account_id);
-      if (typeof input.model !== 'string' || !['low', 'medium', 'high', 'xhigh'].includes(input.effort)) throw new Error('测试参数无效');
-      return service.request('/api/test', 'POST', { account_id: input.account_id, model: input.model, effort: input.effort, route: cleanChannel(input.channel), prompt: 'Reply with only: CONNECTION OK' }, 150000);
+      const probe = cleanProbe(input);
+      return service.request('/api/test', 'POST', { account_id: probe.account_id, model: probe.model, effort: probe.effort, route: probe.channel, prompt: 'Reply with only: CONNECTION OK' }, 150000);
     }
     case 'saveSettings': return service.request('/api/settings', 'PUT', cleanSettings(input));
     case 'preferences':
@@ -240,7 +239,7 @@ if (lock) {
     else Menu.setApplicationMenu(null);
     ipcMain.handle('gptbridge', async (event, method, data) => {
       if (!validSender(event)) return { ok: false, error: '无效的客户端来源' };
-      try { return { ok: true, data: await handle(method, data) }; }
+      try { return { ok: true, data: redactPublic(await handle(method, data)) }; }
       catch (error) { return { ok: false, error: safeError(error) }; }
     });
     await service.start().catch(() => {}); // The UI presents a recoverable error.
