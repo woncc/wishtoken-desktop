@@ -20,7 +20,7 @@ function cleanEffort(value) {
 }
 function cleanProbe(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('测试参数无效');
-  return { account_id: requireID(input.account_id), model: cleanModel(input.model), effort: cleanEffort(input.effort), channel: cleanChannel(input.channel) };
+  return { account_id: requireID(input.account_id), model: cleanModel(input.model), effort: cleanEffort(input.effort), channel: requireChannel(input.channel) };
 }
 const SECRET_KEYS = new Set(['access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'id_token', 'idtoken', 'api_key', 'apikey', 'authorization', 'password', 'secret', 'client_secret', 'clientsecret', 'cockpit_key', 'cockpitkey', 'gptbridge_codex_key', 'personal_access_token', 'personalaccesstoken', 'openai_api_key', 'openaiapikey', 'experimental_bearer_token', 'bearer_token', 'bearertoken', 'auth_token', 'authtoken', 'response_id', 'responseid']);
 const SECRET_TEXT = [
