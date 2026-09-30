@@ -108,6 +108,13 @@ func Redact(raw string) string {
 	}
 	parsed, err := url.Parse(candidate)
 	if err == nil && parsed.User != nil {
+		// user%3Apassword is decoded into the username, so Password() is empty
+		// while the secret is still visible in the original text.
+		if _, ok := parsed.User.Password(); !ok {
+			if name, secret, found := strings.Cut(parsed.User.Username(), ":"); found && secret != "" {
+				parsed.User = url.UserPassword(name, secret)
+			}
+		}
 		if _, ok := parsed.User.Password(); !ok {
 			return raw
 		}

@@ -13,6 +13,9 @@ func TestRedactHidesProxyPassword(t *testing.T) {
 		"socks5://user:" + password + "@127.0.0.1:1080",
 		"http://:" + password + "@127.0.0.1:7890",
 		"http://user:" + password + "@",
+		"http://user%3A" + password + "@127.0.0.1:7890",
+		"http://user%3a" + password + "@127.0.0.1:7890",
+		"user%3A" + password + "@127.0.0.1:7890",
 	}
 	for _, in := range cases {
 		got := Redact(in)
@@ -74,6 +77,10 @@ func TestPreserveProxyKeepsSecretWhenEditorReturnsRedaction(t *testing.T) {
 	current := "http://user:" + password + "@127.0.0.1:7890"
 	if got := PreserveProxy(current, Redact(current)); got != current || strings.Contains(Redact(current), password) {
 		t.Fatalf("preserve %q redact %q", got, Redact(current))
+	}
+	encoded := "http://user%3A" + password + "@127.0.0.1:7890"
+	if got := PreserveProxy(encoded, Redact(encoded)); got != encoded || strings.Contains(Redact(encoded), password) {
+		t.Fatalf("encoded preserve %q redact %q", got, Redact(encoded))
 	}
 	schemeless := "user:" + password + "@127.0.0.1:7890"
 	if got := PreserveProxy(schemeless, "  "+Redact(schemeless)+"  "); got != schemeless {
