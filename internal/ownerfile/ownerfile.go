@@ -42,3 +42,44 @@ func Write(path string, data []byte) error {
 	}
 	return os.Rename(tmpName, path)
 }
+
+// OpenAppend opens path for appending. A symlink is removed rather than
+// followed, and the resulting file is owner-only. Existing regular-file
+// contents are preserved.
+func OpenAppend(path string) (*os.File, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("empty output path")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	info, err := os.Lstat(path)
+	switch {
+	case err == nil && info.Mode()&os.ModeSymlink != 0:
+		if err = os.Remove(path); err != nil {
+			return nil, err
+		}
+	case err == nil && !info.Mode().IsRegular():
+		return nil, fmt.Errorf("output path is not a regular file")
+	case err != nil && !os.IsNotExist(err):
+		return nil, err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	info, err = os.Lstat(path)
+	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		_ = file.Close()
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("refusing to append through a symlink")
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return file, nil
+}
