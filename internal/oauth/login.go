@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 )
 
 // LoginSession is one in-flight PKCE browser login. It binds the Codex
@@ -82,9 +84,23 @@ func StartLogin(ctx context.Context, client *http.Client) (*LoginSession, error)
 
 func (s *LoginSession) handleCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	if errCode := q.Get("error"); errCode != "" {
-		http.Error(w, "登录失败 / login failed: "+errCode+" "+q.Get("error_description"), http.StatusBadRequest)
-		s.finish(nil, fmt.Errorf("authorization failed: %s %s", errCode, q.Get("error_description")))
+	if q.Get("error") != "" {
+		errCode := safeOAuthCode(q.Get("error"))
+		desc := limitFailure(httpx.SanitizeFailure(q.Get("error_description")), 160)
+		msg := "登录失败 / login failed"
+		if errCode != "" {
+			msg += ": " + errCode
+		}
+		if desc != "" {
+			msg += " " + desc
+		}
+		http.Error(w, msg, http.StatusBadRequest)
+		detail := strings.TrimSpace(errCode + " " + desc)
+		if detail == "" {
+			s.finish(nil, errors.New("authorization failed"))
+		} else {
+			s.finish(nil, fmt.Errorf("authorization failed: %s", detail))
+		}
 		return
 	}
 	if q.Get("state") != s.state {
@@ -100,7 +116,7 @@ func (s *LoginSession) handleCallback(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	tokens, err := ExchangeCode(ctx, s.client, code, s.verifier, RedirectURI)
 	if err != nil {
-		http.Error(w, "token exchange failed: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, "token exchange failed", http.StatusBadGateway)
 		s.finish(nil, err)
 		return
 	}
@@ -118,11 +134,15 @@ func (s *LoginSession) finish(t *Tokens, err error) {
 	default:
 	}
 	s.tokens, s.err = t, err
+	server := s.server
 	close(s.done)
+	if server == nil {
+		return
+	}
 	go func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		_ = s.server.Shutdown(shutdownCtx)
+		_ = server.Shutdown(shutdownCtx)
 	}()
 }
 

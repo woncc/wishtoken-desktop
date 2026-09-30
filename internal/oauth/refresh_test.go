@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,8 +62,15 @@ func TestRefreshPermanentFailure(t *testing.T) {
 	if err == nil || !IsPermanent(err) {
 		t.Fatalf("expected permanent failure, got %v", err)
 	}
+	msg := err.Error()
+	if !strings.Contains(msg, "invalid_grant") || !strings.Contains(msg, "Refresh token is invalid") || strings.Contains(msg, "rt_bad_123456") {
+		t.Fatalf("unexpected permanent error: %s", msg)
+	}
 	acc := &account.Account{RefreshToken: "rt_bad_123456"}
 	if err := RefreshAccount(context.Background(), client, acc); err == nil || acc.RefreshFailures != 1 || acc.LastError == "" {
 		t.Fatalf("RefreshAccount bookkeeping: err=%v acc=%+v", err, acc)
+	}
+	if !strings.Contains(acc.LastError, "invalid_grant") || strings.Contains(acc.LastError, "rt_bad_123456") {
+		t.Fatalf("LastError unsafe: %s", acc.LastError)
 	}
 }

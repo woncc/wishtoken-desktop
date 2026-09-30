@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/basispoints"
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 )
 
 // BPSClient talks to the Basispoints gateway.
@@ -110,7 +111,7 @@ func (c *BPSClient) UploadAttachment(ctx context.Context, cred Credentials, att 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", &HTTPError{Status: resp.StatusCode, Body: string(body), Upstream: "basispoints-attachments"}
+		return "", NewHTTPError(resp.StatusCode, "basispoints-attachments", string(body))
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -124,23 +125,53 @@ func (c *BPSClient) UploadAttachment(ctx context.Context, cred Credentials, att 
 	return "", fmt.Errorf("attachment upload returned no file id")
 }
 
-// HTTPError is a non-2xx upstream answer with its (bounded) body.
+// HTTPError is a non-2xx upstream answer. The raw body is parsed once and
+// discarded so logs and account errors cannot retain credential material.
 type HTTPError struct {
 	Status   int
-	Body     string
 	Upstream string
+	code     string
+	detail   string
+}
+
+// NewHTTPError parses body into a safe code and operator message.
+func NewHTTPError(status int, upstreamName, body string) *HTTPError {
+	code, detail := parseUpstreamFailure(upstreamName, status, body)
+	return &HTTPError{Status: status, Upstream: upstreamName, code: code, detail: detail}
 }
 
 func (e *HTTPError) Error() string {
-	body := strings.Join(strings.Fields(e.Body), " ")
-	if len(body) > 400 {
-		body = body[:400] + "…"
+	if e == nil {
+		return "upstream error"
 	}
-	return fmt.Sprintf("%s returned %d: %s", e.Upstream, e.Status, body)
+	if e.detail == "" {
+		return fmt.Sprintf("%s returned %d", e.Upstream, e.Status)
+	}
+	return fmt.Sprintf("%s returned %d: %s", e.Upstream, e.Status, e.detail)
 }
 
 // ErrorCode extracts error.code (or error.type) from a JSON error body.
 func (e *HTTPError) ErrorCode() string {
+	if e == nil {
+		return ""
+	}
+	return e.code
+}
+
+// Message extracts a human readable message from a JSON error body.
+func (e *HTTPError) Message() string {
+	if e == nil {
+		return ""
+	}
+	return e.detail
+}
+
+func parseUpstreamFailure(upstreamName string, status int, body string) (string, string) {
+	trimmed := strings.TrimSpace(body)
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "<!doctype html") || strings.HasPrefix(lower, "<html") {
+		return "", fmt.Sprintf("%s upstream returned HTTP %d (gateway error; retry the same model later)", upstreamName, status)
+	}
 	var payload struct {
 		Error struct {
 			Code    string `json:"code"`
@@ -149,44 +180,85 @@ func (e *HTTPError) ErrorCode() string {
 		} `json:"error"`
 		Detail any `json:"detail"`
 	}
-	if json.Unmarshal([]byte(e.Body), &payload) != nil {
-		return ""
-	}
-	if payload.Error.Code != "" {
-		return payload.Error.Code
-	}
-	if detail, ok := payload.Detail.(map[string]any); ok {
-		if code, ok := detail["code"].(string); ok {
-			return code
+	if json.Unmarshal([]byte(trimmed), &payload) == nil {
+		code := safeUpstreamCode(payload.Error.Code)
+		if code == "" {
+			code = safeUpstreamCode(detailCode(payload.Detail))
 		}
+		if code == "" {
+			code = safeUpstreamCode(payload.Error.Type)
+		}
+		msg := payload.Error.Message
+		if msg == "" {
+			msg = detailMessage(payload.Detail)
+		}
+		msg = limitFailure(httpx.SanitizeFailure(msg), 400)
+		if msg != "" {
+			return code, msg
+		}
+		if code != "" {
+			return code, code
+		}
+		if trimmed != "" {
+			return "", fmt.Sprintf("%s upstream returned HTTP %d", upstreamName, status)
+		}
+		return "", ""
 	}
-	return payload.Error.Type
+	plain := limitFailure(httpx.SanitizeFailure(trimmed), 400)
+	if plain != "" {
+		return "", plain
+	}
+	if trimmed != "" {
+		return "", fmt.Sprintf("%s upstream returned HTTP %d", upstreamName, status)
+	}
+	return "", ""
 }
 
-// Message extracts a human readable message from a JSON error body.
-func (e *HTTPError) Message() string {
-	lower := strings.ToLower(strings.TrimSpace(e.Body))
-	if strings.HasPrefix(lower, "<!doctype html") || strings.HasPrefix(lower, "<html") {
-		return fmt.Sprintf("%s upstream returned HTTP %d (gateway error; retry the same model later)", e.Upstream, e.Status)
+func detailCode(detail any) string {
+	m, ok := detail.(map[string]any)
+	if !ok {
+		return ""
 	}
-	var payload struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-		Detail any `json:"detail"`
+	code, _ := m["code"].(string)
+	return code
+}
+
+func detailMessage(detail any) string {
+	switch d := detail.(type) {
+	case string:
+		return d
+	case map[string]any:
+		msg, _ := d["message"].(string)
+		return msg
+	default:
+		return ""
 	}
-	if json.Unmarshal([]byte(e.Body), &payload) == nil {
-		if payload.Error.Message != "" {
-			return payload.Error.Message
+}
+
+func safeUpstreamCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" || len(code) > 80 || strings.ContainsAny(code, " \t\r\n\"'") {
+		return ""
+	}
+	if httpx.SanitizeFailure(code) != code {
+		return ""
+	}
+	return code
+}
+
+func limitFailure(s string, n int) string {
+	if s == "" || n <= 0 {
+		return ""
+	}
+	if len(s) <= n {
+		return s
+	}
+	i := 0
+	for idx := range s {
+		if i == n {
+			return s[:idx] + "..."
 		}
-		switch d := payload.Detail.(type) {
-		case string:
-			return d
-		case map[string]any:
-			if m, ok := d["message"].(string); ok {
-				return m
-			}
-		}
+		i++
 	}
-	return strings.TrimSpace(e.Body)
+	return s
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/account"
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 	"github.com/xxx-holic/wishtoken-desktop/internal/jwt"
 	"github.com/xxx-holic/wishtoken-desktop/internal/version"
 )
@@ -49,8 +50,16 @@ type HTTPError struct {
 }
 
 func (e *HTTPError) Error() string {
-	if e.Code != "" {
-		return fmt.Sprintf("oauth token endpoint returned %d: %s (%s)", e.Status, e.Code, e.Description)
+	if e == nil {
+		return "oauth token endpoint error"
+	}
+	code := safeOAuthCode(e.Code)
+	desc := limitFailure(httpx.SanitizeFailure(e.Description), 160)
+	if code != "" && desc != "" {
+		return fmt.Sprintf("oauth token endpoint returned %d: %s (%s)", e.Status, code, desc)
+	}
+	if code != "" {
+		return fmt.Sprintf("oauth token endpoint returned %d: %s", e.Status, code)
 	}
 	return fmt.Sprintf("oauth token endpoint returned %d", e.Status)
 }
@@ -124,8 +133,8 @@ func exchange(ctx context.Context, client *http.Client, form url.Values, previou
 			ErrorDescription string `json:"error_description"`
 		}
 		if json.Unmarshal(body, &payload) == nil {
-			he.Code = payload.Error
-			he.Description = payload.ErrorDescription
+			he.Code = safeOAuthCode(payload.Error)
+			he.Description = limitFailure(httpx.SanitizeFailure(payload.ErrorDescription, formSecrets(form)...), 160)
 		}
 		return nil, he
 	}
