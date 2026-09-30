@@ -206,10 +206,10 @@ type View struct {
 // View returns the redacted representation.
 func (a *Account) View() View {
 	v := View{
-		ID: a.ID, Name: a.Name, Email: a.Email, AccountID: MaskID(a.AccountID), PlanType: a.PlanType,
+		ID: a.ID, Name: scrubDisplay(a.Name), Email: scrubDisplay(a.Email), AccountID: MaskID(a.AccountID), PlanType: a.PlanType,
 		Disabled: a.Disabled, HasRefreshToken: a.RefreshToken != "", HasAccessToken: a.AccessToken != "",
-		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: a.Source, Tags: a.Tags,
-		LastError: a.LastError, Usage: a.Usage, Stats: a.Stats, CreatedAt: a.CreatedAt,
+		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: a.Source, Tags: scrubDisplayList(a.Tags),
+		LastError: scrubDisplay(a.LastError), Usage: a.Usage, Stats: a.Stats, CreatedAt: a.CreatedAt,
 	}
 	v.ExpiresAt = formatTime(a.ExpiresAt)
 	v.LastRefresh = formatTime(a.LastRefresh)
@@ -250,6 +250,32 @@ func MaskID(id string) string {
 
 func redactProxy(u string) string {
 	return httpx.Redact(u)
+}
+
+// scrubDisplay hides proxy passwords and credential-shaped values in fields
+// the management API shows. The stored proxy URL itself is redacted separately.
+func scrubDisplay(value string) string {
+	value = displayName(value)
+	if value == "" {
+		return ""
+	}
+	return httpx.Redact(value)
+}
+
+func scrubDisplayList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if shown := scrubDisplay(value); shown != "" {
+			out = append(out, shown)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // NewID returns a random account identifier.

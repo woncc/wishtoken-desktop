@@ -93,3 +93,31 @@ func putJSON(t *testing.T, f *fixture, route, body string) (int, string) {
 	n, _ := resp.Body.Read(buf)
 	return resp.StatusCode, string(buf[:n])
 }
+
+func TestManagementHidesProxyPasswordInDisplayFields(t *testing.T) {
+	const password = "s3cret-proxy"
+	proxyURL := "http://user:" + password + "@127.0.0.1:7890"
+	malformed := "http://user:" + password + "%zz@127.0.0.1:7890"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.Name = "note " + proxyURL
+	acc.Tags = []string{"team", malformed}
+	acc.LastError = "dial " + malformed
+	acc.ProxyURL = proxyURL
+	f := newFixture(t, cfg, acc)
+	resp, err := http.Get(f.api.URL + "/api/accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 1<<20)
+	n, _ := resp.Body.Read(buf)
+	body := string(buf[:n])
+	if resp.StatusCode != http.StatusOK || strings.Contains(body, password) {
+		t.Fatalf("display fields leaked: %d %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(body, "xxxxx") || !strings.Contains(body, "one@example.test") {
+		t.Fatalf("redacted account lost context: %s", body)
+	}
+}
