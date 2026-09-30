@@ -14,15 +14,21 @@ FORBIDDEN_NAMES = {
     'auth.json', 'accounts.json', 'config.json', 'bridge-identity.json',
     'desktop.json', 'history.json', 'launch-history.json',
     'cockpit-integration.json', 'cockpit-process.json',
-    '.env', '.envrc', 'credentials.json', 'tokens.json',
+    'codex_instances.json', 'secrets.json', 'credentials', 'credentials.json',
+    '.env', '.envrc', 'tokens.json',
     'session.json', 'cookies.json', 'cookies.txt', 'id_rsa', 'id_ed25519',
     'id_ecdsa', 'id_dsa', 'id_ecdsa_sk', 'id_ed25519_sk',
-    '.netrc', '_netrc',
+    '.netrc', '_netrc', '.git-credentials', '.npmrc', '.pypirc', '.pgpass',
 }
 FORBIDDEN_SUFFIXES = {
     '.jsonl', '.log', '.bak', '.exe', '.zip', '.dmg', '.pem', '.key', '.env',
     '.har', '.pcap', '.pcapng', '.p12', '.pfx', '.kdbx',
     '.ppk', '.p8', '.jks', '.keystore',
+    '.sqlite', '.sqlite3', '.db', '.ovpn', '.psafe3',
+}
+BACKUP_SUFFIXES = {
+    '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
+    '.swp', '.swo', '.swn', '.tmp',
 }
 RULES = {
     'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
@@ -34,11 +40,32 @@ RULES = {
 FOLD_PARTS = {part.casefold() for part in FORBIDDEN_PARTS}
 FOLD_NAMES = {item.casefold() for item in FORBIDDEN_NAMES}
 
+def secret_alias(name):
+    folded = name.casefold()
+    if folded.startswith('.#'):
+        folded = folded[2:]
+    if folded.startswith('#') and folded.endswith('#') and len(folded) > 2:
+        folded = folded[1:-1]
+    while folded.endswith('~'):
+        folded = folded[:-1]
+    while True:
+        suffix = Path(folded).suffix
+        if suffix not in BACKUP_SUFFIXES:
+            break
+        stem = Path(folded).stem
+        if not stem or stem == folded:
+            break
+        folded = stem
+    if folded in FOLD_NAMES:
+        return True
+    bare = folded[1:] if folded.startswith('.') else folded
+    return bare in FOLD_NAMES
+
 def path_reason(rel):
     path = Path(rel)
     parts = {part.casefold() for part in path.parts}
     name = path.name.casefold()
-    if parts & FOLD_PARTS or name in FOLD_NAMES or private_filename(name):
+    if parts & FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
         return 'private state or generated artifact path'
     if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or path.suffix.casefold() in FORBIDDEN_SUFFIXES:
         return 'private state or generated artifact path'
@@ -100,11 +127,17 @@ def self_test():
         'launch-history.json', 'nested/cockpit-integration.json', 'cockpit-process.json',
         'config.toml.bak-20261001-030405', 'codex_instances.json.gptbridge-backup-20261001',
         'accounts.json.tmp', '.owner-12345',
+        'accounts.json.orig', 'nested/auth.json.old', 'Accounts.JSON.save', 'config.json~',
+        '.#tokens.json', '.accounts.json.swp', '#credentials.json#', 'id_rsa.orig',
+        'auth.json.orig.old', 'ID_ED25519.BACKUP', '.git-credentials', 'home/.npmrc',
+        '.pypirc', '.pgpass', 'aws/credentials', 'secrets.json', 'codex_instances.json',
+        'cache.sqlite', 'state.sqlite3', 'app.db', 'tunnel.ovpn', 'vault.psafe3',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
         'desktop/assets/icon.png', 'README.md', 'scripts/check-public.py', 'internal/config/config.go',
         'internal/oauth/login.go', 'docs/handover-not-private.md',
+        'docs/assets/accounts.png', 'internal/localcodex/models.json', 'notes.tmp', 'script.go.swp',
     )
     for rel in blocked:
         if not path_reason(rel):

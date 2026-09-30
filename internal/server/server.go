@@ -157,12 +157,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 func (s *Server) hostGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cfg := s.Config()
-		if config.IsLoopback(cfg.Listen) && !cfg.AllowRemote {
-			host := r.Host
-			if h, _, err := net.SplitHostPort(host); err == nil {
-				host = h
-			}
-			if !config.IsLoopback(host) {
+		// allow_remote exposes the model API to non-loopback clients. It must
+		// not let a DNS-rebound browser, which is still a loopback peer, call
+		// management with the rebound name as Host.
+		if config.IsLoopbackPeer(r.RemoteAddr) || (config.IsLoopback(cfg.Listen) && !cfg.AllowRemote) {
+			if !config.IsLoopback(r.Host) {
 				http.Error(w, "forbidden host", http.StatusForbidden)
 				return
 			}

@@ -276,10 +276,16 @@ func IsLoopback(addr string) bool {
 		host = h
 	}
 	host = strings.Trim(host, "[]")
+	if zone := strings.IndexByte(host, '%'); zone >= 0 {
+		host = host[:zone]
+	}
+	host = strings.TrimSpace(host)
 	if host == "" {
 		return false
 	}
-	if strings.EqualFold(host, "localhost") {
+	// A single trailing dot is still localhost. Subdomains such as
+	// evil.localhost are not, and must not satisfy the host check.
+	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
 		return true
 	}
 	ip := net.ParseIP(host)
