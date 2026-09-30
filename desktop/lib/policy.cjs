@@ -307,4 +307,22 @@ function publicAbout(info) {
 function publicSelection(accountID) {
   return { account_id: accountID };
 }
-module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection };
+const PROXY_EDITOR_KEYS = new Set(['proxy_url', 'auto_refresh', 'usage_probe']);
+function proxyEditor(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length > 0 && keys.every(key => PROXY_EDITOR_KEYS.has(key));
+}
+// IPC redacts the finished result. Restore only the proxy editor afterwards so
+// the settings field still round-trips, while every other copy loses userinfo.
+function rendererPayload(value) {
+  const redacted = redactPublic(value);
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !redacted || typeof redacted !== 'object' || Array.isArray(redacted)) return redacted;
+  const settings = value.settings;
+  if (settings && typeof settings === 'object' && !Array.isArray(settings) && typeof settings.proxy_url === 'string' && redacted.settings && typeof redacted.settings === 'object' && !Array.isArray(redacted.settings)) {
+    redacted.settings.proxy_url = settings.proxy_url;
+  }
+  if (proxyEditor(value) && typeof value.proxy_url === 'string') redacted.proxy_url = value.proxy_url;
+  return redacted;
+}
+module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload };

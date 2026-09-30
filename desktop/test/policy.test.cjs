@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection } = require('../lib/policy.cjs');
+const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('../lib/policy.cjs');
 test('renderer cannot change local key, listener, route or fallback', () => {
   assert.deepEqual(cleanSettings({ api_key: 'attacker', listen: '0.0.0.0:1', native_fallback: true, route_policy: 'codex_only', desktop_mode: false, auto_refresh: false, proxy_url: ' http://127.0.0.1:7890 ' }), { auto_refresh: false, proxy_url: 'http://127.0.0.1:7890' });
   assert.throws(() => cleanSettings({ usage_probe: 'false' }));
@@ -199,4 +199,25 @@ test('action responses keep explicit mode and drop profile paths and service int
   assert.equal(prefs.app_path, undefined);
   assert.equal(prefs.api_key, undefined);
   assert.deepEqual(prefs.account_speeds, { 'acc-1': 'fast' });
+});
+
+test('final IPC redaction keeps the proxy editor and still strips other userinfo', () => {
+  const proxy = 'http://user:s3cret-token@127.0.0.1:7890';
+  const projected = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true, api_key: 'local-key' },
+    accounts: [{ id: 'acc-1', last_error: 'via http://user:s3cret-token@10.1.1.1:8080 failed' }]
+  });
+  const delivered = rendererPayload(projected);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.settings.api_key, undefined);
+  assert.equal(delivered.accounts[0].last_error, 'via http://10.1.1.1:8080 failed');
+  assert.equal(projected.settings.proxy_url, proxy);
+  const saved = rendererPayload(publicSettings({ proxy_url: proxy, auto_refresh: true, usage_probe: false, api_key: 'local-key', listen: '0.0.0.0:9' }));
+  assert.deepEqual(saved, { proxy_url: proxy, auto_refresh: true, usage_probe: false });
+  const unrelated = rendererPayload({ proxy_url: proxy, error: 'via http://user:s3cret-token@10.0.0.1:9', api_key: 'local-key' });
+  assert.equal(unrelated.proxy_url, 'http://127.0.0.1:7890');
+  assert.equal(unrelated.error, 'via http://10.0.0.1:9');
+  assert.equal(unrelated.api_key, undefined);
+  assert.equal(rendererPayload('socks5://alice:hunter2@10.0.0.8:1080'), 'socks5://10.0.0.8:1080');
+  assert.equal(rendererPayload(null), null);
 });
