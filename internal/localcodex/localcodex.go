@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 //go:embed models.json
@@ -170,10 +172,7 @@ func Prepare(o Options) (Options, error) {
 	identity := o.AccessToken != "" && o.AuthAPIURL != ""
 	if identity {
 		auth, _ := json.Marshal(map[string]any{"OPENAI_API_KEY": nil, "personal_access_token": o.AccessToken})
-		if err := os.WriteFile(filepath.Join(o.Home, "auth.json.tmp"), auth, 0600); err != nil {
-			return o, err
-		}
-		if err := os.Rename(filepath.Join(o.Home, "auth.json.tmp"), filepath.Join(o.Home, "auth.json")); err != nil {
+		if err := ownerfile.Write(filepath.Join(o.Home, "auth.json"), auth); err != nil {
 			return o, err
 		}
 		meta, _ := json.Marshal(map[string]string{"auth_api_url": o.AuthAPIURL})
@@ -222,11 +221,7 @@ http_headers = { "X-GPTBridge-Account" = %s, "X-GPTBridge-Channel" = %s }
 	if err := os.WriteFile(filepath.Join(o.Home, "models.json"), catalog, 0600); err != nil {
 		return o, err
 	}
-	p := filepath.Join(o.Home, "config.toml")
-	if err := os.WriteFile(p+".tmp", []byte(data), 0600); err != nil {
-		return o, err
-	}
-	return o, os.Rename(p+".tmp", p)
+	return o, ownerfile.Write(filepath.Join(o.Home, "config.toml"), []byte(data))
 }
 
 func Environment(o Options) []string {

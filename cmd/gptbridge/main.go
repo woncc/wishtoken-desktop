@@ -41,7 +41,7 @@ const usage = `gptbridge — 本地 GPT 不降智桥接 / local Basispoints brid
   gptbridge import --codex            从 ~/.codex/auth.json 导入 (codex login)
   gptbridge import --cpa [DIR]        从 CLIProxyAPI 凭据目录导入
   gptbridge login                     浏览器 OAuth 登录并导入
-  gptbridge accounts [list|remove ID|refresh [ID]|usage [ID]|export [--format cpa|codex] [-o FILE]]
+  gptbridge accounts [list|remove ID|refresh [ID]|usage [ID]|export --format cpa|codex -o FILE]
   gptbridge check                     检查凭据、代理与上游连通性
   gptbridge test [--model M] [--route bps|codex]   发送一条探测请求
   gptbridge codex-config [--model M] [--effort E] [--remove]  写入 Codex config.toml
@@ -430,20 +430,24 @@ func runAccounts(args []string) error {
 	case "export":
 		fs := flag.NewFlagSet("export", flag.ExitOnError)
 		format := fs.String("format", "cpa", "cpa | codex")
-		out := fs.String("o", "", "output file (default stdout)")
+		out := fs.String("o", "", "owner-only output file (required; stdout is refused)")
 		_ = fs.Parse(args)
-		raw, err := account.ExportJSON(store.List(), *format)
-		if err != nil {
-			return err
-		}
-		if *out == "" {
-			fmt.Println(string(raw))
-			return nil
-		}
-		return writeOwnerFile(*out, raw)
+		return exportAccounts(store.List(), *format, *out)
 	default:
 		return fmt.Errorf("unknown accounts subcommand %q", sub)
 	}
+}
+
+func exportAccounts(accounts []account.Account, format, out string) error {
+	out = strings.TrimSpace(out)
+	if out == "" || out == "-" {
+		return fmt.Errorf("accounts export requires -o FILE; OAuth credentials are not written to stdout")
+	}
+	raw, err := account.ExportJSON(accounts, format)
+	if err != nil {
+		return err
+	}
+	return writeOwnerFile(out, raw)
 }
 
 func serverIdentity(cfg *config.Config) oauth.UsageIdentity {

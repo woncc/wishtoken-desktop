@@ -13,13 +13,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/jwt"
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 // Account is one ChatGPT login usable by the bridge.
@@ -322,18 +322,11 @@ func (s *Store) saveLocked() error {
 	if s.path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
-		return err
-	}
 	raw, err := json.MarshalIndent(storeFile{Version: 1, Accounts: s.accounts}, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return ownerfile.Write(s.path, raw)
 }
 
 // List returns copies of all accounts ordered by creation time.

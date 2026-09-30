@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 // Route policies decide which upstream serves a request.
@@ -147,22 +149,16 @@ func Load(path string) (*Config, error) {
 }
 
 // Save writes the configuration atomically with owner-only permissions.
+// A symlink at path or path.tmp is not followed.
 func (c *Config) Save(path string) error {
 	if err := c.Normalize(); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	raw, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return ownerfile.Write(path, raw)
 }
 
 // ApplyEnv overlays GPTBRIDGE_* environment variables.
