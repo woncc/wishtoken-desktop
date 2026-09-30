@@ -34,7 +34,9 @@ const SECRET_TEXT = [
 // A space, newline, or extra @ defeats a normal URL parse. Those passwords are
 // removed from renderer text too. Username-only values stay; the settings
 // field is copied back after this pass so the editor can round-trip.
-const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,})(?::\\d+)?(?=$|[\\s/?#])';
+// A single-label host counts only with an explicit port. "v1:2@beta" has no
+// port, so it stays ordinary text; "user:secret@my-proxy:7890" does not.
+const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|[A-Za-z][A-Za-z0-9_-]*:\\d{2,5})(?::\\d+)?(?=$|[\\s/?#])';
 const PROXY_BOUND = '[\\s"\'()<>]';
 function redactProxyCredentials(text) {
   const compact = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@/gi;
