@@ -87,29 +87,66 @@ func ParseProxyURL(raw string) (*url.URL, error) {
 
 // Redact hides credentials embedded in a proxy URL for logging and management
 // responses. A schemeless user:password@host value is recognized too.
+// A space or bad percent escape makes url.Parse fail; those passwords are
+// scrubbed instead of returned unchanged.
 func Redact(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
 	candidate := raw
-	synthetic := false
+	restore := ""
 	if !strings.Contains(raw, "://") {
-		candidate = "http://" + raw
-		synthetic = true
+		if strings.HasPrefix(raw, "//") {
+			// Prepending "http://" would produce "http:////user..." and hide userinfo.
+			candidate = "http:" + raw
+			restore = "//"
+		} else {
+			candidate = "http://" + raw
+			restore = "schemeless"
+		}
 	}
 	parsed, err := url.Parse(candidate)
-	if err != nil || parsed.User == nil {
-		return raw
+	if err == nil && parsed.User != nil {
+		if _, ok := parsed.User.Password(); !ok {
+			return raw
+		}
+		redacted := parsed.Redacted()
+		switch restore {
+		case "schemeless":
+			redacted = strings.TrimPrefix(redacted, "http://")
+		case "//":
+			redacted = "//" + strings.TrimPrefix(redacted, "http://")
+		}
+		return redacted
 	}
-	if _, ok := parsed.User.Password(); !ok {
-		return raw
+	if scrubbed, ok := scrubProxyUserinfo(raw); ok {
+		return scrubbed
 	}
-	redacted := parsed.Redacted()
-	if synthetic {
-		redacted = strings.TrimPrefix(redacted, "http://")
+	return raw
+}
+
+// scrubProxyUserinfo replaces a password in user:password@host when url.Parse
+// rejects the string. Username-only values are left unchanged.
+func scrubProxyUserinfo(raw string) (string, bool) {
+	at := strings.LastIndex(raw, "@")
+	if at <= 0 {
+		return "", false
 	}
-	return redacted
+	head, tail := raw[:at], raw[at:]
+	prefix, userinfo := "", head
+	if i := strings.Index(head, "://"); i >= 0 {
+		prefix = head[:i+3]
+		userinfo = head[i+3:]
+	} else if strings.HasPrefix(head, "//") {
+		prefix = "//"
+		userinfo = head[2:]
+	}
+	colon := strings.Index(userinfo, ":")
+	if colon < 0 {
+		return "", false
+	}
+	return prefix + userinfo[:colon] + ":xxxxx" + tail, true
 }
 
 // PreserveProxy returns current when incoming is empty of changes or is only

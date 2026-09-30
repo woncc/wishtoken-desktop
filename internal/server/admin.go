@@ -415,7 +415,7 @@ func (s *Server) adminAccountAction(w http.ResponseWriter, r *http.Request, rest
 				return
 			}
 			value := httpx.PreserveProxy(current.ProxyURL, *req.ProxyURL)
-			if value != "" {
+			if value != "" && value != current.ProxyURL {
 				if _, err := httpx.ParseProxyURL(value); err != nil {
 					writeError(w, r, http.StatusBadRequest, "invalid_proxy", "invalid_request_error", err.Error())
 					return
@@ -525,7 +525,9 @@ func (s *Server) adminUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated.ProxyURL = httpx.PreserveProxy(current.ProxyURL, updated.ProxyURL)
-	if updated.ProxyURL != "" {
+	// A round-trip of the redacted value keeps the stored proxy, even when that
+	// stored value cannot be parsed. Re-validating it would reject unrelated edits.
+	if updated.ProxyURL != "" && updated.ProxyURL != current.ProxyURL {
 		if _, err := httpx.ParseProxyURL(updated.ProxyURL); err != nil {
 			writeError(w, r, http.StatusBadRequest, "invalid_proxy", "invalid_request_error", err.Error())
 			return

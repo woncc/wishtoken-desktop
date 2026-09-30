@@ -20,8 +20,28 @@ func TestRedactHidesProxyPassword(t *testing.T) {
 			t.Fatalf("redact %q -> %q", in, got)
 		}
 	}
-	if Redact("http://127.0.0.1:7890") != "http://127.0.0.1:7890" || Redact("") != "" {
+	if Redact("http://127.0.0.1:7890") != "http://127.0.0.1:7890" || Redact("") != "" || Redact("http://user@127.0.0.1:7890") != "http://user@127.0.0.1:7890" {
 		t.Fatal("proxy without credentials changed")
+	}
+	unparsed := []string{
+		"http://user:" + password + " proxy@127.0.0.1:7890",
+		"http://user:" + password + "%zz@127.0.0.1:7890",
+		"http://user:" + password + "\n" + "proxy@127.0.0.1:1",
+		"//user:" + password + "@127.0.0.1:7890",
+		"user:" + password + " proxy@127.0.0.1:7890",
+	}
+	for _, in := range unparsed {
+		got := Redact(in)
+		if strings.Contains(got, password) || got == in {
+			t.Fatalf("unparsed redact %q -> %q", in, got)
+		}
+		if again := Redact(got); strings.Contains(again, password) {
+			t.Fatalf("second redact leaked: %q", again)
+		}
+	}
+	malformed := "http://user:" + password + "%zz@127.0.0.1:7890"
+	if got := PreserveProxy(malformed, Redact(malformed)); got != malformed {
+		t.Fatalf("malformed preserve %q", got)
 	}
 	again := Redact(Redact("user:" + password + "@127.0.0.1:7890"))
 	if strings.Contains(again, password) {
