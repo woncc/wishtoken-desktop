@@ -22,5 +22,17 @@ test('preload exposes only named bridge methods and main keeps the renderer sand
   assert.match(main, /publicProbe/);
   assert.match(main, /publicLogs/);
   assert.match(main, /withoutSecrets\(prefs\)/);
+  assert.match(main, /return publicLaunch\(result, options\)/);
+  assert.match(main, /return publicRestore\(result\)/);
+  assert.match(main, /return publicAccountAction\(result\)/);
+  assert.match(main, /return publicUsageResult\(/);
+  assert.match(main, /return publicSettings\(/);
+  assert.match(main, /return publicPreferences\(prefs\)/);
+  assert.match(main, /return publicApp\(codexApp\)/);
+  assert.match(main, /return publicServiceState\(/);
+  assert.match(main, /return publicAbout\(/);
+  assert.match(main, /return publicSelection\(account_id\)/);
+  assert.doesNotMatch(main, /return result;|return prefs;|return codexApp;|service\.logPath/);
+  assert.match(main, /case 'about': return publicAbout\(\{ version: app\.getVersion\(\), platform: process\.platform, arch: process\.arch \}\)/);
   assert.doesNotMatch(main, /nodeIntegration: true|sandbox: false|webviewTag: true/);
 });

@@ -251,4 +251,52 @@ function publicImport(result) {
     ...(typeof value.files === 'number' ? { files: value.files } : {})
   });
 }
-module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport };
+function objectValue(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+function publicLaunch(result, options) {
+  const value = objectValue(result);
+  if (value.cancelled === true) return { cancelled: true };
+  const requested = objectValue(options);
+  const out = { ok: true };
+  if (requested.target === 'app' && (requested.app_mode === 'main' || requested.app_mode === 'isolated')) out.app_mode = requested.app_mode;
+  if (typeof value.warning === 'string' && value.warning) out.warning = value.warning;
+  return redactPublic(out);
+}
+function publicRestore(result) {
+  const value = objectValue(result);
+  if (value.cancelled === true) return { cancelled: true };
+  const out = {};
+  if (value.restored === true) out.restored = true;
+  if (typeof value.warning === 'string' && value.warning) out.warning = value.warning;
+  return redactPublic(out);
+}
+function publicAccountAction(result) {
+  const value = objectValue(result);
+  if (typeof value.id === 'string' && value.id) return redactPublic(publicAccount(value));
+  return { ok: true };
+}
+function publicUsageResult(result) {
+  return redactPublic({ ok: true, ...(publicUsage(result) || {}) });
+}
+function publicSettings(result) {
+  const value = objectValue(result);
+  return redactPublic({ proxy_url: asString(value.proxy_url), auto_refresh: value.auto_refresh === true, usage_probe: value.usage_probe === true });
+}
+function publicApp(app) {
+  const value = objectValue(app);
+  const out = { installed: value.installed === true };
+  if (typeof value.error === 'string' && value.error) out.error = value.error;
+  return redactPublic(out);
+}
+function publicServiceState(result) {
+  return { reused: objectValue(result).reused === true };
+}
+function publicAbout(info) {
+  const value = objectValue(info);
+  return { version: asString(value.version), platform: asString(value.platform), arch: asString(value.arch) };
+}
+function publicSelection(accountID) {
+  return { account_id: accountID };
+}
+module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection };

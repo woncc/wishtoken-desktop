@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -90,18 +90,19 @@ async function handle(method, input) {
       prefs.directory = result.filePaths[0]; savePrefs();
       return prefs.directory;
     }
-    case 'usage': return service.request(`/api/accounts/${requireID(input)}/usage`, 'POST', {}, 40000);
+    case 'usage': return publicUsageResult(await service.request(`/api/accounts/${requireID(input)}/usage`, 'POST', {}, 40000));
     case 'account': {
       requireID(input?.id);
-      if (input.action === 'delete') return service.request(`/api/accounts/${input.id}`, 'DELETE');
-      if (['refresh', 'clear-cooldown'].includes(input.action)) return service.request(`/api/accounts/${input.id}/${input.action}`, 'POST', {}, 95000);
-      if (input.action === 'update') {
+      let result;
+      if (input.action === 'delete') result = await service.request(`/api/accounts/${input.id}`, 'DELETE');
+      else if (['refresh', 'clear-cooldown'].includes(input.action)) result = await service.request(`/api/accounts/${input.id}/${input.action}`, 'POST', {}, 95000);
+      else if (input.action === 'update') {
         const patch = {};
         if (typeof input.name === 'string') patch.name = input.name.slice(0, 100);
         if (typeof input.disabled === 'boolean') patch.disabled = input.disabled;
-        return service.request(`/api/accounts/${input.id}`, 'PATCH', patch);
-      }
-      throw new Error('未知账号操作');
+        result = await service.request(`/api/accounts/${input.id}`, 'PATCH', patch);
+      } else throw new Error('未知账号操作');
+      return publicAccountAction(result);
     }
     case 'launch': {
       if (switchingApp) throw new Error('正在切换 Codex，请等待完成');
@@ -114,7 +115,7 @@ async function handle(method, input) {
           if (!codexApp.installed) throw new Error(codexApp.error);
           if (options.app_mode === 'main') {
             processes = await appRuntime.mainProcesses(codexApp.binary);
-            if (processes.length && !(await confirmMainRestart(false))) return { cancelled: true };
+            if (processes.length && !(await confirmMainRestart(false))) return publicLaunch({ cancelled: true });
           }
         }
         const result = await service.request('/api/codex/launch', 'POST', { ...options, prepare_only: options.target === 'app' }, 25000);
@@ -135,7 +136,7 @@ async function handle(method, input) {
         }
         if (options.channel === 'codex') prefs.account_speeds = { ...prefs.account_speeds, [options.account_id]: options.speed };
         prefs = { ...prefs, directory: options.target === 'cli' ? options.directory : prefs.directory, target: options.target, app_mode: options.app_mode || prefs.app_mode, channel: options.channel, account_id: options.account_id, model: options.model, effort: options.effort, context_window: options.context_window, compact_limit: options.compact_limit }; savePrefs();
-        return result;
+        return publicLaunch(result, options);
       } finally { switchingApp = false; }
     }
     case 'restoreMainApp': {
@@ -146,24 +147,24 @@ async function handle(method, input) {
         codexApp = await appRuntime.discoverApp(prefs.app_path);
         if (!codexApp.installed) throw new Error(codexApp.error);
         const processes = await appRuntime.mainProcesses(codexApp.binary);
-        if (!(await confirmMainRestart(true))) return { cancelled: true };
+        if (!(await confirmMainRestart(true))) return publicRestore({ cancelled: true });
         await appRuntime.closeMainProcesses(codexApp.binary, processes);
         const result = mainProfile.restore(dataHome, primaryHome);
         try { await appRuntime.launchApp(codexApp.binary, primaryHome, service.config.api_key, path.join(dataHome, 'config.json'), 'main'); }
         catch (error) { result.warning = '原配置已恢复，请手动打开 Codex App：' + safeError(error); }
-        return result;
+        return publicRestore(result);
       } finally { switchingApp = false; }
     }
     case 'selectAccount': {
       const account_id = requireID(input);
-      const result = await service.request('/api/codex/select', 'POST', { account_id });
-      prefs.account_id = account_id; savePrefs(); return result;
+      await service.request('/api/codex/select', 'POST', { account_id });
+      prefs.account_id = account_id; savePrefs(); return publicSelection(account_id);
     }
     case 'chooseApp': {
       const result = await dialog.showOpenDialog(window, { title: '选择 Codex App', properties: ['openFile'], ...(process.platform === 'linux' ? {} : {filters: [{ name: 'Codex App', extensions: process.platform === 'darwin' ? ['app'] : ['exe'] }]}) });
       if (result.canceled) return null;
       const binary = appRuntime.appExecutable(result.filePaths[0]); if (!binary) throw new Error('请选择 Codex/ChatGPT 应用，或其完整安装目录内的图形主程序');
-      prefs.app_path = binary; savePrefs(); codexApp = await appRuntime.discoverApp(binary); return codexApp;
+      prefs.app_path = binary; savePrefs(); codexApp = await appRuntime.discoverApp(binary); return publicApp(codexApp);
     }
     case 'pelicanHistory': return { batches: pelican.snapshot(), default_prompt: DEFAULT_PROMPT };
     case 'pelicanStart': {
@@ -183,22 +184,22 @@ async function handle(method, input) {
       const probe = cleanProbe(input);
       return publicProbe(await service.request('/api/test', 'POST', { account_id: probe.account_id, model: probe.model, effort: probe.effort, route: probe.channel, prompt: 'Reply with only: CONNECTION OK' }, 150000));
     }
-    case 'saveSettings': return service.request('/api/settings', 'PUT', cleanSettings(input));
+    case 'saveSettings': return publicSettings(await service.request('/api/settings', 'PUT', cleanSettings(input)));
     case 'preferences': {
       const applied = applyPreferences(prefs, input);
       prefs = applied.prefs;
       if (applied.theme) nativeTheme.themeSource = applied.theme;
       savePrefs();
-      return prefs;
+      return publicPreferences(prefs);
     }
     case 'logs': return publicLogs(await service.request('/api/logs'));
     case 'openLink': await shell.openExternal(externalLink(input)); return true;
     case 'openData': {
       const error = await shell.openPath(dataHome); if (error) throw new Error(error); return true;
     }
-    case 'repairService': return service.start();
+    case 'repairService': return publicServiceState(await service.start());
     case 'copyInstall': clipboard.writeText('npm install -g @openai/codex'); return true;
-    case 'about': return { version: app.getVersion(), platform: process.platform, arch: process.arch, home: dataHome, log: service.logPath };
+    case 'about': return publicAbout({ version: app.getVersion(), platform: process.platform, arch: process.arch });
     default: throw new Error('不支持的操作');
   }
 }

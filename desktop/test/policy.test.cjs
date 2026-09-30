@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport } = require('../lib/policy.cjs');
+const { cleanSettings, cleanLaunch, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, requireID, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection } = require('../lib/policy.cjs');
 test('renderer cannot change local key, listener, route or fallback', () => {
   assert.deepEqual(cleanSettings({ api_key: 'attacker', listen: '0.0.0.0:1', native_fallback: true, route_policy: 'codex_only', desktop_mode: false, auto_refresh: false, proxy_url: ' http://127.0.0.1:7890 ' }), { auto_refresh: false, proxy_url: 'http://127.0.0.1:7890' });
   assert.throws(() => cleanSettings({ usage_probe: 'false' }));
@@ -137,4 +137,55 @@ test('renderer snapshot keeps ui fields and drops credential payloads', () => {
   assert.match(imported.warnings[0], /access_token or refresh_token/);
   assert.match(imported.warnings[1], /凭据已隐藏/);
   assert.equal(publicImport(null), null);
+});
+
+test('action responses keep explicit mode and drop profile paths and service internals', () => {
+  const jwt = 'eyJaaaaaaaaaa.bbbbbbbbbb.cccccccccc';
+  const launch = publicLaunch({
+    ok: true, pid: 42, home: '/tmp/instance', directory: '/work', account_id: 'acc-1', backup: '/tmp/main-backup',
+    app_data: '/tmp/instance/app-data', app_mode: 'isolated', api_key: 'local-key', warning: 'record failed near ' + jwt
+  }, { target: 'app', app_mode: 'main' });
+  assert.equal(launch.ok, true);
+  assert.equal(launch.app_mode, 'main');
+  assert.equal(launch.home, undefined);
+  assert.equal(launch.backup, undefined);
+  assert.equal(launch.app_data, undefined);
+  assert.equal(launch.pid, undefined);
+  assert.equal(launch.api_key, undefined);
+  assert.match(launch.warning, /凭据已隐藏/);
+  assert.deepEqual(publicLaunch({ cancelled: true, home: '/tmp/instance', app_mode: 'main' }, { target: 'app', app_mode: 'main' }), { cancelled: true });
+  assert.equal(publicLaunch({ home: '/tmp/main', app_mode: 'main' }, { target: 'app', app_mode: 'isolated' }).app_mode, 'isolated');
+  assert.equal(publicLaunch({ home: '/tmp/instance', pid: 9, app_mode: 'main' }, { target: 'cli' }).app_mode, undefined);
+  const restored = publicRestore({ home: '/tmp/main', backup: '/tmp/main-backup', restored: true, warning: '请手动打开 Codex App', api_key: 'local-key' });
+  assert.equal(restored.restored, true);
+  assert.equal(restored.home, undefined);
+  assert.equal(restored.backup, undefined);
+  assert.equal(restored.api_key, undefined);
+  assert.equal(restored.warning, '请手动打开 Codex App');
+  assert.deepEqual(publicRestore({ cancelled: true, home: '/tmp/main' }), { cancelled: true });
+  const account = publicAccountAction({ id: 'acc-1', email: 'a@example.test', access_token: 'raw-token', proxy_url: 'http://user:secret@127.0.0.1:7890', stats: { requests: 4 }, source: 'import', has_refresh_token: true, last_error: 'bad ' + jwt });
+  assert.equal(account.email, 'a@example.test');
+  assert.equal(account.has_refresh_token, true);
+  assert.equal(account.access_token, undefined);
+  assert.equal(account.proxy_url, undefined);
+  assert.equal(account.stats, undefined);
+  assert.equal(account.source, undefined);
+  assert.match(account.last_error, /凭据已隐藏/);
+  assert.deepEqual(publicAccountAction({ ok: true }), { ok: true });
+  const usage = publicUsageResult({ primary: { used_percent: 10, window_seconds: 18000, reset_at: '2026-10-02T00:00:00Z', access_token: 'nested' }, limit_reached: false, access_token: 'raw-token' });
+  assert.equal(usage.ok, true);
+  assert.equal(usage.primary.used_percent, 10);
+  assert.equal(usage.primary.access_token, undefined);
+  assert.equal(usage.access_token, undefined);
+  const settings = publicSettings({ proxy_url: 'http://127.0.0.1:7890', auto_refresh: true, usage_probe: false, config_path: '/tmp/config.json', listen: '0.0.0.0:9', api_key: 'local-key', api_key_set: true });
+  assert.deepEqual(settings, { proxy_url: 'http://127.0.0.1:7890', auto_refresh: true, usage_probe: false });
+  assert.deepEqual(publicApp({ installed: true, binary: '/secret/Codex.app', error: '' }), { installed: true });
+  assert.equal(publicApp({ installed: false, binary: '', error: 'missing ' + jwt }).error.includes('凭据已隐藏'), true);
+  assert.deepEqual(publicServiceState({ reused: false, config: { api_key: 'local-key' } }), { reused: false });
+  assert.deepEqual(publicAbout({ version: '0.8.2', platform: 'linux', arch: 'x64', home: '/tmp/desktop-home', log: '/tmp/service.log' }), { version: '0.8.2', platform: 'linux', arch: 'x64' });
+  assert.deepEqual(publicSelection('acc-1'), { account_id: 'acc-1' });
+  const prefs = publicPreferences({ channel: 'codex', app_path: '/secret/Codex', api_key: 'local-key', account_speeds: { 'acc-1': 'fast', 'acc-2': 'ultra' } });
+  assert.equal(prefs.app_path, undefined);
+  assert.equal(prefs.api_key, undefined);
+  assert.deepEqual(prefs.account_speeds, { 'acc-1': 'fast' });
 });
