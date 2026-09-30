@@ -38,3 +38,37 @@ test('renderer requests stay inside the app or the exact preview URL', () => {
   assert.equal(rendererRequestAllowed(preview, root), false);
   assert.equal(rendererRequestAllowed('not a url', root, allowPreview), false);
 });
+
+test('a symlink inside the app cannot expose a file outside it', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'gptbridge-nav-link-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'gptbridge-nav-outside-'));
+  t.after(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+  const page = path.join(home, 'renderer', 'index.html');
+  fs.mkdirSync(path.dirname(page), { recursive: true });
+  fs.writeFileSync(page, '<!doctype html>');
+  const inside = path.join(home, 'renderer', 'local.txt');
+  fs.writeFileSync(inside, 'local');
+  const secret = path.join(outside, 'secret.txt');
+  fs.writeFileSync(secret, 'keep');
+  const allowPreview = () => false;
+  try {
+    fs.symlinkSync(inside, path.join(home, 'alias.txt'));
+    fs.symlinkSync(secret, path.join(home, 'leak.txt'));
+    fs.symlinkSync(outside, path.join(home, 'linked-dir'));
+    fs.symlinkSync(path.join(outside, 'missing-target'), path.join(home, 'broken.txt'));
+  } catch (error) {
+    t.skip(error.message);
+    return;
+  }
+  assert.equal(rendererRequestAllowed(pathToFileURL(page).href, home, allowPreview), true);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'alias.txt')).href, home, allowPreview), true);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'assets', 'icon.png')).href, home, allowPreview), true);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'leak.txt')).href, home, allowPreview), false);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'linked-dir', 'secret.txt')).href, home, allowPreview), false);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'linked-dir', 'missing.txt')).href, home, allowPreview), false);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(home, 'broken.txt')).href, home, allowPreview), false);
+  assert.equal(fs.readFileSync(secret, 'utf8'), 'keep');
+});
