@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src http://127.0.0.1:*; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>WishToken Desktop</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="workspace.css">
+  <script src="app.js" defer></script>
+  <script src="pelican.js" defer></script>
+</head>
+<body>
+  <svg class="sprites" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5.3 7a8 8 0 0 1 13-2L20 7M4 17l1.7 2a8 8 0 0 0 13-2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-13h-8z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3m6 0h4"/></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><path d="M8 4h11a2 2 0 0 1 2 2v14H5a2 2 0 0 1-2-2V7h5zM8 4v14M12 9h5m-5 5h5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  </defs></svg>
+  <aside class="sidebar">
+    <div class="brand"><img src="../assets/icon.png" alt=""><div>WishToken<span>CODEX COMPANION</span></div></div>
+    <div class="nav-caption">工作空间</div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-page="accounts" aria-current="page"><svg><use href="#i-grid"/></svg>Team 账号<span id="nav-count">0</span></button>
+      <button class="nav-item" data-page="history"><svg><use href="#i-clock"/></svg>最近项目</button>
+      <button class="nav-item" data-page="pelican"><svg><use href="#i-bolt"/></svg>鹈鹕测智</button>
+      <button class="nav-item" data-page="logs"><svg><use href="#i-log"/></svg>运行记录</button>
+      <button class="nav-item" data-page="settings"><svg><use href="#i-settings"/></svg>设置</button>
+    </nav>
+    <div class="community-links"><button data-link="website">WishToken 官网 ↗</button><button data-link="invitations">邀请码与公告 ↗</button><button data-link="releases">下载与版本更新 ↗</button><button data-link="project">GitHub 开源项目 ↗</button></div><div class="sidebar-note"><div class="note-icon"><svg><use href="#i-terminal"/></svg></div><strong>一个账号，一个工作空间</strong><p>选好子号与项目，<br>接着上次的工作继续。</p></div>
+    <footer><div class="service-state"><span class="dot" id="service-dot"></span><span id="service-label">正在连接本地服务</span></div><div class="version">专用客户端 <span id="version">—</span></div></footer>
+  </aside>
+  <main>
+    <header class="page-header"><div><div class="eyebrow">YOUR LOCAL WORKSPACE</div><h1 id="page-title">Team 账号</h1></div><div class="header-actions"><button id="refresh-all" class="secondary"><svg><use href="#i-refresh"/></svg>刷新额度</button><button id="import-files" class="primary"><svg><use href="#i-upload"/></svg>导入 JSON</button></div></header>
+    <div id="connection-error" class="banner error" hidden><span></span><button id="repair-service">重新连接</button></div>
+    <section id="page-accounts" class="page">
+      <div class="overview"><div><span>已导入账号</span><strong id="total-count">—</strong></div><div><span>凭据就绪</span><strong id="ready-count">—</strong></div><div class="current-summary"><span>当前启动账号</span><strong id="current-label">尚未启动</strong></div><div class="route-pill"><span class="dot"></span><span id="route-label">BPS 通道</span></div></div>
+      <div class="workspace">
+        <div class="account-column">
+          <div class="list-toolbar"><label class="search"><svg><use href="#i-search"/></svg><input id="search" placeholder="搜索邮箱、备注或 Team" aria-label="搜索账号"></label><select id="filter" aria-label="账号状态筛选"><option value="all">全部状态</option><option value="ready">就绪</option><option value="cooldown">冷却中</option><option value="error">需处理</option><option value="disabled">已停用</option></select></div>
+          <div class="account-tools"><select id="account-sort" aria-label="账号排序"><option value="current">当前账号优先</option><option value="quota">剩余额度优先</option><option value="name">名称排序</option></select><label><input type="checkbox" id="compact-view">列表视图</label></div>
+          <div id="account-list" class="account-list" aria-live="polite"></div>
+          <button class="drop-hint" id="paste-json"><svg><use href="#i-upload"/></svg>拖入 JSON 文件，或粘贴账号 JSON<span>支持单个账号与批量导入</span></button>
+        </div>
+        <aside class="launch-panel">
+          <div class="panel-heading"><span class="icon-box"><svg><use href="#i-terminal"/></svg></span><div><h2>启动 Codex</h2><p>独立账号 · 独立项目会话</p></div></div>
+          <div id="selected-summary" class="selected-summary"><span class="muted">先从左侧选择一个账号</span></div>
+          <select id="quick-account" class="full" aria-label="快速选择子号"></select>
+          <button id="select-account" class="text-button">设为当前账号</button>
+          <button id="launch" class="primary launch" disabled>切换并启动<svg><use href="#i-arrow"/></svg></button>
+          <button id="resume" class="secondary full" disabled><svg><use href="#i-clock"/></svg>继续上次会话</button>
+          <label class="field-label" for="launch-target">启动方式</label><select id="launch-target" class="full"><option value="app">Codex App · 图形客户端</option><option value="cli">Codex CLI · 系统终端</option></select>
+          <label class="field-label" for="channel">服务通道</label><select id="channel" class="full"><option value="bps">BPS（默认）</option><option value="codex">原生 Codex</option></select>
+          <label class="field-label" for="model">模型</label><select id="model" class="full"><option value="gpt-6-astra">GPT-6 Astra</option></select>
+          <label class="field-label" for="speed">响应速度</label><select id="speed" class="full"><option value="standard">标准 · 常规用量</option><option value="fast">快速 · 用量可能增加</option></select><p id="speed-hint" class="small"></p>
+          <div class="field-label">推理强度</div><div class="efforts" id="efforts" role="group" aria-label="推理强度"><button data-effort="low">Low</button><button data-effort="medium">Medium</button><button data-effort="high">High</button><button data-effort="xhigh" class="chosen" aria-pressed="true">Xhigh</button></div>
+          <div id="directory-field"><label class="field-label" for="directory">项目目录</label><div class="directory-input"><input id="directory" placeholder="选择要工作的文件夹" spellcheck="false"><button id="choose-folder" title="浏览项目目录" aria-label="浏览项目目录"><svg><use href="#i-folder"/></svg></button></div></div>
+          <p id="app-directory-note" class="small">App 无需项目目录，打开后再选项目或开始新会话。</p>
+          <details class="advanced"><summary>上下文设置<span>272k / 200k</span></summary><div class="advanced-fields"><label>上下文窗口<input id="context-window" type="number" min="32000" max="272000" step="1000" value="272000"></label><label>自动压缩阈值<input id="compact-limit" type="number" min="8000" max="271999" step="1000" value="200000"></label></div></details>
+          <div id="cli-status" class="cli-status">正在检测 Codex CLI…</div><button id="copy-install" class="text-button" hidden>复制 Codex 安装命令</button>
+          <button id="choose-app" class="text-button">选择 Codex App 路径</button>
+          <div class="panel-footnote">App 使用子号身份查询额度。快速是请求偏好，实际服务等级以运行记录为准。速度设置用于后续新会话；已打开的 App 请退出后重启以重新加载。关闭本窗口，服务继续运行。</div>
+        </aside>
+      </div>
+    </section>
+    <section id="page-history" class="page" hidden><div class="section-intro"><h2>回到你的项目</h2><p>按账号和项目目录保存，每次启动沿用该账号的独立会话。</p></div><div id="history-list"></div></section>
+    <section id="page-pelican" class="page" hidden>
+      <div class="section-intro"><h2>让每个子号画一只骑自行车的鹈鹕</h2><p>同一提示词、模型和推理强度，直接对比动画细节。这是作品对比，不是标准化智商评分；测试会消耗账号额度。</p></div>
+      <div class="pelican-setup settings-card">
+        <div class="pelican-config"><label>服务通道<select id="pelican-channel" class="full"><option value="bps">BPS（默认）</option><option value="codex">原生 Codex</option></select></label><label>模型<select id="pelican-model" class="full"></select></label><label>推理强度<select id="pelican-effort" class="full"><option>low</option><option>medium</option><option>high</option><option selected>xhigh</option></select></label><label>同时测试<select id="pelican-concurrency" class="full"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+        <label class="field-label" for="pelican-prompt">提示词</label><textarea id="pelican-prompt" class="full" rows="3" maxlength="10000"></textarea>
+        <div class="horizontal pelican-account-heading"><strong>测试账号</strong><div><button id="pelican-current" class="text-button">只选当前</button><button id="pelican-all" class="text-button">全选可用</button></div></div>
+        <div id="pelican-accounts" class="pelican-accounts"></div>
+        <div class="pelican-actions"><button id="pelican-start" class="primary">开始测智</button><button id="pelican-cancel" class="secondary" hidden>取消本轮</button><span id="pelican-progress" class="muted"></span></div>
+      </div>
+      <div class="pelican-history-toolbar"><h2>测试结果</h2><select id="pelican-history" aria-label="选择历史测试"></select><button id="pelican-retry" class="secondary" hidden>重试未完成</button><button id="pelican-delete" class="text-button danger-text" hidden>删除本轮</button></div>
+      <p id="pelican-description" class="small"></p><div id="pelican-results" class="pelican-results"></div>
+    </section>
+    <section id="page-logs" class="page" hidden><div class="section-intro horizontal"><div><h2>最近请求</h2><p>查看实际路由、响应状态与耗时，排查连接问题。</p></div><button id="reload-logs" class="secondary">刷新记录</button></div><div id="logs-list"></div></section>
+    <section id="page-settings" class="page" hidden>
+      <div class="settings-grid"><div class="settings-card"><h2>连接与维护</h2><p>代理用于额度查询、凭据续期和模型请求。</p><label class="field-label" for="proxy">网络代理</label><input id="proxy" class="full" placeholder="留空使用系统网络 · http://127.0.0.1:7890" spellcheck="false"><label class="toggle-row"><span><strong>自动续期</strong><small>账号含 refresh token 时，在到期前续期</small></span><input type="checkbox" id="auto-refresh"></label><label class="toggle-row"><span><strong>定时查询额度</strong><small>后台每 30 分钟查询；也可随时手动刷新</small></span><input type="checkbox" id="usage-probe"></label><button id="save-settings" class="primary">保存设置</button></div>
+      <div class="settings-card"><h2>客户端</h2><label class="field-label" for="theme">外观</label><select id="theme" class="full"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select><div class="info-row"><span>单号最大并发</span><strong>5</strong></div><div class="info-row"><span>模型通道</span><strong>BPS / 原生 · 默认 BPS</strong></div><div class="info-row"><span>平台</span><strong id="platform">—</strong></div><div class="field-label">本地数据目录</div><code id="data-home"></code><button id="open-data" class="secondary full">打开数据目录</button><p class="small">这里保存账号凭据、额度快照与独立 Codex 配置。凭据没有 refresh token 时，到期后需重新导入。</p></div></div>
+    </section>
+  </main>
+  <div id="drop-overlay" hidden><svg><use href="#i-upload"/></svg><h2>松开以导入账号</h2><p>支持多个 JSON 文件</p></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <dialog id="modal"><form method="dialog"><button class="modal-close" aria-label="关闭"><svg><use href="#i-close"/></svg></button></form><div id="modal-content"></div></dialog>
+  <dialog id="pelican-preview"><form method="dialog"><button class="secondary">关闭预览</button></form><div id="pelican-preview-body"></div></dialog>
+</body>
+</html>

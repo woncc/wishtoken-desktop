@@ -1,0 +1,17 @@
+'use strict';
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const platform = process.argv[2] || process.platform;
+const arch = process.argv[3] || process.arch;
+if (!['win32', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) throw new Error('Expected win32/darwin and x64/arm64');
+const folder = `${platform === 'win32' ? 'win' : 'mac'}-${arch}`;
+const root = path.resolve(__dirname, '..', '..');
+const version = require('../package.json').version;
+const output = path.join(root, 'desktop', 'backend', folder, platform === 'win32' ? 'gptbridge.exe' : 'gptbridge');
+fs.mkdirSync(path.dirname(output), { recursive: true });
+const result = spawnSync(process.env.GO_BINARY || 'go', ['build', '-trimpath', `-ldflags=-s -w -X github.com/xxx-holic/wishtoken-desktop/internal/version.Version=${version}`, '-o', output, './cmd/gptbridge'], { cwd: root, env: { ...process.env, GOOS: platform === 'win32' ? 'windows' : 'darwin', GOARCH: arch === 'x64' ? 'amd64' : 'arm64', CGO_ENABLED: '0' }, stdio: 'inherit', windowsHide: true });
+if (result.error) throw result.error;
+if (result.status) process.exit(result.status);
+if (platform === 'darwin') fs.chmodSync(output, 0o755);
+console.log(`Built ${folder}`);

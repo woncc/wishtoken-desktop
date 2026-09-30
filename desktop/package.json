@@ -1,0 +1,33 @@
+{
+  "name": "wishtoken-desktop",
+  "version": "0.7.0",
+  "private": true,
+  "description": "WishToken companion for local Codex accounts, explicit channels and isolated workspaces",
+  "main": "main.cjs",
+  "author": "WishToken Desktop contributors",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "backend": "node scripts/build-backend.cjs",
+    "pack:win": "npm run backend -- win32 x64 && electron-builder --win dir --x64",
+    "dist:win": "npm run backend -- win32 x64 && electron-builder --win zip nsis --x64",
+    "dist:mac": "npm run backend -- darwin arm64 && npm run backend -- darwin x64 && electron-builder --mac zip --arm64 --x64",
+    "pack:mac:cross": "npm run backend -- darwin arm64 && npm run backend -- darwin x64 && node scripts/package-mac.cjs",
+    "smoke": "node test/features-smoke.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "44.5.0",
+    "electron-builder": "26.15.3"
+  },
+  "productName": "WishToken Desktop",
+  "homepage": "https://wishtoken.team/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xxx-holic/wishtoken-desktop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xxx-holic/wishtoken-desktop/issues"
+  }
+}

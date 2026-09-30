@@ -1,0 +1,82 @@
+'use strict';
+const { _electron: electron, expect } = require('@playwright/test');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const os = require('node:os');
+const net = require('node:net');
+const root = path.resolve(__dirname, '../..');
+(async()=>{
+ const home=await fs.mkdtemp(path.join(os.tmpdir(),'gptbridge-feature-ui-'));
+ const socket=net.createServer(); await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
+ await fs.writeFile(path.join(home,'config.json'),JSON.stringify({listen:`127.0.0.1:${port}`,api_key:'feature-ui-test-key',auto_refresh:false,usage_probe:false}));
+ const client=await electron.launch({executablePath:process.env.GPTBRIDGE_TEST_APP || require('electron'),args:process.env.GPTBRIDGE_TEST_APP ? [] : [path.join(root,'desktop')],env:{...process.env,GPTBRIDGE_DESKTOP_HOME:home}});
+ await fs.mkdir(path.join(root,'build/validation'),{recursive:true});const errors=[];
+ try {
+  const page=await client.firstWindow();page.on('pageerror',e=>errors.push(e.message));
+  await expect(page.locator('#service-label')).toHaveText('本地服务运行中');
+  await expect(page.locator('#channel')).toHaveValue('bps');
+  await page.locator('#channel').selectOption('codex');
+  await expect(page.locator('#model option')).toHaveCount(5);
+  await page.locator('#model').selectOption('gpt-5.6-terra');
+  await expect.poll(async()=> (await page.evaluate(()=>window.bridge.snapshot())).preferences.channel).toBe('codex');
+  const imported=await page.evaluate(()=>window.bridge.importText(JSON.stringify([1,2,3].map(n=>({access_token:'fake-local-only-'+n,account_id:'test-team',email:`member${n}@example.test`,name:`Team 子号 ${n}`})))));
+  await page.evaluate(()=>refresh());
+  await expect(page.locator('.account-card')).toHaveCount(3);
+  await page.locator(`#quick-account`).selectOption(imported.ids[1]);await page.locator('#select-account').click();
+  await expect(page.locator('#current-label')).toContainText('Team 子号 2');
+  const snapshot=await page.evaluate(()=>window.bridge.snapshot());if(snapshot.codex.active_account_id!==imported.ids[1]) throw new Error('Selection not persisted');
+  await expect(page.locator('#compact-view')).not.toBeChecked();
+  await page.locator('#speed').selectOption('fast');
+  await expect.poll(async()=> (await page.evaluate(()=>window.bridge.snapshot())).preferences.account_speeds?.[imported.ids[1]]).toBe('fast');
+  await page.locator('#channel').selectOption('bps');await expect(page.locator('#speed')).toBeDisabled();await expect(page.locator('#speed')).toHaveValue('standard');
+  await page.locator('#channel').selectOption('codex');await expect(page.locator('#speed')).toHaveValue('fast');
+  await page.locator('#model').selectOption('gpt-5.6-terra');
+  await page.locator('#quick-account').selectOption(imported.ids[0]);await expect(page.locator('#speed')).toHaveValue('standard');
+  await page.locator('#quick-account').selectOption(imported.ids[1]);await expect(page.locator('#speed')).toHaveValue('fast');
+  await page.locator('#launch-target').selectOption('cli');await page.locator('#directory').fill('');await page.locator('#launch-target').selectOption('app');
+  await expect(page.locator('#directory-field')).toBeHidden(); if(snapshot.codex.app.installed) await expect(page.locator('#launch')).toBeEnabled();
+  await page.locator('#launch-target').selectOption('cli');await expect(page.locator('#directory-field')).toBeVisible();await expect(page.locator('#launch')).toBeDisabled();
+  // Substitute only upstream generation; renderer, IPC, queue, preview and
+  // account switch still use production code and the real sidecar.
+  await client.evaluate(({app}, root)=>{
+   const require=process.mainModule.require.bind(process.mainModule);
+   const {BridgeService}=require(require('node:path').join(app.getAppPath(),'lib/service.cjs'));
+   const original=BridgeService.prototype.request;
+   BridgeService.prototype.request=async function(route,...args){
+    if(route!=='/api/pelican/generate') return original.call(this,route,...args);
+    const signal=args[3];
+    if(args[1].channel!=='codex' || args[1].model!=='gpt-5.6-terra') throw new Error('UI did not pass selected channel/model');
+    await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,650);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new Error('cancelled'));},{once:true});});
+    return {text:`<!doctype html><html><body style="margin:0;background:#edf7f4;display:grid;place-items:center;height:100vh"><svg width="280" height="170" viewBox="0 0 280 170"><circle cx="75" cy="126" r="32" fill="none" stroke="#23846e" stroke-width="5"/><circle cx="210" cy="126" r="32" fill="none" stroke="#23846e" stroke-width="5"/><path d="M75 126 120 80 148 126H75M148 126l42-54 20 54" fill="none" stroke="#344957" stroke-width="5"/><ellipse cx="128" cy="56" rx="32" ry="22" fill="white" stroke="#647788"/><circle cx="167" cy="28" r="16" fill="white" stroke="#647788"/><path d="m180 25 52 8-52 8z" fill="#efb847"/><circle cx="171" cy="24" r="3"/></svg><script>window.tick=0;setInterval(()=>document.body.dataset.tick=String(++window.tick),30);document.body.dataset.bridge=typeof window.bridge;try{parent.document.body;document.body.dataset.parent='readable'}catch{document.body.dataset.parent='blocked'}document.body.dataset.rtc=typeof RTCPeerConnection;fetch('https://example.test/blocked').then(()=>document.body.dataset.network='allowed').catch(()=>document.body.dataset.network='blocked');</script></body></html>`,duration_ms:1234,model:'gpt-6-astra',usage:{input_tokens:110,output_tokens:850,reasoning_tokens:400}};
+   };
+  },root);
+  await page.locator('[data-page="pelican"]').click();await expect(page.locator('.pelican-account')).toHaveCount(3);
+  await expect(page.locator('#pelican-channel')).toHaveValue('bps');
+  await page.locator('#pelican-channel').selectOption('codex');
+  await page.locator('#pelican-model').selectOption('gpt-5.6-terra');
+  await page.locator('#pelican-all').click();await page.locator('#pelican-start').click();
+  await expect(page.locator('.pelican-result iframe')).toHaveCount(3,{timeout:20000});
+  const frame=page.frameLocator('.pelican-result iframe').first();
+  await expect(frame.locator('body')).toHaveAttribute('data-parent','blocked');
+  await expect(frame.locator('body')).toHaveAttribute('data-bridge','undefined');await expect(frame.locator('body')).toHaveAttribute('data-rtc','undefined');await expect(frame.locator('body')).toHaveAttribute('data-network','blocked');
+  const before=Number(await frame.locator('body').getAttribute('data-tick'));await expect.poll(async()=>Number(await frame.locator('body').getAttribute('data-tick'))).toBeGreaterThan(before);
+  await page.locator('[data-pelican="preview"]').first().click();await expect(page.locator('#pelican-preview')).toBeVisible();await page.locator('#pelican-preview button').click();
+  await page.screenshot({path:path.join(root,'build/validation/pelican.png'),fullPage:true});
+  await page.locator('#pelican-start').click();await expect(page.locator('#pelican-cancel')).toBeVisible();await page.locator('#pelican-cancel').click();
+  await expect(page.locator('#pelican-cancel')).toBeHidden({timeout:12000});
+  const history=await page.evaluate(()=>window.bridge.pelicanHistory());if(history.batches[0].status!=='cancelled' || history.batches.some(b=>b.channel!=='codex')) throw new Error('Cancel or channel not persisted');
+  await page.locator('[data-page="accounts"]').click();await page.locator('#launch-target').selectOption('app');
+  await expect(page.locator('#toasts .toast')).toHaveCount(0,{timeout:15000});
+  // Synthetic presentation fixtures only; do not query or capture real accounts.
+  await page.evaluate(() => { state.data.accounts.forEach((account,i) => { account.usage={updated_at:new Date().toISOString(),primary:{used_percent:[26,69,87][i],window_seconds:604800,reset_at:new Date(Date.now()+172800000).toISOString()}}; }); renderAccounts(); window.scrollTo(0,0); });
+  await expect(page.locator('#account-list progress')).toHaveCount(3);
+  const launchBox=await page.locator('#launch').boundingBox();if(launchBox.y+launchBox.height>900)throw new Error('Primary launch action is below the initial viewport');
+  await fs.mkdir(path.join(root,'build/validation'),{recursive:true});await page.screenshot({path:path.join(root,'build/validation/accounts.png'),fullPage:true});
+  if(errors.length) throw new Error(errors.join('\n'));
+  console.log(JSON.stringify({ok:true,accounts:3,appWithoutDirectory:true,persistedSwitch:true,previews:3,previewScripts:true,networkBlocked:true,preloadIsolated:true,cancelled:true,rendererErrors:0}));
+ } finally {
+  const config=JSON.parse(await fs.readFile(path.join(home,'config.json'),'utf8'));
+  const {BridgeService}=require('../lib/service.cjs'); const service=new BridgeService({home,binary:''});service.config=config;await service.stop();
+  require('node:child_process').execFileSync('taskkill.exe',['/PID',String(client.process().pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+ }
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,65 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { Pelican, extractHTML } = require('../lib/pelican.cjs');
+const { launchEnvironment } = require('../lib/codex-app.cjs');
+const { cleanLaunch } = require('../lib/policy.cjs');
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const accounts = [1,2,3].map(n => ({id:`acc-test${n}`,email:`test${n}@example.test`}));
+const input = {account_ids:accounts.map(a=>a.id),model:'gpt-6-astra',effort:'high',concurrency:2};
+const result = {text:'<!doctype html><html><body><svg></svg><script>window.animation=true;</script></body></html>',duration_ms:100,usage:{output_tokens:42}};
+test('channel persists in generation, history, retry and legacy defaults', async t => {
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'gptbridge-channels-'));
+ const seen=[]; const p=new Pelican(home,async body=>{seen.push(body);return result;});
+ t.after(async()=>{await p.close();fs.rmSync(home,{recursive:true,force:true});});
+ p.start({...input,channel:'codex'},accounts); await p.running;
+ assert.ok(seen.every(body=>body.channel==='codex'));
+ const batch=p.snapshot()[0]; assert.equal(batch.channel,'codex');
+ assert.equal(p.artifact(batch.items[0].id).channel,'codex');
+ assert.equal(batch.items[0].response_model,null); // never invent a returned model
+ const recovered=new Pelican(home,async()=>result); assert.equal(recovered.snapshot()[0].channel,'codex');
+ recovered.start({...batch,account_ids:accounts.map(a=>a.id)},accounts); await recovered.running;
+ assert.equal(recovered.snapshot()[0].channel,'codex');
+ delete recovered.batches[0].channel; recovered.save();
+ const legacy=new Pelican(home,()=>{}); assert.equal(legacy.snapshot()[0].channel,'bps');
+ assert.throws(()=>p.start({...input,channel:'invalid'},accounts));
+});
+test('batch concurrency, pinned accounts, persistence, preview containment and deletion', async t => {
+ const home = fs.mkdtempSync(path.join(os.tmpdir(),'gptbridge-pelican-test-'));
+ let count=0,peak=0; const seen=[];
+ const p = new Pelican(home,async (body) => { count++; peak=Math.max(peak,count); seen.push(body.account_id); await delay(30); count--; return result; });
+ t.after(async()=>{await p.close();fs.rmSync(home,{recursive:true,force:true});});
+ await p.listen();
+ const id = p.start(input,accounts); assert.throws(()=>p.start(input,accounts));
+ await p.running; assert.equal(peak,2); assert.deepEqual(seen.sort(),accounts.map(a=>a.id));
+ assert.equal(p.snapshot()[0].status,'completed');
+ const item=p.snapshot()[0].items[0];
+ const response=await fetch(item.preview); const text=await response.text();
+ assert.match(response.headers.get('content-security-policy'),/sandbox allow-scripts/);
+ assert.match(response.headers.get('content-security-policy'),/connect-src 'none'/);
+ assert.ok(text.indexOf('RTCPeerConnection') < text.indexOf('window.animation'));
+ assert.equal((await fetch(`${p.origin}/wrong/${item.id}`)).status,404);
+ assert.throws(()=>p.artifact('../config'));
+ const recovered=new Pelican(home,()=>{}); assert.equal(recovered.batches[0].items[0].status,'completed');
+ p.remove(id); assert.equal(p.snapshot().length,0); assert.throws(()=>p.artifact(item.id));
+});
+test('cancel aborts running requests, drops queued work and survives restart', async t => {
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'gptbridge-pelican-cancel-')); let started=0;
+ const p=new Pelican(home,(_body,signal)=>new Promise((resolve,reject)=>{started++;signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});}));
+ t.after(async()=>{await p.close();fs.rmSync(home,{recursive:true,force:true});});
+ p.start({...input,concurrency:1},accounts); p.cancel(); await p.running;
+ assert.equal(started,1); assert.ok(p.batches[0].items.every(i=>i.status==='cancelled'));
+ p.batches[0].status='running';p.batches[0].items[0].status='running';p.save();
+ const recovered=new Pelican(home,()=>{}); assert.equal(recovered.batches[0].status,'interrupted'); assert.equal(recovered.batches[0].items[0].status,'interrupted');
+});
+test('App launch has no directory requirement and never inherits the host Codex identity',()=>{
+ const request=cleanLaunch({target:'app',account_id:'acc-test1',model:'gpt-6-astra',effort:'xhigh',resume:true});
+ assert.equal(request.directory,'');assert.equal(request.resume,false);
+ const env=launchEnvironment('/private/profile','test-key',{CODEX_HOME:'/original',CODEX_CLI_PATH:'original',ELECTRON_RUN_AS_NODE:'1',GPTBRIDGE_OTHER:'bad',PATH:'system',OPENAI_API_KEY:'original'});
+ assert.equal(env.CODEX_HOME,'/private/profile');assert.equal(env.GPTBRIDGE_CODEX_KEY,'test-key');assert.equal(env.CODEX_CLI_PATH,undefined);assert.equal(env.ELECTRON_RUN_AS_NODE,undefined);assert.equal(env.OPENAI_API_KEY,undefined);
+ assert.throws(()=>extractHTML('partial <html><body>'));
+ assert.match(extractHTML('```html\n<html></html>\n```'),/<html>/);
+});

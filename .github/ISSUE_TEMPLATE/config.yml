@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: WishToken 官网与服务
+    url: https://wishtoken.team/
+    about: 站点入口与服务信息
+  - name: 公告与邀请码
+    url: https://github.com/xxx-holic/wishtoken-desktop/discussions/categories/announcements
+    about: 不定期发放与版本公告，以维护者发布的信息为准

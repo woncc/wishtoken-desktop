@@ -1,0 +1,40 @@
+appId: app.gptbridge.team
+productName: WishToken Desktop
+copyright: Copyright © 2026 WishToken Desktop contributors
+directories:
+  output: release
+  buildResources: assets
+files:
+  - main.cjs
+  - preload.cjs
+  - lib/**
+  - renderer/**
+  - assets/icon.png
+  - package.json
+extraResources:
+  - from: backend/${os}-${arch}/
+    to: backend
+  - from: ../LICENSE
+    to: LICENSE.txt
+  - from: ../NOTICE.md
+    to: NOTICE.md
+asar: true
+artifactName: WishToken-Desktop-${version}-${os}-${arch}.${ext}
+win:
+  icon: assets/icon.ico
+  target: [zip, nsis]
+  signExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  deleteAppDataOnUninstall: false
+mac:
+  icon: assets/icon.icns
+  category: public.app-category.developer-tools
+  target: [zip]
+  identity: null
+  hardenedRuntime: false
+  extendInfo:
+    NSHighResolutionCapable: true
