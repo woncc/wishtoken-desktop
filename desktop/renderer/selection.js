@@ -53,6 +53,50 @@
     if (channel == null || channel === '' || channel === 'bps') return 'BPS';
     return '';
   }
+  function resolveChoice(value, allowed, fallback) {
+    const options = Array.isArray(allowed) ? allowed : [];
+    if (value == null || value === '') return { value: fallback, explicit: false, available: options.includes(fallback) };
+    const text = String(value);
+    return { value: text, explicit: true, available: options.includes(text) };
+  }
+  function explicitNumber(value, fallback) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  }
+  // Missing legacy speed is standard. Any other recorded value stays unnamed
+  // so the history row cannot present it as standard.
+  function speedName(speed) {
+    if (speed == null || speed === '' || speed === 'standard') return '标准';
+    if (speed === 'fast') return '快速';
+    return '';
+  }
+  // Retry must repeat the recorded compare settings, not the preview URLs
+  // or any other item payload carried in the history snapshot.
+  function pelicanRetryRequest(batch) {
+    if (!batch || typeof batch !== 'object' || Array.isArray(batch)) return null;
+    const items = Array.isArray(batch.items) ? batch.items : [];
+    return {
+      account_ids: items.filter(item => item && item.status !== 'completed' && typeof item.account_id === 'string').map(item => item.account_id),
+      channel: batch.channel,
+      model: batch.model,
+      effort: batch.effort,
+      prompt: batch.prompt,
+      concurrency: batch.concurrency
+    };
+  }
+  function historyPlace(record) {
+    const value = record && typeof record === 'object' && !Array.isArray(record) ? record : {};
+    const target = value.target;
+    if (target == null || target === '' || target === 'cli') {
+      const directory = typeof value.directory === 'string' ? value.directory : '';
+      return { kind: 'directory', title: directory, text: directory };
+    }
+    if (target === 'app') {
+      if (value.app_mode === 'main') return { kind: 'app', title: '主应用 · 原有项目与会话', text: '主应用 · 原有项目与会话' };
+      if (value.app_mode === 'isolated') return { kind: 'app', title: '独立实例 · 单独工作空间', text: '独立实例 · 单独工作空间' };
+      return { kind: 'app', title: '未标明 App 工作空间', text: '未标明 App 工作空间' };
+    }
+    return { kind: 'other', title: String(target), text: String(target) };
+  }
   function recorded(value, fallback) {
     return value == null || value === '' ? fallback : value;
   }
@@ -97,5 +141,5 @@
     const effortValue = typeof prefs.pelican_effort === 'string' && prefs.pelican_effort ? prefs.pelican_effort : launchEffort;
     return { channel: resolveChannel(prefs.pelican_channel), model, effort: resolveEffort(effortValue) };
   }
-  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults, replayLaunch };
+  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch };
 });

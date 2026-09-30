@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanProbe, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanProbe, safeError, applyPreferences, appliedTheme, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -189,7 +189,7 @@ async function handle(method, input) {
     case 'preferences': {
       const applied = applyPreferences(prefs, input);
       prefs = applied.prefs;
-      if (applied.theme) nativeTheme.themeSource = applied.theme;
+      if (applied.theme) nativeTheme.themeSource = appliedTheme(applied.theme);
       savePrefs();
       return publicPreferences(prefs);
     }
@@ -215,7 +215,7 @@ if (lock) {
     await fsp.mkdir(dataHome, { recursive: true, mode: 0o700 });
     readPrefs();
     codexApp = await appRuntime.discoverApp(prefs.app_path);
-    nativeTheme.themeSource = prefs.theme || 'system';
+    nativeTheme.themeSource = appliedTheme(prefs.theme);
     const platformFolder = {win32:'win',darwin:'mac',linux:'linux'}[process.platform];
     if (!platformFolder) throw new Error('当前系统暂不支持桌面客户端');
     const executable = process.platform === 'win32' ? 'gptbridge.exe' : 'gptbridge';

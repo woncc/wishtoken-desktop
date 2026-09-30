@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
+const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
 
 const catalog = {
   catalog: [
@@ -62,15 +62,58 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.match(app, /speedLabel\(record\.speed\)/);
   assert.match(pelican, /dataset\.available/);
   assert.match(pelican, /resolvePelicanDefaults/);
+  assert.match(pelican, /pelicanRetryRequest/);
+  assert.doesNotMatch(pelican, /startPelican\(\{ \.\.\.b/);
   assert.match(pelican, /pelican_model/);
   assert.doesNotMatch(pelican, /channelModels\(\$\('pelican-channel'\)\.value, \$\('pelican-model'\), \$\('model'\)\.value\)/);
-  assert.match(app, /replayLaunch/);
+  assert.match(app, /replayLaunch\(record, false\)/);
+  assert.match(app, /historyPlace/);
+  assert.match(app, /showTarget/);
+  assert.match(app, /dataset\.available === 'false' \? 'system'/);
+  assert.match(app, /explicitNumber\(preferences\.context_window, 272000\)/);
   assert.doesNotMatch(app, /app_mode \|\| 'isolated'/);
+  assert.doesNotMatch(app, /preferences\.app_mode \|\| 'main'/);
+  assert.doesNotMatch(app, /preferences\.target \|\|/);
+  assert.doesNotMatch(app, /app_mode === 'main' \? '主应用/);
+  assert.doesNotMatch(app, /speed === 'fast' \? '快速' : '标准'/);
   assert.doesNotMatch(pelican, /item\.route \|\| b\.channel/);
   assert.match(pelican, /返回通道/);
   assert.doesNotMatch(app, /service_tier \|\| 'standard'/);
   assert.match(app, /service_tier \|\| '未报告'/);
   assert.match(app, /record\.route \|\| '未报告'/);
+});
+
+test('explicit launch choices and recorded labels are not rewritten', () => {
+  assert.deepEqual(resolveChoice('cli', ['app', 'cli'], 'app'), { value: 'cli', explicit: true, available: true });
+  assert.deepEqual(resolveChoice(undefined, ['app', 'cli'], 'app'), { value: 'app', explicit: false, available: true });
+  assert.deepEqual(resolveChoice('browser', ['app', 'cli'], 'app'), { value: 'browser', explicit: true, available: false });
+  assert.equal(resolveChoice('', ['main', 'isolated'], 'main').explicit, false);
+  assert.equal(resolveChoice('side', ['main', 'isolated'], 'main').value, 'side');
+  assert.equal(resolveChoice('contrast', ['system', 'light', 'dark'], 'system').available, false);
+  assert.equal(explicitNumber(0, 272000), 0);
+  assert.equal(explicitNumber(undefined, 272000), 272000);
+  assert.equal(speedName('fast'), '快速');
+  assert.equal(speedName(undefined), '标准');
+  assert.equal(speedName('priority'), '');
+  assert.equal(historyPlace({ target: 'app', app_mode: 'main' }).text, '主应用 · 原有项目与会话');
+  assert.equal(historyPlace({ target: 'app', app_mode: 'isolated' }).text, '独立实例 · 单独工作空间');
+  const unlabeled = historyPlace({ target: 'app', directory: '/work' });
+  assert.equal(unlabeled.text, '未标明 App 工作空间');
+  assert.equal(unlabeled.text.includes('独立实例'), false);
+  assert.equal(historyPlace({ directory: '/work/app' }).kind, 'directory');
+  assert.equal(historyPlace({ target: 'cli', directory: '/work/app' }).text, '/work/app');
+  assert.equal(historyPlace({ target: 'browser', directory: '/work/app' }).text, 'browser');
+  const retry = pelicanRetryRequest({
+    id: 'batch-1', channel: 'codex', model: 'gpt-5.6-terra', effort: 'high', prompt: 'draw', concurrency: 1,
+    items: [
+      { account_id: 'acc-done', status: 'completed', preview: 'http://127.0.0.1:9/token/item' },
+      { account_id: 'acc-failed', status: 'failed', access_token: 'raw-token', preview: 'http://127.0.0.1:9/token/other' }
+    ]
+  });
+  assert.deepEqual(retry, { account_ids: ['acc-failed'], channel: 'codex', model: 'gpt-5.6-terra', effort: 'high', prompt: 'draw', concurrency: 1 });
+  assert.equal(JSON.stringify(retry).includes('token'), false);
+  assert.equal(JSON.stringify(retry).includes('raw-token'), false);
+  assert.equal(pelicanRetryRequest(null), null);
 });
 test('a saved pelican model is not replaced by the launch-panel model', () => {
   const saved = resolvePelicanDefaults({ pelican_channel: 'bps', pelican_model: 'gpt-5.6-sol', pelican_effort: 'low' }, { model: 'gpt-6-astra', effort: 'xhigh' });

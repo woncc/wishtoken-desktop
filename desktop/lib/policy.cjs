@@ -130,6 +130,11 @@ function cleanPreferences(input) {
   }
   return out;
 }
+// Native theme only accepts three values. An unknown stored choice is left
+// untouched and the control falls back without rewriting that preference.
+function appliedTheme(value) {
+  return value === 'light' || value === 'dark' || value === 'system' ? value : 'system';
+}
 function applyPreferences(prefs, input) {
   const patch = cleanPreferences(input);
   const next = withoutSecrets(prefs && typeof prefs === 'object' && !Array.isArray(prefs) ? prefs : {});
@@ -325,4 +330,4 @@ function rendererPayload(value) {
   if (proxyEditor(value) && typeof value.proxy_url === 'string') redacted.proxy_url = value.proxy_url;
   return redacted;
 }
-module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload };
+module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, appliedTheme, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload };
