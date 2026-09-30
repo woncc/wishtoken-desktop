@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -108,29 +109,82 @@ func Redact(raw string) string {
 	}
 	parsed, err := url.Parse(candidate)
 	if err == nil && parsed.User != nil {
-		// user%3Apassword is decoded into the username, so Password() is empty
-		// while the secret is still visible in the original text.
+		// A percent-encoded colon is decoded into the username, so Password()
+		// stays empty while the secret is still visible.
 		if _, ok := parsed.User.Password(); !ok {
-			if name, secret, found := strings.Cut(parsed.User.Username(), ":"); found && secret != "" {
+			if name, secret, found := splitEncodedPassword(parsed.User.Username()); found {
 				parsed.User = url.UserPassword(name, secret)
 			}
 		}
-		if _, ok := parsed.User.Password(); !ok {
-			return raw
+		if pass, ok := parsed.User.Password(); ok {
+			redacted := maskProxyPassword(parsed.Redacted(), pass)
+			switch restore {
+			case "schemeless":
+				redacted = strings.TrimPrefix(redacted, "http://")
+			case "//":
+				redacted = "//" + strings.TrimPrefix(redacted, "http://")
+			}
+			return redacted
 		}
-		redacted := parsed.Redacted()
-		switch restore {
-		case "schemeless":
-			redacted = strings.TrimPrefix(redacted, "http://")
-		case "//":
-			redacted = "//" + strings.TrimPrefix(redacted, "http://")
-		}
-		return redacted
 	}
 	if scrubbed, ok := scrubProxyUserinfo(raw); ok {
 		return scrubbed
 	}
 	return raw
+}
+
+// splitEncodedPassword finds a colon hidden by one or more layers of percent
+// encoding. The decoded username and password are returned separately.
+func splitEncodedPassword(userinfo string) (string, string, bool) {
+	decoded := userinfo
+	for i := 0; i < 4; i++ {
+		next := lenientUnescape(decoded)
+		if next == decoded {
+			break
+		}
+		decoded = next
+	}
+	name, secret, found := strings.Cut(decoded, ":")
+	if !found || secret == "" {
+		return "", "", false
+	}
+	return name, secret, true
+}
+
+func lenientUnescape(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] == '%' && i+2 < len(s) && isHex(s[i+1]) && isHex(s[i+2]) {
+			v, err := strconv.ParseUint(s[i+1:i+3], 16, 8)
+			if err == nil {
+				b.WriteByte(byte(v))
+				i += 3
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
+}
+
+func isHex(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+func maskProxyPassword(redacted, password string) string {
+	if len(password) < 8 {
+		return redacted
+	}
+	redacted = strings.ReplaceAll(redacted, password, "xxxxx")
+	if esc := url.PathEscape(password); esc != password {
+		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
+	}
+	if esc := url.QueryEscape(password); esc != password {
+		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
+	}
+	return redacted
 }
 
 // scrubProxyUserinfo replaces a password in user:password@host when url.Parse
@@ -149,11 +203,11 @@ func scrubProxyUserinfo(raw string) (string, bool) {
 		prefix = "//"
 		userinfo = head[2:]
 	}
-	colon := strings.Index(userinfo, ":")
-	if colon < 0 {
+	name, secret, found := splitEncodedPassword(userinfo)
+	if !found {
 		return "", false
 	}
-	return prefix + userinfo[:colon] + ":xxxxx" + tail, true
+	return maskProxyPassword(prefix+name+":xxxxx"+tail, secret), true
 }
 
 // PreserveProxy returns current when incoming is empty of changes or is only
