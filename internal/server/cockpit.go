@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/subtle"
 	"encoding/json"
-	"net"
 	"net/http"
 	"strings"
 
@@ -34,9 +33,9 @@ func (s *Server) initCockpit() {
 }
 
 func (s *Server) handleCockpit(w http.ResponseWriter, r *http.Request) {
-	remote, _, _ := net.SplitHostPort(r.RemoteAddr)
 	key := s.Config().CockpitKey
-	if !config.IsLoopback(remote) || key == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-GPTBridge-Cockpit")), []byte(key)) != 1 {
+	// Empty addresses and hostnames are not proof of a loopback socket.
+	if !config.IsLoopbackPeer(r.RemoteAddr) || key == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-GPTBridge-Cockpit")), []byte(key)) != 1 {
 		writeError(w, r, 401, "cockpit_plugin_auth", "authentication_error", "请通过已配置的 GPTBridge BPS 实例连接")
 		return
 	}

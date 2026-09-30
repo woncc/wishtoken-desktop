@@ -141,3 +141,26 @@ func TestExportRoundTrip(t *testing.T) {
 		t.Fatalf("cpa round trip failed: %v %+v", err, res)
 	}
 }
+
+func TestParseConcatenatedJSON(t *testing.T) {
+	one := `{"refresh_token":"rt_line_one_1234567890","email":"one@example.test"}`
+	two := `{"refresh_token":"rt_line_two_1234567890","email":"two@example.test"}`
+	res, err := Parse([]byte(one+"\n"+two+"\n"), "lines")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Accounts) != 2 || res.Accounts[0].Email != "one@example.test" || res.Accounts[1].RefreshToken != "rt_line_two_1234567890" {
+		t.Fatalf("json lines: %+v warnings=%v", res.Accounts, res.Warnings)
+	}
+	res, err = Parse([]byte(one+" "+two), "concat")
+	if err != nil || len(res.Accounts) != 2 {
+		t.Fatalf("concatenated values: %v accounts=%d warnings=%v", err, len(res.Accounts), res.Warnings)
+	}
+	res, err = Parse([]byte(one+"\nnot-json\n"), "partial")
+	if err != nil || len(res.Accounts) != 1 || len(res.Warnings) == 0 {
+		t.Fatalf("partial: err=%v accounts=%d warnings=%v", err, len(res.Accounts), res.Warnings)
+	}
+	if _, err = Parse([]byte("{"), "bad"); err == nil {
+		t.Fatal("truncated JSON accepted")
+	}
+}

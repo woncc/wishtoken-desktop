@@ -12,10 +12,14 @@ FORBIDDEN_PARTS = {
 }
 FORBIDDEN_NAMES = {
     'auth.json', 'accounts.json', 'config.json', 'bridge-identity.json',
-    'desktop.json', 'history.json', '.env', 'credentials.json', 'tokens.json',
-    'session.json', 'id_rsa', 'id_ed25519',
+    'desktop.json', 'history.json', '.env', '.envrc', 'credentials.json', 'tokens.json',
+    'session.json', 'cookies.json', 'cookies.txt', 'id_rsa', 'id_ed25519',
+    'id_ecdsa', 'id_dsa', 'id_ecdsa_sk', 'id_ed25519_sk',
 }
-FORBIDDEN_SUFFIXES = {'.jsonl', '.log', '.bak', '.exe', '.zip', '.dmg', '.pem', '.key', '.env'}
+FORBIDDEN_SUFFIXES = {
+    '.jsonl', '.log', '.bak', '.exe', '.zip', '.dmg', '.pem', '.key', '.env',
+    '.har', '.pcap', '.pcapng', '.p12', '.pfx', '.kdbx',
+}
 RULES = {
     'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
     'JWT literal': re.compile(rb'eyJ[A-Za-z0-9_-]{25,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{15,}'),
@@ -30,11 +34,17 @@ def path_reason(rel):
     path = Path(rel)
     parts = {part.casefold() for part in path.parts}
     name = path.name.casefold()
-    if parts & FOLD_PARTS or name in FOLD_NAMES:
+    if parts & FOLD_PARTS or name in FOLD_NAMES or private_filename(name):
         return 'private state or generated artifact path'
     if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or path.suffix.casefold() in FORBIDDEN_SUFFIXES:
         return 'private state or generated artifact path'
     return ''
+
+def private_filename(name):
+    if name.startswith('.envrc') or name.startswith(('handoff-', 'handoff_')):
+        return True
+    stem = Path(name).stem.replace('_', '-')
+    return stem == 'handoff' or stem == 'auth-snapshot' or stem.startswith('auth-snapshot-')
 
 def content_reasons(data):
     found = []
@@ -74,10 +84,14 @@ def self_test():
         'Diagnostics/capture.png', 'screenshots/ui.png', 'credentials.json',
         'nested/auth.json', 'sub2api-account-1.json', 'trace.jsonl', 'notes.bak',
         'id_rsa', 'ID_RSA', 'Accounts.json', 'tokens.json',
+        '.envrc', 'config/.envrc.local', 'id_ecdsa', 'id_ed25519_sk',
+        'notes/HANDOFF.md', 'Handoff-notes.txt', 'auth_snapshot.json',
+        'capture.har', 'trace.pcapng', 'cert.p12', 'vault.kdbx', 'Cookies.json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
         'desktop/assets/icon.png', 'README.md', 'scripts/check-public.py', 'internal/config/config.go',
+        'internal/oauth/login.go', 'docs/handover-not-private.md',
     )
     for rel in blocked:
         if not path_reason(rel):

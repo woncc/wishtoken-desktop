@@ -2,7 +2,9 @@ package account
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -35,17 +37,14 @@ func Parse(data []byte, source string) (*ImportResult, error) {
 	}
 	res := &ImportResult{}
 	if strings.HasPrefix(text, "{") || strings.HasPrefix(text, "[") {
-		var value any
-		dec := json.NewDecoder(strings.NewReader(text))
-		dec.UseNumber()
-		if err := dec.Decode(&value); err != nil {
-			// Some exports concatenate objects (JSON lines). Try line by line.
+		if err := decodeJSONValues(text, source, res); err != nil {
+			// Some exports concatenate objects (JSON lines). Try line by line
+			// only when no complete value was decoded.
 			if lines := parseJSONLines(text, source, res); lines > 0 {
 				return finish(res), nil
 			}
-			return nil, fmt.Errorf("invalid JSON: %w", err)
+			return nil, err
 		}
-		walk(value, source, res, 0)
 		return finish(res), nil
 	}
 	parseTextLines(text, source, res)
@@ -68,6 +67,32 @@ func finish(res *ImportResult) *ImportResult {
 	}
 	res.Accounts = out
 	return res
+}
+
+func decodeJSONValues(text, source string, res *ImportResult) error {
+	dec := json.NewDecoder(strings.NewReader(text))
+	dec.UseNumber()
+	count := 0
+	for {
+		var value any
+		err := dec.Decode(&value)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			if count == 0 {
+				return fmt.Errorf("invalid JSON: %w", err)
+			}
+			res.Warnings = append(res.Warnings, fmt.Sprintf("stopped after %d JSON values: %v", count, err))
+			break
+		}
+		count++
+		walk(value, source, res, 0)
+	}
+	if count == 0 {
+		return fmt.Errorf("invalid JSON: empty payload")
+	}
+	return nil
 }
 
 func parseJSONLines(text, source string, res *ImportResult) int {
