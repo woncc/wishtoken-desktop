@@ -29,7 +29,8 @@ const SECRET_TEXT = [
   [/\brt_[A-Za-z0-9_-]{8,}\b/g, '[凭据已隐藏]'],
   [/\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g, '[凭据已隐藏]'],
   [/(cockpit-auth\/)[A-Fa-f0-9]{32,}/gi, '$1[凭据已隐藏]'],
-  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]']
+  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]'],
+  [/\b([a-z][a-z0-9+.-]*:\/\/)[^\/\s:@]+:[^\/\s@]+@/gi, '$1']
 ];
 function redactText(value) {
   let text = String(value);
@@ -211,7 +212,7 @@ function publicSnapshot(input) {
   const models = input?.models && typeof input.models === 'object' ? input.models : {};
   const settings = input?.settings && typeof input.settings === 'object' ? input.settings : {};
   const catalog = (list) => (Array.isArray(list) ? list.map(publicModel).filter(Boolean) : []);
-  return redactPublic({
+  const view = redactPublic({
     status: { home: asString(status.home) },
     accounts: Array.isArray(input?.accounts) ? input.accounts.map(publicAccount).filter(Boolean) : [],
     codex: {
@@ -226,6 +227,10 @@ function publicSnapshot(input) {
     preferences: publicPreferences(input?.preferences),
     platform: asString(input?.platform), version: asString(input?.version)
   });
+  // The proxy field is an editor. Redact the same URL everywhere else, but
+  // keep this copy intact so saving the form does not drop its password.
+  view.settings.proxy_url = asString(settings.proxy_url);
+  return view;
 }
 function publicLogs(payload) {
   const records = Array.isArray(payload?.records) ? payload.records : [];
@@ -281,7 +286,10 @@ function publicUsageResult(result) {
 }
 function publicSettings(result) {
   const value = objectValue(result);
-  return redactPublic({ proxy_url: asString(value.proxy_url), auto_refresh: value.auto_refresh === true, usage_probe: value.usage_probe === true });
+  const proxy = asString(value.proxy_url);
+  const out = redactPublic({ proxy_url: proxy, auto_refresh: value.auto_refresh === true, usage_probe: value.usage_probe === true });
+  out.proxy_url = proxy;
+  return out;
 }
 function publicApp(app) {
   const value = objectValue(app);
