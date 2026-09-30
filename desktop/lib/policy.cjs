@@ -39,12 +39,15 @@ const SECRET_TEXT = [
 const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|[A-Za-z][A-Za-z0-9_-]*:\\d{2,5})(?::\\d+)?(?=$|[\\s/?#])';
 const PROXY_BOUND = '[\\s"\'()<>]';
 function redactProxyCredentials(text) {
-  const compact = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@/gi;
-  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'gi');
-  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'g');
-  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
-  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
-  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  // %3A is a colon. user%3Apassword decodes to a password, but a username-only
+  // check never sees a separator and would leave the secret in renderer text.
+  const sep = '(?::|%3[Aa])';
+  const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'gi');
+  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'gi');
+  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'g');
+  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
   return text
     .replace(compact, '$1')
     .replace(spaced, '$1')

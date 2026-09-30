@@ -295,3 +295,35 @@ test('renderer text drops schemeless proxy passwords on a single-label host', ()
   assert.equal(delivered.accounts[0].last_error, 'dial my-proxy:7890');
   assert.equal(delivered.accounts[0].name.includes('s3cret'), false);
 });
+
+test('renderer text drops proxy passwords hidden by an encoded colon', () => {
+  const cases = [
+    ['http://user%3As3cret-token@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['http://user%3as3cret-token@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['user%3As3cret-token@127.0.0.1:7890', '127.0.0.1:7890'],
+    ['//user%3As3cret-token@my-proxy:7890', '//my-proxy:7890'],
+    ['note http://user%3As3cret proxy@10.1.1.1:8080 failed', 'note http://10.1.1.1:8080 failed'],
+    ['socks5://alice%3Ahunter2@10.0.0.8:1080', 'socks5://10.0.0.8:1080']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.toLowerCase().includes('%3a'), false);
+    assert.equal(got.includes('hunter2'), false);
+  }
+  assert.equal(redactPublic('http://user@127.0.0.1:7890'), 'http://user@127.0.0.1:7890');
+  assert.equal(redactPublic('http://user%3A@127.0.0.1:7890'), 'http://user%3A@127.0.0.1:7890');
+  const proxy = 'http://user%3As3cret-token@127.0.0.1:7890';
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note ${proxy}`, email: 'a@example.test', plan_type: 'team', last_error: `dial ${proxy}` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note http://127.0.0.1:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial http://127.0.0.1:7890');
+  assert.equal(snap.settings.proxy_url, proxy);
+});
