@@ -298,7 +298,7 @@ func (s *Server) adminImport(w http.ResponseWriter, r *http.Request) {
 	for _, payload := range payloads {
 		res, err := account.Parse(payload, source)
 		if err != nil {
-			merged.Warnings = append(merged.Warnings, err.Error())
+			merged.Warnings = append(merged.Warnings, importFailure(err.Error()))
 			continue
 		}
 		merged.Accounts = append(merged.Accounts, res.Accounts...)
@@ -308,12 +308,20 @@ func (s *Server) adminImport(w http.ResponseWriter, r *http.Request) {
 	if len(merged.Accounts) == 0 {
 		msg := "no account recognised in the payload"
 		if len(merged.Warnings) > 0 {
-			msg += ": " + strings.Join(merged.Warnings, "; ")
+			msg += ": " + importFailure(strings.Join(merged.Warnings, "; "))
 		}
 		writeError(w, r, http.StatusBadRequest, "no_accounts_found", "invalid_request_error", msg)
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, s.importAccounts(merged, refresh))
+}
+
+func importFailure(detail string) string {
+	cleaned := httpx.SanitizeFailure(detail)
+	if cleaned == "" {
+		return "import payload was rejected"
+	}
+	return cleaned
 }
 
 func (s *Server) adminImportCodex(w http.ResponseWriter, r *http.Request) {
