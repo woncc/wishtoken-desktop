@@ -12,7 +12,9 @@ FORBIDDEN_PARTS = {
 }
 FORBIDDEN_NAMES = {
     'auth.json', 'accounts.json', 'config.json', 'bridge-identity.json',
-    'desktop.json', 'history.json', '.env', '.envrc', 'credentials.json', 'tokens.json',
+    'desktop.json', 'history.json', 'launch-history.json',
+    'cockpit-integration.json', 'cockpit-process.json',
+    '.env', '.envrc', 'credentials.json', 'tokens.json',
     'session.json', 'cookies.json', 'cookies.txt', 'id_rsa', 'id_ed25519',
     'id_ecdsa', 'id_dsa', 'id_ecdsa_sk', 'id_ed25519_sk',
     '.netrc', '_netrc',
@@ -43,9 +45,14 @@ def path_reason(rel):
     return ''
 
 def private_filename(name):
-    if name.startswith('.envrc') or name.startswith(('handoff-', 'handoff_')):
+    if name.startswith('.envrc') or name.startswith(('handoff-', 'handoff_')) or name.startswith('.owner-'):
         return True
-    stem = Path(name).stem.replace('_', '-')
+    if '.bak-' in name or '.gptbridge-backup-' in name:
+        return True
+    path = Path(name)
+    if path.suffix == '.tmp' and path.stem in FOLD_NAMES:
+        return True
+    stem = path.stem.replace('_', '-')
     return stem == 'handoff' or stem == 'auth-snapshot' or stem.startswith('auth-snapshot-')
 
 def content_reasons(data):
@@ -90,6 +97,9 @@ def self_test():
         'notes/HANDOFF.md', 'Handoff-notes.txt', 'auth_snapshot.json',
         'capture.har', 'trace.pcapng', 'cert.p12', 'vault.kdbx', 'Cookies.json',
         '.netrc', 'home/_netrc', 'keys/id.ppk', 'AuthKey.p8', 'store.jks', 'app.keystore',
+        'launch-history.json', 'nested/cockpit-integration.json', 'cockpit-process.json',
+        'config.toml.bak-20261001-030405', 'codex_instances.json.gptbridge-backup-20261001',
+        'accounts.json.tmp', '.owner-12345',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',

@@ -3,8 +3,10 @@ package codexcfg
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 const sample = `model = "gpt-5.5"
@@ -74,5 +76,57 @@ func TestApplyCreatesFile(t *testing.T) {
 	raw, _ := os.ReadFile(path)
 	if !strings.Contains(string(raw), `experimental_bearer_token = "secret"`) || !strings.HasPrefix(string(raw), `model = "gpt-5.6-sol"`) {
 		t.Fatalf("content:\n%s", raw)
+	}
+}
+
+func TestApplyReplacesSymlinkWithoutFollowingIt(t *testing.T) {
+	dir := t.TempDir()
+	stolen := filepath.Join(dir, "stolen.toml")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	if err := os.Symlink(stolen, path); err != nil {
+		t.Skip(err)
+	}
+	fixed := time.Date(2026, 10, 1, 3, 4, 5, 0, time.UTC)
+	previous := backupClock
+	backupClock = func() time.Time { return fixed }
+	t.Cleanup(func() { backupClock = previous })
+	backup := path + ".bak-" + fixed.Format("20060102-150405")
+	if err := os.Symlink(stolen, backup); err != nil {
+		t.Skip(err)
+	}
+	const key = "synthetic-local-key"
+	gotBackup, err := Apply(path, Projection{BaseURL: "http://127.0.0.1:8790/v1", Model: "gpt-6-astra", APIKey: key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotBackup != backup {
+		t.Fatalf("backup path %q", gotBackup)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" || strings.Contains(string(kept), key) {
+		t.Fatalf("config write followed a symlink: %q %v", kept, err)
+	}
+	for _, name := range []string{path, backup} {
+		info, err := os.Lstat(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			t.Fatalf("%s remained a symlink", name)
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+			t.Fatalf("%s mode %o", name, info.Mode().Perm())
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), key) || !strings.Contains(string(raw), "keep") {
+		t.Fatalf("replacement config: %q %v", raw, err)
+	}
+	braw, err := os.ReadFile(backup)
+	if err != nil || string(braw) != "keep" {
+		t.Fatalf("backup content: %q %v", braw, err)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 // ProviderID is the model_providers key written by the bridge.
@@ -67,8 +69,12 @@ func Snippet(p Projection) string {
 
 var tableHeader = regexp.MustCompile(`^\s*\[`)
 
+// backupClock is the timestamp used in backup filenames.
+var backupClock = time.Now
+
 // Apply rewrites path so Codex uses the bridge. It returns the backup path
-// (empty when the file did not exist before).
+// (empty when the file did not exist before). A symlink at the config path
+// or the backup path is replaced; it is not followed.
 func Apply(path string, p Projection) (string, error) {
 	if path == "" {
 		return "", errors.New("codex config path is unknown")
@@ -81,8 +87,8 @@ func Apply(path string, p Projection) (string, error) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil:
-		backup = path + ".bak-" + time.Now().Format("20060102-150405")
-		if err := os.WriteFile(backup, raw, 0o600); err != nil {
+		backup = path + ".bak-" + backupClock().Format("20060102-150405")
+		if err := ownerfile.Write(backup, raw); err != nil {
 			return "", fmt.Errorf("write backup: %w", err)
 		}
 		lines = strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
@@ -105,7 +111,7 @@ func Apply(path string, p Projection) (string, error) {
 		content += "\n\n"
 	}
 	content += Block(p)
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	if err := ownerfile.Write(path, []byte(content)); err != nil {
 		return backup, err
 	}
 	return backup, nil
@@ -119,8 +125,8 @@ func Remove(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	backup := path + ".bak-" + time.Now().Format("20060102-150405")
-	if err := os.WriteFile(backup, raw, 0o600); err != nil {
+	backup := path + ".bak-" + backupClock().Format("20060102-150405")
+	if err := ownerfile.Write(backup, raw); err != nil {
 		return "", err
 	}
 	lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
@@ -132,7 +138,7 @@ func Remove(path string) (string, error) {
 		}
 		out = append(out, line)
 	}
-	return backup, os.WriteFile(path, []byte(strings.Join(out, "\n")), 0o600)
+	return backup, ownerfile.Write(path, []byte(strings.Join(out, "\n")))
 }
 
 // Status reports whether the bridge is the active provider.
