@@ -89,7 +89,11 @@ def secret_alias(name):
         return True
     if folded.startswith('copy of ') and secret_alias(folded[8:]):
         return True
-    return forbidden_name(strip_alias(folded))
+    folded = strip_alias(folded)
+    if forbidden_name(folded):
+        return True
+    # A trailing .txt can hide a forbidden suffix, as in accounts.json.bak.txt.
+    return Path(folded).suffix in FORBIDDEN_SUFFIXES
 
 def path_reason(rel):
     path = Path(rel)
@@ -167,6 +171,7 @@ def self_test():
         'config.json.save1', 'home/.netrc.bak3', 'Copy of auth.json', 'auth (1).json',
         'accounts copy.json', 'nested/auth.json.bak3', 'ID_ED25519.OLD2', '._.netrc',
         'id_rsa.txt', 'accounts.json.txt', 'nested/auth.json.txt', 'credentials.txt', 'ID_ED25519.TXT',
+        'accounts.json.bak.txt', 'notes.bak.txt', 'auth.json.log.txt', 'trace.jsonl.txt', 'auth.json.bak.txt.1', 'Accounts.JSON.BAK.TXT',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -175,6 +180,7 @@ def self_test():
         'docs/assets/accounts.png', 'internal/localcodex/models.json', 'notes.tmp', 'script.go.swp',
         'id_rsa.pub', 'script (1).go', 'notes.bak3', 'Copy of README.md', '._script.go',
         'notes.txt', 'docs/readme.txt', 'script.go.txt',
+        'models.json.txt',
     )
     for rel in blocked:
         if not path_reason(rel):
