@@ -134,3 +134,48 @@ func TestPrepareAuthFileDoesNotFollowSymlink(t *testing.T) {
 		t.Fatalf("auth file: %q %v", auth, err)
 	}
 }
+
+func TestPrepareProfileFilesDoNotFollowSymlink(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "profile")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stolen := filepath.Join(root, "stolen.txt")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"models.json", "bridge-identity.json"} {
+		if err := os.Symlink(stolen, filepath.Join(home, name)); err != nil {
+			t.Skip(err)
+		}
+	}
+	token := "synthetic-access-token"
+	if _, err := Prepare(Options{
+		Home: home, Directory: root, BaseURL: "http://127.0.0.1:8792",
+		Model: "gpt-6-astra", Effort: "high", Channel: "codex",
+		AccountID: "acc-test", AccessToken: token, AuthAPIURL: "http://127.0.0.1:8792/cockpit-auth/private",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" || strings.Contains(string(kept), token) {
+		t.Fatalf("profile write followed a symlink: %q %v", kept, err)
+	}
+	for _, name := range []string{"models.json", "bridge-identity.json"} {
+		info, err := os.Lstat(filepath.Join(home, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			t.Fatalf("%s remained a symlink", name)
+		}
+		if info.Mode().Perm()&0o077 != 0 {
+			t.Fatalf("%s mode %o", name, info.Mode().Perm())
+		}
+	}
+	identity, err := os.ReadFile(filepath.Join(home, "bridge-identity.json"))
+	if err != nil || strings.Contains(string(identity), token) || !strings.Contains(string(identity), "auth_api_url") {
+		t.Fatalf("bridge identity: %q %v", identity, err)
+	}
+}
