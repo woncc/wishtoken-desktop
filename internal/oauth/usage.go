@@ -56,7 +56,7 @@ func QueryUsage(ctx context.Context, client *http.Client, acc *account.Account, 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK {
-		return nil, &UsageError{Status: resp.StatusCode, Body: strings.TrimSpace(string(body))}
+		return nil, &UsageError{Status: resp.StatusCode, detail: usageFailureDetail(string(body), acc.AccessToken)}
 	}
 	var raw map[string]any
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -77,13 +77,20 @@ func QueryUsage(ctx context.Context, client *http.Client, acc *account.Account, 
 }
 
 // UsageError is a non-200 answer from the usage endpoint.
+// The raw response is not retained; detail is safe to store and return.
 type UsageError struct {
 	Status int
-	Body   string
+	detail string
 }
 
 func (e *UsageError) Error() string {
-	return fmt.Sprintf("usage endpoint returned %d: %s", e.Status, truncate(e.Body, 200))
+	if e == nil {
+		return "usage endpoint error"
+	}
+	if e.detail == "" {
+		return fmt.Sprintf("usage endpoint returned %d", e.Status)
+	}
+	return fmt.Sprintf("usage endpoint returned %d: %s", e.Status, e.detail)
 }
 
 func parseWindow(v any) *account.Window {
@@ -126,11 +133,4 @@ func floatField(m map[string]any, keys ...string) float64 {
 		}
 	}
 	return 0
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
 }

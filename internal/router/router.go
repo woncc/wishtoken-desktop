@@ -351,7 +351,7 @@ func (r *Router) executeBPS(ctx context.Context, cfg *config.Config, acc *accoun
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-		he := &upstream.HTTPError{Status: resp.StatusCode, Body: string(bodyBytes), Upstream: "basispoints"}
+		he := upstream.NewHTTPError(resp.StatusCode, "basispoints", string(bodyBytes))
 		rec.Error = he.Error()
 		r.observe(rec)
 		return nil, r.classifyFailure(acc, RouteBPS, resp, he, resolved.Upstream)
@@ -366,9 +366,14 @@ func (r *Router) executeBPS(ctx context.Context, cfg *config.Config, acc *accoun
 	}
 	if code, message, failed := failedEvent(peek); failed {
 		reader.Close()
-		rec.Error = code + ": " + message
+		he := upstream.NewHTTPError(200, "basispoints", fmt.Sprintf(`{"error":{"code":%q,"message":%q}}`, code, message))
+		rec.Error = he.Message()
+		if he.ErrorCode() != "" && he.Message() != "" && he.Message() != he.ErrorCode() {
+			rec.Error = he.ErrorCode() + ": " + he.Message()
+		} else if rec.Error == "" {
+			rec.Error = he.Error()
+		}
 		r.observe(rec)
-		he := &upstream.HTTPError{Status: 200, Body: fmt.Sprintf(`{"error":{"code":%q,"message":%q}}`, code, message), Upstream: "basispoints"}
 		return nil, r.classifyFailure(acc, RouteBPS, resp, he, resolved.Upstream)
 	}
 	r.observe(rec)
@@ -415,7 +420,7 @@ func (r *Router) executeCodex(ctx context.Context, cfg *config.Config, acc *acco
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-		he := &upstream.HTTPError{Status: resp.StatusCode, Body: string(bodyBytes), Upstream: "codex"}
+		he := upstream.NewHTTPError(resp.StatusCode, "codex", string(bodyBytes))
 		rec.Error = he.Error()
 		r.observe(rec)
 		return nil, r.classifyFailure(acc, RouteCodex, resp, he, resolved.Upstream)
