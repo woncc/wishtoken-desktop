@@ -2,6 +2,7 @@
 package httpx
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -69,7 +70,7 @@ func ParseProxyURL(raw string) (*url.URL, error) {
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid proxy url %q: %w", raw, err)
+		return nil, errors.New("invalid proxy url")
 	}
 	switch strings.ToLower(parsed.Scheme) {
 	case "http", "https", "socks5":
@@ -79,16 +80,49 @@ func ParseProxyURL(raw string) (*url.URL, error) {
 		return nil, fmt.Errorf("unsupported proxy scheme %q (use http, https or socks5)", parsed.Scheme)
 	}
 	if parsed.Hostname() == "" {
-		return nil, fmt.Errorf("proxy url %q has no host", raw)
+		return nil, errors.New("proxy url has no host")
 	}
 	return parsed, nil
 }
 
-// Redact hides credentials embedded in a proxy URL for logging.
+// Redact hides credentials embedded in a proxy URL for logging and management
+// responses. A schemeless user:password@host value is recognized too.
 func Redact(raw string) string {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	candidate := raw
+	synthetic := false
+	if !strings.Contains(raw, "://") {
+		candidate = "http://" + raw
+		synthetic = true
+	}
+	parsed, err := url.Parse(candidate)
 	if err != nil || parsed.User == nil {
 		return raw
 	}
-	return parsed.Redacted()
+	if _, ok := parsed.User.Password(); !ok {
+		return raw
+	}
+	redacted := parsed.Redacted()
+	if synthetic {
+		redacted = strings.TrimPrefix(redacted, "http://")
+	}
+	return redacted
+}
+
+// PreserveProxy returns current when incoming is empty of changes or is only
+// the redacted form of current. Callers can show Redact(current) in an editor
+// and accept it back without storing the mask as the password.
+func PreserveProxy(current, incoming string) string {
+	incoming = strings.TrimSpace(incoming)
+	current = strings.TrimSpace(current)
+	if incoming == "" || current == "" {
+		return incoming
+	}
+	if incoming == current || incoming == Redact(current) {
+		return current
+	}
+	return incoming
 }
