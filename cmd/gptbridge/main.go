@@ -440,7 +440,7 @@ func runAccounts(args []string) error {
 			fmt.Println(string(raw))
 			return nil
 		}
-		return os.WriteFile(*out, raw, 0o600)
+		return writeOwnerFile(*out, raw)
 	default:
 		return fmt.Errorf("unknown accounts subcommand %q", sub)
 	}
