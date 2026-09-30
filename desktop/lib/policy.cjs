@@ -6,6 +6,10 @@ function cleanChannel(value) {
   if (!['bps', 'codex'].includes(channel)) throw new Error('请选择 BPS 或原生通道');
   return channel;
 }
+function requireChannel(value) {
+  if (value !== 'bps' && value !== 'codex') throw new Error('请选择 BPS 或原生通道');
+  return value;
+}
 function cleanModel(value) {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9.-]{1,80}$/.test(value)) throw new Error('模型无效');
   return value;
@@ -18,16 +22,44 @@ function cleanProbe(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('测试参数无效');
   return { account_id: requireID(input.account_id), model: cleanModel(input.model), effort: cleanEffort(input.effort), channel: cleanChannel(input.channel) };
 }
-const SECRET_KEYS = new Set(['access_token', 'refresh_token', 'id_token', 'api_key', 'authorization', 'password', 'secret', 'client_secret', 'cockpit_key', 'gptbridge_codex_key']);
+const SECRET_KEYS = new Set(['access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'id_token', 'idtoken', 'api_key', 'apikey', 'authorization', 'password', 'secret', 'client_secret', 'clientsecret', 'cockpit_key', 'cockpitkey', 'gptbridge_codex_key', 'personal_access_token', 'personalaccesstoken', 'openai_api_key', 'openaiapikey', 'experimental_bearer_token', 'bearer_token', 'bearertoken', 'auth_token', 'authtoken']);
+const SECRET_TEXT = [
+  [/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[凭据已隐藏]'],
+  [/\bBearer\s+[A-Za-z0-9._~+/-]{12,}/gi, 'Bearer [凭据已隐藏]'],
+  [/\brt_[A-Za-z0-9_-]{8,}\b/g, '[凭据已隐藏]'],
+  [/\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g, '[凭据已隐藏]'],
+  [/(cockpit-auth\/)[A-Fa-f0-9]{32,}/gi, '$1[凭据已隐藏]'],
+  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]']
+];
+function redactText(value) {
+  let text = String(value);
+  for (const [pattern, replacement] of SECRET_TEXT) text = text.replace(pattern, replacement);
+  return text;
+}
+function blockedKey(key) {
+  const name = String(key);
+  return name === '__proto__' || name === 'constructor' || name === 'prototype' || SECRET_KEYS.has(name.toLowerCase());
+}
 function redactPublic(value) {
-  if (value == null || typeof value !== 'object') return value;
+  if (typeof value === 'string') return redactText(value);
   if (Array.isArray(value)) return value.map(redactPublic);
+  if (value == null || typeof value !== 'object') return value;
   const out = {};
   for (const [key, item] of Object.entries(value)) {
-    if (SECRET_KEYS.has(String(key).toLowerCase())) continue;
-    if (typeof item === 'string') out[key] = item.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[凭据已隐藏]');
+    if (blockedKey(key)) continue;
+    if (typeof item === 'string') out[key] = redactText(item);
     else if (item && typeof item === 'object') out[key] = redactPublic(item);
     else out[key] = item;
+  }
+  return out;
+}
+function withoutSecrets(value) {
+  if (Array.isArray(value)) return value.map(withoutSecrets);
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (blockedKey(key)) continue;
+    out[key] = item && typeof item === 'object' ? withoutSecrets(item) : item;
   }
   return out;
 }
@@ -74,7 +106,149 @@ function cleanLaunch(input) {
   }
   return out;
 }
-function safeError(error) {
-  return String(error?.message || error || '操作失败').replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[凭据已隐藏]').slice(0, 1200);
+function cleanPreferences(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('设置无效');
+  const out = {};
+  if ('account_speed' in input && input.account_speed != null) {
+    const speed = input.account_speed;
+    if (!speed || typeof speed !== 'object' || Array.isArray(speed)) throw new Error('速度设置无效');
+    const value = speed.speed;
+    if (value !== 'standard' && value !== 'fast') throw new Error('速度设置无效');
+    out.account_speed = { id: requireID(speed.id), speed: value };
+  }
+  if ('compact_view' in input) {
+    if (typeof input.compact_view !== 'boolean') throw new Error('设置类型无效');
+    out.compact_view = input.compact_view;
+  }
+  for (const key of ['channel', 'pelican_channel']) if (key in input) out[key] = requireChannel(input[key]);
+  if ('pelican_model' in input) out.pelican_model = cleanModel(input.pelican_model);
+  if ('pelican_effort' in input) out.pelican_effort = cleanEffort(input.pelican_effort);
+  if ('theme' in input) {
+    if (!['system', 'light', 'dark'].includes(input.theme)) throw new Error('外观设置无效');
+    out.theme = input.theme;
+  }
+  return out;
 }
-module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, cleanModel, cleanEffort, cleanProbe, redactPublic, safeError };
+function applyPreferences(prefs, input) {
+  const patch = cleanPreferences(input);
+  const next = withoutSecrets(prefs && typeof prefs === 'object' && !Array.isArray(prefs) ? prefs : {});
+  if (patch.account_speed) next.account_speeds = { ...next.account_speeds, [patch.account_speed.id]: patch.account_speed.speed };
+  for (const key of ['compact_view', 'channel', 'pelican_channel', 'pelican_model', 'pelican_effort', 'theme']) {
+    if (Object.hasOwn(patch, key)) next[key] = patch[key];
+  }
+  return { prefs: next, theme: patch.theme };
+}
+function safeError(error) {
+  return redactText(String(error?.message || error || '操作失败')).slice(0, 1200);
+}
+function asString(value) { return typeof value === 'string' ? value : ''; }
+function asNumber(value) { return typeof value === 'number' && Number.isFinite(value) ? value : null; }
+function publicWindow(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out = {};
+  if (typeof value.used_percent === 'number') out.used_percent = value.used_percent;
+  if (typeof value.window_seconds === 'number') out.window_seconds = value.window_seconds;
+  if (typeof value.reset_at === 'string') out.reset_at = value.reset_at;
+  return Object.keys(out).length ? out : undefined;
+}
+function publicUsage(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out = {};
+  if (value.limit_reached === true) out.limit_reached = true;
+  if (typeof value.updated_at === 'string') out.updated_at = value.updated_at;
+  const primary = publicWindow(value.primary);
+  const secondary = publicWindow(value.secondary);
+  if (primary) out.primary = primary;
+  if (secondary) out.secondary = secondary;
+  return Object.keys(out).length ? out : undefined;
+}
+function publicAccount(account) {
+  if (!account || typeof account !== 'object' || Array.isArray(account)) return null;
+  return {
+    id: asString(account.id), name: asString(account.name), email: asString(account.email), account_id: asString(account.account_id),
+    plan_type: asString(account.plan_type), disabled: account.disabled === true, has_refresh_token: account.has_refresh_token === true,
+    has_access_token: account.has_access_token === true, expired: account.expired === true, status: asString(account.status),
+    last_error: asString(account.last_error), cooldown_until: asString(account.cooldown_until), expires_at: asString(account.expires_at),
+    usage: publicUsage(account.usage)
+  };
+}
+function publicHistory(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const out = {};
+  for (const key of ['id', 'account_id', 'directory', 'model', 'effort', 'channel', 'speed', 'target', 'app_mode']) {
+    if (typeof record[key] === 'string') out[key] = record[key];
+  }
+  for (const key of ['context_window', 'compact_limit']) if (typeof record[key] === 'number') out[key] = record[key];
+  if (typeof record.last_used === 'string') out.last_used = record.last_used;
+  return out;
+}
+function publicModel(model) {
+  if (!model || typeof model !== 'object' || typeof model.id !== 'string' || !model.id) return null;
+  const out = { id: model.id };
+  if (typeof model.display_name === 'string' && model.display_name) out.display_name = model.display_name;
+  return out;
+}
+function publicPreferences(prefs) {
+  const source = prefs && typeof prefs === 'object' && !Array.isArray(prefs) ? prefs : {};
+  const out = {};
+  for (const key of ['directory', 'target', 'app_mode', 'channel', 'account_id', 'model', 'effort', 'pelican_channel', 'pelican_model', 'pelican_effort', 'theme']) {
+    if (typeof source[key] === 'string') out[key] = source[key];
+  }
+  for (const key of ['context_window', 'compact_limit']) if (typeof source[key] === 'number') out[key] = source[key];
+  if (typeof source.compact_view === 'boolean') out.compact_view = source.compact_view;
+  if (source.account_speeds && typeof source.account_speeds === 'object' && !Array.isArray(source.account_speeds)) {
+    const speeds = {};
+    for (const [id, speed] of Object.entries(source.account_speeds)) if (speed === 'standard' || speed === 'fast') speeds[id] = speed;
+    out.account_speeds = speeds;
+  }
+  return out;
+}
+function publicSnapshot(input) {
+  const status = input?.status && typeof input.status === 'object' ? input.status : {};
+  const codex = input?.codex && typeof input.codex === 'object' ? input.codex : {};
+  const app = codex.app && typeof codex.app === 'object' ? codex.app : {};
+  const mainApp = codex.main_app && typeof codex.main_app === 'object' ? codex.main_app : {};
+  const models = input?.models && typeof input.models === 'object' ? input.models : {};
+  const settings = input?.settings && typeof input.settings === 'object' ? input.settings : {};
+  const catalog = (list) => (Array.isArray(list) ? list.map(publicModel).filter(Boolean) : []);
+  return redactPublic({
+    status: { home: asString(status.home) },
+    accounts: Array.isArray(input?.accounts) ? input.accounts.map(publicAccount).filter(Boolean) : [],
+    codex: {
+      installed: codex.installed === true, binary: asString(codex.binary), error: asString(codex.error),
+      active_account_id: asString(codex.active_account_id), model: asString(codex.model), effort: asString(codex.effort),
+      app: { installed: app.installed === true, binary: asString(app.binary), error: asString(app.error) },
+      main_app: { active: mainApp.active === true, home: asString(mainApp.home) },
+      history: Array.isArray(codex.history) ? codex.history.map(publicHistory).filter(Boolean) : []
+    },
+    models: { catalog: catalog(models.catalog), native_catalog: catalog(models.native_catalog), bps_models: Array.isArray(models.bps_models) ? models.bps_models.filter(id => typeof id === 'string') : [] },
+    settings: { proxy_url: asString(settings.proxy_url), auto_refresh: settings.auto_refresh === true, usage_probe: settings.usage_probe === true },
+    preferences: publicPreferences(input?.preferences),
+    platform: asString(input?.platform), version: asString(input?.version)
+  });
+}
+function publicLogs(payload) {
+  const records = Array.isArray(payload?.records) ? payload.records : [];
+  return redactPublic({ records: records.filter(record => record && typeof record === 'object').map(record => ({
+    time: asString(record.time), model: asString(record.model), response_model: asString(record.response_model), effort: asString(record.effort),
+    route: asString(record.route), service_tier: asString(record.service_tier), response_service_tier: asString(record.response_service_tier),
+    status: asNumber(record.status), stream_status: asString(record.stream_status), error: asString(record.error), duration_ms: asNumber(record.duration_ms)
+  })) });
+}
+function publicProbe(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const out = { ok: value.ok === true, model: asString(value.model), effort: asString(value.effort), duration_ms: asNumber(value.duration_ms) };
+  if (typeof value.error === 'string' && value.error) out.error = value.error;
+  return redactPublic(out);
+}
+function publicImport(result) {
+  if (result == null) return null;
+  const value = result && typeof result === 'object' ? result : {};
+  return redactPublic({
+    imported: asNumber(value.imported) || 0, merged: asNumber(value.merged) || 0, skipped: asNumber(value.skipped) || 0,
+    warnings: Array.isArray(value.warnings) ? value.warnings.filter(item => typeof item === 'string') : [],
+    ids: Array.isArray(value.ids) ? value.ids.filter(item => typeof item === 'string') : [],
+    ...(typeof value.files === 'number' ? { files: value.files } : {})
+  });
+}
+module.exports = { requireID, cleanSettings, cleanLaunch, cleanChannel, requireChannel, cleanModel, cleanEffort, cleanProbe, cleanPreferences, applyPreferences, redactPublic, withoutSecrets, safeError, publicSnapshot, publicLogs, publicProbe, publicImport };

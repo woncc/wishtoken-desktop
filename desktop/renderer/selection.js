@@ -53,5 +53,15 @@
     if (channel == null || channel === '' || channel === 'bps') return 'BPS';
     return '';
   }
-  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName };
+  // A saved pelican choice stays put. Launch-panel values are only the
+  // initial default when the compare view has never recorded its own.
+  function resolvePelicanDefaults(preferences, launch) {
+    const prefs = preferences && typeof preferences === 'object' ? preferences : {};
+    const launchModel = launch && typeof launch.model === 'string' ? launch.model : '';
+    const launchEffort = launch && typeof launch.effort === 'string' ? launch.effort : '';
+    const model = typeof prefs.pelican_model === 'string' && prefs.pelican_model ? prefs.pelican_model : launchModel;
+    const effortValue = typeof prefs.pelican_effort === 'string' && prefs.pelican_effort ? prefs.pelican_effort : launchEffort;
+    return { channel: resolveChannel(prefs.pelican_channel), model, effort: resolveEffort(effortValue) };
+  }
+  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults };
 });

@@ -6,7 +6,42 @@ const http = require('node:http');
 const { atomicJSON } = require('./service.cjs');
 const { requireID, cleanChannel, cleanModel, cleanEffort, redactPublic, safeError } = require('./policy.cjs');
 const DEFAULT_PROMPT = '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要有任何限制';
-const uuid = /^[0-9a-f-]{36}$/;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function textValue(value) { return typeof value === 'string' ? value : ''; }
+function usageView(usage) {
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return undefined;
+  const out = {};
+  for (const key of ['input_tokens', 'output_tokens', 'reasoning_tokens', 'cached_tokens']) {
+    if (typeof usage[key] === 'number' && Number.isFinite(usage[key])) out[key] = usage[key];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function publicArtifact(raw) {
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return redactPublic({
+    text: textValue(value.text), html: textValue(value.html), channel: textValue(value.channel),
+    model: textValue(value.model) || null, effort: textValue(value.effort) || null, route: textValue(value.route) || null,
+    response_model: textValue(value.response_model) || null,
+    duration_ms: typeof value.duration_ms === 'number' ? value.duration_ms : null,
+    usage: usageView(value.usage)
+  });
+}
+function publicBatch(batch, origin, token) {
+  const items = Array.isArray(batch?.items) ? batch.items : [];
+  return {
+    id: textValue(batch?.id), created_at: textValue(batch?.created_at), channel: textValue(batch?.channel),
+    model: textValue(batch?.model), effort: textValue(batch?.effort), prompt: textValue(batch?.prompt),
+    concurrency: typeof batch?.concurrency === 'number' ? batch.concurrency : null,
+    status: textValue(batch?.status), finished_at: textValue(batch?.finished_at) || null,
+    items: items.filter(item => item && typeof item === 'object').map(item => ({
+      id: textValue(item.id), account_id: textValue(item.account_id), name: textValue(item.name), status: textValue(item.status),
+      usage: usageView(item.usage), duration_ms: typeof item.duration_ms === 'number' ? item.duration_ms : null,
+      response_model: textValue(item.response_model) || null, route: textValue(item.route) || null, error: textValue(item.error) || null,
+      started_at: textValue(item.started_at) || null, finished_at: textValue(item.finished_at) || null,
+      preview: item.status === 'completed' && origin && uuid.test(textValue(item.id)) ? `${origin}/${token}/${item.id}` : null
+    }))
+  };
+}
 const active = batch => batch && ['running', 'cancelling'].includes(batch.status);
 function extractHTML(raw) {
   const fenced = raw.match(/```(?:html)?\s*([\s\S]*?)```/i);
@@ -31,7 +66,7 @@ class Pelican {
     this.save();
   }
   save() { atomicJSON(this.file, this.batches); }
-  snapshot() { return this.batches.map(b => ({ ...b, items: b.items.map(i => ({ ...i, preview: i.status === 'completed' && this.origin ? `${this.origin}/${this.token}/${i.id}` : null })) })); }
+  snapshot() { return redactPublic(this.batches.map(batch => publicBatch(batch, this.origin, this.token))); }
   async listen() {
     this.server = http.createServer((req, res) => {
       const id = req.url?.split('/')[2];
@@ -52,7 +87,7 @@ class Pelican {
   }
   artifact(id) {
     if (!uuid.test(id || '') || !this.batches.some(b => b.items.some(i => i.id === id && i.status === 'completed'))) throw new Error('测试结果不存在');
-    return JSON.parse(fs.readFileSync(path.join(this.home, `${id}.json`), 'utf8'));
+    return publicArtifact(JSON.parse(fs.readFileSync(path.join(this.home, `${id}.json`), 'utf8')));
   }
   start(input, accounts) {
     if (this.batches.some(active)) throw new Error('已有测试在运行，请等待完成或取消');
@@ -82,8 +117,8 @@ class Pelican {
           if (controller.signal.aborted) throw new Error('测试已取消');
           if (typeof result.text !== 'string' || Buffer.byteLength(result.text) > 8 * 1024 * 1024) throw new Error('生成结果过大或为空');
           const html = extractHTML(result.text);
-          atomicJSON(path.join(this.home, `${item.id}.json`), redactPublic({ ...result, channel: batch.channel, html }));
-          item.status = 'completed'; item.usage = result.usage; item.duration_ms = result.duration_ms; item.response_model = result.response_model || null; item.route = result.route || batch.channel;
+          atomicJSON(path.join(this.home, `${item.id}.json`), publicArtifact({ ...result, channel: batch.channel, html }));
+          item.status = 'completed'; item.usage = usageView(result.usage); item.duration_ms = result.duration_ms; item.response_model = typeof result.response_model === 'string' ? result.response_model : null; item.route = typeof result.route === 'string' && result.route ? result.route : batch.channel;
         } catch (error) { item.status = controller.signal.aborted ? 'cancelled' : 'failed'; item.error = safeError(error); }
         finally { item.finished_at = new Date().toISOString(); this.controllers.delete(item.id); this.save(); }
       }

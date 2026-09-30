@@ -11,10 +11,10 @@ async function loadPelican() {
   try {
     const data = await api.pelicanHistory(); pelicanState.batches = data.batches;
     if (!pelicanState.initialized) {
-      const channel = wishSelection.resolveChannel(state.data.preferences.pelican_channel);
-      pinExplicitOption($('pelican-channel'), channel, value => `${value} · 不在通道列表`);
-      channelModels($('pelican-channel').value, $('pelican-model'), $('model').value);
-      pinExplicitOption($('pelican-effort'), wishSelection.resolveEffort(state.effort), value => `${value} · 不在档位列表`);
+      const picked = wishSelection.resolvePelicanDefaults(state.data.preferences, { model: $('model').value, effort: state.effort });
+      pinExplicitOption($('pelican-channel'), picked.channel, value => `${value} · 不在通道列表`);
+      channelModels(picked.channel.value, $('pelican-model'), picked.model);
+      pinExplicitOption($('pelican-effort'), picked.effort, value => `${value} · 不在档位列表`);
       $('pelican-prompt').value = data.default_prompt;
       if (!pelicanState.selected.size && state.selected) pelicanState.selected.add(state.selected);
       pelicanState.initialized = true;
@@ -49,11 +49,36 @@ function renderPelican() {
   }
 }
 async function startPelican(input) {
-  await action('pelican-start', async () => { $('pelican-start').disabled = true; pelicanState.batch = await api.pelicanStart(input || { account_ids: [...pelicanState.selected], channel: $('pelican-channel').value, model: $('pelican-model').value, effort: $('pelican-effort').value, prompt: $('pelican-prompt').value, concurrency: Number($('pelican-concurrency').value) }); await loadPelican(); });
+  await action('pelican-start', async () => {
+    const request = input || { account_ids: [...pelicanState.selected], channel: $('pelican-channel').value, model: $('pelican-model').value, effort: $('pelican-effort').value, prompt: $('pelican-prompt').value, concurrency: Number($('pelican-concurrency').value) };
+    if (!input) await api.preferences({ pelican_channel: request.channel, pelican_model: request.model, pelican_effort: request.effort });
+    $('pelican-start').disabled = true;
+    pelicanState.batch = await api.pelicanStart(request);
+    await loadPelican();
+  });
 }
-$('pelican-channel').onchange = () => action('pelican-channel', async () => { const channel = wishSelection.resolveChannel($('pelican-channel').value); channelModels(channel.value, $('pelican-model'), $('pelican-model').value); if (channel.available) await api.preferences({ pelican_channel: channel.value }); renderPelican(); });
-$('pelican-model').onchange = () => { channelModels($('pelican-channel').value, $('pelican-model'), $('pelican-model').value); renderPelican(); };
-$('pelican-effort').onchange = () => { pinExplicitOption($('pelican-effort'), wishSelection.resolveEffort($('pelican-effort').value), value => `${value} · 不在档位列表`); renderPelican(); };
+$('pelican-channel').onchange = () => action('pelican-channel', async () => {
+  const channel = wishSelection.resolveChannel($('pelican-channel').value);
+  channelModels(channel.value, $('pelican-model'), $('pelican-model').value);
+  if (channel.available) {
+    const patch = { pelican_channel: channel.value };
+    if ($('pelican-model').value) patch.pelican_model = $('pelican-model').value;
+    if ($('pelican-effort').dataset.available !== 'false' && $('pelican-effort').value) patch.pelican_effort = $('pelican-effort').value;
+    await api.preferences(patch);
+  }
+  renderPelican();
+});
+$('pelican-model').onchange = () => action('pelican-model', async () => {
+  const choice = channelModels($('pelican-channel').value, $('pelican-model'), $('pelican-model').value);
+  if (choice.value) await api.preferences({ pelican_model: choice.value });
+  renderPelican();
+});
+$('pelican-effort').onchange = () => action('pelican-effort', async () => {
+  const choice = wishSelection.resolveEffort($('pelican-effort').value);
+  pinExplicitOption($('pelican-effort'), choice, value => `${value} · 不在档位列表`);
+  if (choice.available) await api.preferences({ pelican_effort: choice.value });
+  renderPelican();
+});
 $('pelican-accounts').onchange = event => { const id = event.target.value; event.target.checked ? pelicanState.selected.add(id) : pelicanState.selected.delete(id); renderPelican(); };
 $('pelican-current').onclick = () => { pelicanState.selected = new Set([state.data?.codex.active_account_id || state.selected].filter(Boolean)); pelicanAccounts(); renderPelican(); };
 $('pelican-all').onclick = () => { pelicanState.selected = new Set((state.data?.accounts || []).filter(a => !a.disabled && !(a.expired && !a.has_refresh_token)).map(a => a.id)); pelicanAccounts(); renderPelican(); };
