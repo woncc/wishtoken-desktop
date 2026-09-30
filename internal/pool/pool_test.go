@@ -5,6 +5,7 @@ import (
 	"github.com/xxx-holic/wishtoken-desktop/internal/account"
 	"github.com/xxx-holic/wishtoken-desktop/internal/config"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -42,15 +43,24 @@ func TestMemberConcurrencyAndCancellation(t *testing.T) {
 }
 
 func TestSingleMemberRecoversAfterCooldown(t *testing.T) {
-	s, _ := account.Open("")
-	x, _ := s.Upsert(account.Account{AccountID: "team", UserID: "one", AccessToken: "at"})
-	p := New(s, config.Default)
-	p.ReportRateLimited(x.ID, time.Millisecond, "temporary")
-	if _, e := p.Pick(context.Background(), PickOptions{}); e == nil {
-		t.Fatal("cooling account selected")
-	}
-	time.Sleep(3 * time.Millisecond)
-	if _, e := p.Pick(context.Background(), PickOptions{}); e != nil {
-		t.Fatal("account did not recover", e)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s, _ := account.Open("")
+		x, _ := s.Upsert(account.Account{AccountID: "team", UserID: "one", AccessToken: "at"})
+		p := New(s, config.Default)
+		p.ReportRateLimited(x.ID, time.Second, "temporary")
+		// Virtual time cannot expire while CI is descheduled between assertions.
+		time.Sleep(time.Second - time.Nanosecond)
+		if _, e := p.Pick(context.Background(), PickOptions{}); e == nil {
+			t.Fatal("cooling account selected")
+		}
+		time.Sleep(time.Nanosecond)
+		if recovered, e := p.Pick(context.Background(), PickOptions{}); e != nil {
+			t.Fatal("account did not recover", e)
+		} else if recovered.ID != x.ID {
+			t.Fatal("recovery substituted another account")
+		}
+		if _, _, active := p.Cooldown(x.ID); active {
+			t.Fatal("expired cooldown still active")
+		}
+	})
 }

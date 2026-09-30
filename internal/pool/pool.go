@@ -310,7 +310,7 @@ func (p *Pool) ReportFailure(id, message string) {
 	})
 }
 
-// ReportRateLimited cools the account down for d (default five minutes).
+// ReportRateLimited cools the account down for d (default fifteen seconds).
 func (p *Pool) ReportRateLimited(id string, d time.Duration, reason string) {
 	if d <= 0 {
 		d = defaultCooldown
