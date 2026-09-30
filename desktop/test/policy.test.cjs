@@ -236,3 +236,34 @@ test('final IPC redaction keeps the proxy editor and still strips other userinfo
   assert.equal(rendererPayload('socks5://alice:hunter2@10.0.0.8:1080'), 'socks5://10.0.0.8:1080');
   assert.equal(rendererPayload(null), null);
 });
+
+test('renderer text drops proxy passwords that a URL parser would reject', () => {
+  const password = 's3cret proxy';
+  const cases = [
+    [`http://user:${password}@127.0.0.1:7890`, 'http://127.0.0.1:7890'],
+    ['http://user:s3cret%zz@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['http://user:s3cret\nproxy@127.0.0.1:1', 'http://127.0.0.1:1'],
+    ['http://user:p@ss@127.0.0.1:7890/x', 'http://127.0.0.1:7890/x'],
+    ['user:s3cret-token@127.0.0.1:7890', '127.0.0.1:7890'],
+    ['//user:s3cret-token@127.0.0.1:7890', '//127.0.0.1:7890'],
+    [`via user:${password}@10.1.1.1:8080 failed`, 'via 10.1.1.1:8080 failed'],
+    ['http://user:secret@[::1]:8792/path', 'http://[::1]:8792/path']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.includes('s3cret'), false);
+    assert.equal(got.includes('p@ss'), false);
+  }
+  assert.equal(redactPublic('http://user@127.0.0.1:7890'), 'http://user@127.0.0.1:7890');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic('http://example.com/foo:bar@baz'), 'http://example.com/foo:bar@baz');
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  const proxy = `http://user:${password}@127.0.0.1:7890`;
+  const snap = publicSnapshot({ settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true }, accounts: [{ id: 'acc-1', last_error: `via ${proxy} failed` }] });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].last_error, 'via http://127.0.0.1:7890 failed');
+  assert.equal(snap.settings.proxy_url, proxy);
+});
