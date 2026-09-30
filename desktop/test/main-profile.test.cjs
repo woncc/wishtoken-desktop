@@ -100,7 +100,7 @@ test('app identity URL must stay on loopback HTTP', t => {
   assert.equal(runtime.loopbackIdentityURL(local), local);
   assert.equal(runtime.loopbackIdentityURL('http://localhost:8792/cockpit-auth/synthetic'), 'http://localhost:8792/cockpit-auth/synthetic');
   assert.equal(runtime.loopbackIdentityURL('http://[::1]:8792/cockpit-auth/synthetic'), 'http://[::1]:8792/cockpit-auth/synthetic');
-  for (const bad of ['https://127.0.0.1:8792/cockpit-auth/synthetic', 'http://evil.test/cockpit-auth/synthetic', 'http://user:pw@127.0.0.1:8792/x', 'http://127.0.0.1:8792/x?token=synthetic', local + '#frag', 'http://10.0.0.8:8792/x', 'http://127.0.0.1:8792/x`id', '']) {
+  for (const bad of ['https://127.0.0.1:8792/cockpit-auth/synthetic', 'http://evil.test/cockpit-auth/synthetic', 'http://user:pw@127.0.0.1:8792/x', 'http://127.0.0.1:8792/x?token=synthetic', local + '#frag', 'http://10.0.0.8:8792/x', 'http://127.0.0.1:8792/x`id', '', 'http://0x7f000001:8792/x', 'http://2130706433:8792/x', 'http://127.1:8792/x', 'http://0177.0.0.1:8792/x', 'http://127.0.0.1.:8792/x', 'http://[::0001]:8792/x', 'HTTP://127.0.0.1:8792/x', 'http://127.0.0.1:08792/x']) {
     assert.equal(runtime.loopbackIdentityURL(bad), '');
   }
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wishtoken-identity-'));
@@ -113,6 +113,12 @@ test('app identity URL must stay on loopback HTTP', t => {
   assert.throws(() => runtime.launchEnvironment(home, 'local-test-key', env), error => {
     assert.match(error.message, /本地服务/);
     assert.equal(error.message.includes('evil.test'), false);
+    return true;
+  });
+  fs.writeFileSync(path.join(home, 'bridge-identity.json'), JSON.stringify({ auth_api_url: 'http://0x7f000001:8792/cockpit-auth/synthetic' }));
+  assert.throws(() => runtime.launchEnvironment(home, 'local-test-key', env), error => {
+    assert.match(error.message, /本地服务/);
+    assert.equal(error.message.includes('0x7f000001'), false);
     return true;
   });
   fs.writeFileSync(path.join(home, 'bridge-identity.json'), 'not-json secret-token');

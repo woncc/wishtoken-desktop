@@ -41,6 +41,9 @@ function loopbackIdentityURL(value) {
   try { url = new URL(value); } catch { return ''; }
   if (url.protocol !== 'http:' || url.username || url.password || url.search || url.hash) return '';
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return '';
+  // 0x7f000001, 127.1 and a trailing dot become 127.0.0.1 in this parser.
+  // Codex receives the original text, where those spellings are hostnames.
+  if (url.href !== value) return '';
   return value;
 }
 // Codex sends the account token to this endpoint. A profile file can be
