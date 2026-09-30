@@ -162,3 +162,34 @@ func TestSaveReplacesPermissiveFileAndIgnoresTempSymlink(t *testing.T) {
 		t.Fatal("config path remained a symlink")
 	}
 }
+
+func TestRefuseNonLoopbackListen(t *testing.T) {
+	if err := RefuseNonLoopbackListen(""); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("empty: %v", err)
+	}
+	if err := RefuseNonLoopbackListen(":8791"); err == nil {
+		t.Fatal("missing host accepted")
+	}
+	if err := RefuseNonLoopbackListen("203.0.113.10:1"); err == nil || !strings.Contains(err.Error(), "203.0.113.10") {
+		t.Fatalf("public ip: %v", err)
+	}
+	for _, ok := range []string{"127.0.0.1:8791", "[::1]:8791", "[::ffff:127.0.0.1]:8791"} {
+		if err := RefuseNonLoopbackListen(ok); err != nil {
+			t.Fatalf("%s: %v", ok, err)
+		}
+	}
+	previous := lookupIP
+	t.Cleanup(func() { lookupIP = previous })
+	lookupIP = func(string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("203.0.113.10"), net.ParseIP("127.0.0.1")}, nil
+	}
+	if err := RefuseNonLoopbackListen("localhost:8791"); err == nil || !strings.Contains(err.Error(), "203.0.113.10") {
+		t.Fatalf("mixed lookup: %v", err)
+	}
+	lookupIP = func(string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, nil
+	}
+	if err := RefuseNonLoopbackListen("localhost:8791"); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 	"github.com/xxx-holic/wishtoken-desktop/internal/jwt"
 	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
@@ -248,16 +249,7 @@ func MaskID(id string) string {
 }
 
 func redactProxy(u string) string {
-	u = strings.TrimSpace(u)
-	if u == "" {
-		return ""
-	}
-	if at := strings.LastIndex(u, "@"); at > 0 {
-		if scheme := strings.Index(u, "://"); scheme > 0 && scheme < at {
-			return u[:scheme+3] + "***@" + u[at+1:]
-		}
-	}
-	return u
+	return httpx.Redact(u)
 }
 
 // NewID returns a random account identifier.

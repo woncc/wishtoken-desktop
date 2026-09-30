@@ -398,18 +398,29 @@ func (s *Server) adminAccountAction(w http.ResponseWriter, r *http.Request, rest
 			writeError(w, r, http.StatusBadRequest, "invalid_json", "invalid_request_error", err.Error())
 			return
 		}
-		if req.ProxyURL != nil && strings.TrimSpace(*req.ProxyURL) != "" {
-			if _, err := httpx.ParseProxyURL(*req.ProxyURL); err != nil {
-				writeError(w, r, http.StatusBadRequest, "invalid_proxy", "invalid_request_error", err.Error())
+		var current account.Account
+		if req.ProxyURL != nil {
+			var ok bool
+			current, ok = s.Store.Get(id)
+			if !ok {
+				writeError(w, r, http.StatusNotFound, "account_not_found", "invalid_request_error", "unknown account")
 				return
 			}
+			value := httpx.PreserveProxy(current.ProxyURL, *req.ProxyURL)
+			if value != "" {
+				if _, err := httpx.ParseProxyURL(value); err != nil {
+					writeError(w, r, http.StatusBadRequest, "invalid_proxy", "invalid_request_error", err.Error())
+					return
+				}
+			}
+			req.ProxyURL = &value
 		}
 		err := s.Store.Update(id, func(acc *account.Account) {
 			if req.Name != nil {
 				acc.Name = strings.TrimSpace(*req.Name)
 			}
 			if req.ProxyURL != nil {
-				acc.ProxyURL = strings.TrimSpace(*req.ProxyURL)
+				acc.ProxyURL = *req.ProxyURL
 			}
 			if req.Disabled != nil {
 				acc.Disabled = *req.Disabled
@@ -453,12 +464,13 @@ func (s *Server) adminAccountAction(w http.ResponseWriter, r *http.Request, rest
 	}
 }
 
-// settingsView returns the editable configuration (API key redacted).
+// settingsView returns the editable configuration. The API key is omitted.
+// A proxy password is masked; saving that exact mask keeps the stored proxy.
 func (s *Server) settingsView() object {
 	cfg := s.Config()
 	return object{
 		"listen": cfg.Listen, "allow_remote": cfg.AllowRemote, "api_key_set": cfg.APIKey != "",
-		"proxy_url": cfg.ProxyURL, "route_policy": cfg.RoutePolicy, "bps_models": cfg.BPSModels,
+		"proxy_url": httpx.Redact(cfg.ProxyURL), "route_policy": cfg.RoutePolicy, "bps_models": cfg.BPSModels,
 		"native_fallback": cfg.NativeFallback, "default_model": cfg.DefaultModel, "default_effort": cfg.DefaultEffort,
 		"active_account_id":   cfg.ActiveAccountID,
 		"anthropic_model_map": cfg.AnthropicModelMap, "scheduler": cfg.Scheduler, "auto_refresh": cfg.AutoRefresh,
@@ -504,6 +516,7 @@ func (s *Server) adminUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid_settings", "invalid_request_error", err.Error())
 		return
 	}
+	updated.ProxyURL = httpx.PreserveProxy(current.ProxyURL, updated.ProxyURL)
 	if updated.ProxyURL != "" {
 		if _, err := httpx.ParseProxyURL(updated.ProxyURL); err != nil {
 			writeError(w, r, http.StatusBadRequest, "invalid_proxy", "invalid_request_error", err.Error())
