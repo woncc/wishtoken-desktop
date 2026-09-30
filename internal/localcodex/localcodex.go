@@ -176,7 +176,7 @@ func Prepare(o Options) (Options, error) {
 			return o, err
 		}
 		meta, _ := json.Marshal(map[string]string{"auth_api_url": o.AuthAPIURL})
-		if err := os.WriteFile(filepath.Join(o.Home, "bridge-identity.json"), meta, 0600); err != nil {
+		if err := ownerfile.Write(filepath.Join(o.Home, "bridge-identity.json"), meta); err != nil {
 			return o, err
 		}
 	}
@@ -218,7 +218,7 @@ http_headers = { "X-GPTBridge-Account" = %s, "X-GPTBridge-Channel" = %s }
 	if o.Channel == "codex" {
 		catalog = nativeCatalog
 	}
-	if err := os.WriteFile(filepath.Join(o.Home, "models.json"), catalog, 0600); err != nil {
+	if err := ownerfile.Write(filepath.Join(o.Home, "models.json"), catalog); err != nil {
 		return o, err
 	}
 	return o, ownerfile.Write(filepath.Join(o.Home, "config.toml"), []byte(data))
