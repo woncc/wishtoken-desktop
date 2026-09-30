@@ -117,7 +117,14 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	s.stop = cancel
 	s.stopMu.Unlock()
 	cfg := s.Config()
-	if !config.IsLoopback(cfg.Listen) && (!cfg.AllowRemote || cfg.APIKey == "") {
+	if strings.TrimSpace(cfg.Listen) == "" {
+		return fmt.Errorf("refusing to bind %q: empty listen address is not loopback", cfg.Listen)
+	}
+	if !cfg.AllowRemote {
+		if err := config.RefuseNonLoopbackListen(cfg.Listen); err != nil {
+			return fmt.Errorf("refusing to bind %q: %w", cfg.Listen, err)
+		}
+	} else if !config.IsLoopback(cfg.Listen) && strings.TrimSpace(cfg.APIKey) == "" {
 		return fmt.Errorf("refusing to bind %q: set allow_remote=true and an api_key to expose the bridge", cfg.Listen)
 	}
 	ln, err := net.Listen("tcp", cfg.Listen)

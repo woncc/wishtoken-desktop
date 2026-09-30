@@ -107,6 +107,12 @@ func TestListenAndServeRefusesNonLoopbackBeforeBind(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "refusing to bind") {
 		t.Fatalf("expected refusal before bind, got %v", err)
 	}
+	cfg.Listen = ""
+	f.srv.setConfig(cfg)
+	err = f.srv.ListenAndServe(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "empty") || !strings.Contains(err.Error(), "refusing to bind") {
+		t.Fatalf("empty listen: %v", err)
+	}
 }
 
 func getRaw(t *testing.T, f *fixture, route string) (int, string) {

@@ -302,6 +302,56 @@ func IsLoopbackPeer(remoteAddr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// lookupIP resolves a listen hostname. Tests replace it.
+var lookupIP = net.LookupIP
+
+// RefuseNonLoopbackListen reports whether addr may be passed to net.Listen
+// without exposing a non-loopback interface. It does not bind. An empty
+// address is rejected because the standard library treats it as all
+// interfaces. Hostnames are resolved first so a name that is not loopback
+// never reaches Listen.
+func RefuseNonLoopbackListen(addr string) error {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return errors.New("empty listen address is not loopback")
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	host = strings.Trim(host, "[]")
+	if zone := strings.IndexByte(host, '%'); zone >= 0 {
+		host = host[:zone]
+	}
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return errors.New("listen address has no host")
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if !ip.IsLoopback() {
+			return fmt.Errorf("resolved address %s is not loopback", ip)
+		}
+		return nil
+	}
+	ips, err := lookupIP(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve %s: %w", host, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("cannot resolve %s", host)
+	}
+	for _, ip := range ips {
+		if ip == nil || !ip.IsLoopback() {
+			shown := "<nil>"
+			if ip != nil {
+				shown = ip.String()
+			}
+			return fmt.Errorf("resolved address %s is not loopback", shown)
+		}
+	}
+	return nil
+}
+
 // RequireLoopbackListener rejects a bound socket that is not loopback.
 // allowRemote skips the check only when the operator explicitly exposed the
 // model API. Management routes still require a loopback peer.
