@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/config"
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 	"github.com/xxx-holic/wishtoken-desktop/internal/version"
 )
 
@@ -69,7 +70,8 @@ func ensureDesktopService(base string, requireCockpit bool) error {
 	if err := os.MkdirAll(config.Home(), 0700); err != nil {
 		return err
 	}
-	logfile, err := os.OpenFile(filepath.Join(config.Home(), "service.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	// A planted service.log symlink must not receive process output.
+	logfile, err := ownerfile.OpenAppend(filepath.Join(config.Home(), "service.log"))
 	if err != nil {
 		return err
 	}

@@ -123,3 +123,85 @@ func TestWriteIgnoresPredictableTempSymlink(t *testing.T) {
 		t.Fatalf("destination %q %v", got, err)
 	}
 }
+
+func TestOpenAppendPreservesLogAndRejectsNonFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "service.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file, err := OpenAppend(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write([]byte("new\n")); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != "old\nnew\n" {
+		t.Fatalf("append %q %v", got, err)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("log mode %o", info.Mode().Perm())
+		}
+	}
+	if _, err := OpenAppend("  "); err == nil {
+		t.Fatal("empty path accepted")
+	}
+	if _, err := OpenAppend(dir); err == nil {
+		t.Fatal("directory path accepted")
+	}
+}
+
+func TestOpenAppendReplacesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	stolen := filepath.Join(dir, "stolen.log")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "service.log")
+	if err := os.Symlink(stolen, link); err != nil {
+		t.Skip(err)
+	}
+	file, err := OpenAppend(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write([]byte("local\n")); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" {
+		t.Fatalf("log append followed a symlink: %q %v", kept, err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("log path remained a symlink")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("replacement log mode %o", info.Mode().Perm())
+	}
+	got, err := os.ReadFile(link)
+	if err != nil || string(got) != "local\n" {
+		t.Fatalf("replacement log %q %v", got, err)
+	}
+}
