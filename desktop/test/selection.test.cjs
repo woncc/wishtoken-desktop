@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults } = require('../renderer/selection.js');
+const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
 
 const catalog = {
   catalog: [
@@ -64,6 +64,8 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.match(pelican, /resolvePelicanDefaults/);
   assert.match(pelican, /pelican_model/);
   assert.doesNotMatch(pelican, /channelModels\(\$\('pelican-channel'\)\.value, \$\('pelican-model'\), \$\('model'\)\.value\)/);
+  assert.match(app, /replayLaunch/);
+  assert.doesNotMatch(app, /app_mode \|\| 'isolated'/);
   assert.doesNotMatch(pelican, /item\.route \|\| b\.channel/);
   assert.match(pelican, /返回通道/);
   assert.doesNotMatch(app, /service_tier \|\| 'standard'/);
@@ -82,4 +84,30 @@ test('a saved pelican model is not replaced by the launch-panel model', () => {
   assert.equal(kept.model, 'gpt-5.6-terra');
   assert.equal(kept.effort.value, 'max');
   assert.equal(kept.effort.available, false);
+});
+
+test('history replay keeps explicit choices and does not invent an app workspace', () => {
+  const legacy = replayLaunch({ account_id: 'acc-1', directory: '/work', model: 'gpt-6-astra', effort: 'high' }, true);
+  assert.equal(legacy.ok, true);
+  assert.equal(legacy.options.target, 'cli');
+  assert.equal(legacy.options.channel, 'bps');
+  assert.equal(legacy.options.speed, 'standard');
+  assert.equal(legacy.options.resume, true);
+  assert.equal(legacy.options.app_mode, undefined);
+  const native = replayLaunch({ account_id: 'acc-1', directory: '/work', model: 'gpt-5.6-terra', effort: 'max', channel: 'codex', speed: 'fast', target: 'cli' }, false);
+  assert.equal(native.options.channel, 'codex');
+  assert.equal(native.options.speed, 'fast');
+  assert.equal(native.options.effort, 'max');
+  assert.equal(native.options.resume, false);
+  const main = replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'xhigh', target: 'app', app_mode: 'main', channel: 'codex', speed: 'standard' }, true);
+  assert.equal(main.options.app_mode, 'main');
+  assert.equal(main.options.resume, false);
+  assert.equal(replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'xhigh', target: 'app', app_mode: 'isolated', channel: 'bps' }).options.app_mode, 'isolated');
+  const missing = replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'xhigh', target: 'app', channel: 'codex' }, false);
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /未自动改为独立实例/);
+  assert.equal(replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'high', channel: 'automatic' }).ok, false);
+  assert.equal(replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'high', speed: 'ultrafast' }).ok, false);
+  assert.equal(replayLaunch({ account_id: 'acc-1', model: 'gpt-6-astra', effort: 'high', channel: 'bps', speed: 'fast' }).ok, false);
+  assert.equal(replayLaunch({ account_id: 'acc-1', effort: 'high', channel: 'codex' }).ok, false);
 });

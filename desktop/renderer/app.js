@@ -276,12 +276,17 @@ function editDialog(id) {
 function launchOptions() { return { account_id: state.selected, app_mode: $('app-mode').value, channel: $('channel').value, speed: $('speed').value, directory: $('directory').value.trim(), target: $('launch-target').value, model: $('model').value, effort: state.effort, context_window: Number($('context-window').value), compact_limit: Number($('compact-limit').value) }; }
 async function launch(resume = false, record) {
   await action('launch', async () => {
-    const options = record ? { account_id: record.account_id, app_mode: record.app_mode || 'isolated', channel: record.channel || 'bps', speed:record.speed || 'standard', directory: record.directory, target: record.target || 'cli', model: record.model, effort: record.effort, context_window: record.context_window, compact_limit: record.compact_limit, resume } : { ...launchOptions(), resume };
+    let options;
+    if (record) {
+      const replay = wishSelection.replayLaunch(record, resume);
+      if (!replay.ok) throw new Error(replay.error);
+      options = replay.options;
+    } else options = { ...launchOptions(), resume };
     const result = await api.launch(options);
     if (result.cancelled) return;
     state.selected = options.account_id;
     $('launch-target').value = options.target;
-    $('app-mode').value = options.app_mode || 'main';
+    if (options.app_mode) $('app-mode').value = options.app_mode;
     launchChannel(options.channel, options.model);
     $('directory').value = options.directory; $('model').value = options.model; setEffort(options.effort);
     $('context-window').value = options.context_window; $('compact-limit').value = options.compact_limit; updateContextLabel();

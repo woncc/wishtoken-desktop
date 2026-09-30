@@ -65,6 +65,9 @@ test('renderer payloads drop camelCase oauth fields and credential-shaped text',
   assert.match(value.url, /cockpit-auth\/\[凭据已隐藏\]/);
   assert.equal(value.email, 'member@example.test');
   assert.equal(value.model, 'gpt-5.6-terra');
+  assert.equal(redactPublic('proxy http://user:s3cret-token@127.0.0.1:7890/path'), 'proxy http://127.0.0.1:7890/path');
+  assert.equal(redactPublic('http://127.0.0.1:7890'), 'http://127.0.0.1:7890');
+  assert.equal(redactPublic('socks5://alice:hunter2@10.0.0.8:1080'), 'socks5://10.0.0.8:1080');
   const clean = redactPublic(JSON.parse('{"__proto__":{"polluted":true},"ok":1}'));
   assert.equal(clean.ok, 1);
   assert.equal(clean.polluted, undefined);
@@ -120,6 +123,7 @@ test('renderer snapshot keeps ui fields and drops credential payloads', () => {
   assert.deepEqual(view.models.bps_models, ['gpt-6-astra']);
   assert.equal(view.settings.api_key, undefined);
   assert.equal(view.settings.auto_refresh, true);
+  assert.equal(view.settings.proxy_url, 'http://127.0.0.1:7890');
   assert.equal(view.preferences.app_path, undefined);
   assert.equal(view.preferences.api_key, undefined);
   assert.equal(view.preferences.pelican_model, 'gpt-5.6-sol');
@@ -179,6 +183,13 @@ test('action responses keep explicit mode and drop profile paths and service int
   assert.equal(usage.access_token, undefined);
   const settings = publicSettings({ proxy_url: 'http://127.0.0.1:7890', auto_refresh: true, usage_probe: false, config_path: '/tmp/config.json', listen: '0.0.0.0:9', api_key: 'local-key', api_key_set: true });
   assert.deepEqual(settings, { proxy_url: 'http://127.0.0.1:7890', auto_refresh: true, usage_probe: false });
+  const authed = publicSettings({ proxy_url: 'http://user:s3cret-token@127.0.0.1:7890', auto_refresh: false, usage_probe: true });
+  assert.equal(authed.proxy_url, 'http://user:s3cret-token@127.0.0.1:7890');
+  const snap = publicSnapshot({ settings: { proxy_url: 'http://user:s3cret-token@127.0.0.1:7890', auto_refresh: false, usage_probe: false }, accounts: [{ id: 'acc-1', last_error: 'via http://user:s3cret-token@10.1.1.1:8080 failed' }] });
+  assert.equal(snap.settings.proxy_url, 'http://user:s3cret-token@127.0.0.1:7890');
+  assert.equal(snap.accounts[0].last_error, 'via http://10.1.1.1:8080 failed');
+  const logs = publicLogs({ records: [{ model: 'gpt-6-astra', error: 'proxy http://user:s3cret-token@127.0.0.1:7890 refused' }] });
+  assert.equal(logs.records[0].error, 'proxy http://127.0.0.1:7890 refused');
   assert.deepEqual(publicApp({ installed: true, binary: '/secret/Codex.app', error: '' }), { installed: true });
   assert.equal(publicApp({ installed: false, binary: '', error: 'missing ' + jwt }).error.includes('凭据已隐藏'), true);
   assert.deepEqual(publicServiceState({ reused: false, config: { api_key: 'local-key' } }), { reused: false });

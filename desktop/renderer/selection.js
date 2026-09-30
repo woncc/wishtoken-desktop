@@ -53,6 +53,40 @@
     if (channel == null || channel === '' || channel === 'bps') return 'BPS';
     return '';
   }
+  function recorded(value, fallback) {
+    return value == null || value === '' ? fallback : value;
+  }
+  // Replay a saved launch exactly. Absent legacy fields keep their original
+  // meaning; an explicit value is never rewritten, and App mode is never invented.
+  function replayLaunch(record, resume) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return { ok: false, error: '启动记录无效' };
+    const target = recorded(record.target, 'cli');
+    if (target !== 'cli' && target !== 'app') return { ok: false, error: '启动目标无效，未自动更换' };
+    const channel = recorded(record.channel, 'bps');
+    if (channel !== 'bps' && channel !== 'codex') return { ok: false, error: '记录中的通道无效，未自动更换' };
+    const speed = recorded(record.speed, 'standard');
+    if (speed !== 'standard' && speed !== 'fast') return { ok: false, error: '记录中的速度无效，未自动更换' };
+    if (channel === 'bps' && speed !== 'standard') return { ok: false, error: 'BPS 暂不支持快速模式，未改成标准速度' };
+    if (typeof record.model !== 'string' || !record.model) return { ok: false, error: '记录中没有模型，未自动更换' };
+    if (typeof record.effort !== 'string' || !record.effort) return { ok: false, error: '记录中没有推理档位，未自动更换' };
+    const options = {
+      account_id: record.account_id,
+      channel,
+      speed,
+      directory: typeof record.directory === 'string' ? record.directory : '',
+      target,
+      model: record.model,
+      effort: record.effort,
+      context_window: record.context_window,
+      compact_limit: record.compact_limit,
+      resume: target === 'cli' && resume === true
+    };
+    if (target === 'app') {
+      if (record.app_mode !== 'main' && record.app_mode !== 'isolated') return { ok: false, error: '这条记录没有明确的 App 工作空间，未自动改为独立实例' };
+      options.app_mode = record.app_mode;
+    }
+    return { ok: true, options };
+  }
   // A saved pelican choice stays put. Launch-panel values are only the
   // initial default when the compare view has never recorded its own.
   function resolvePelicanDefaults(preferences, launch) {
@@ -63,5 +97,5 @@
     const effortValue = typeof prefs.pelican_effort === 'string' && prefs.pelican_effort ? prefs.pelican_effort : launchEffort;
     return { channel: resolveChannel(prefs.pelican_channel), model, effort: resolveEffort(effortValue) };
   }
-  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults };
+  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolvePelicanDefaults, replayLaunch };
 });
