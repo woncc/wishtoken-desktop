@@ -276,9 +276,7 @@ func IsLoopback(addr string) bool {
 		host = h
 	}
 	host = strings.Trim(host, "[]")
-	if zone := strings.IndexByte(host, '%'); zone >= 0 {
-		host = host[:zone]
-	}
+	host = stripIPv6Zone(host)
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return false
@@ -301,11 +299,19 @@ func IsLoopbackPeer(remoteAddr string) bool {
 		host = h
 	}
 	host = strings.Trim(host, "[]")
-	if zone := strings.IndexByte(host, '%'); zone >= 0 {
-		host = host[:zone]
-	}
+	host = stripIPv6Zone(host)
 	ip := net.ParseIP(strings.TrimSpace(host))
 	return ip != nil && ip.IsLoopback()
+}
+
+// stripIPv6Zone removes an interface zone from an IPv6 literal.
+// A percent sign in a hostname is not a zone: localhost%evil must stay intact.
+func stripIPv6Zone(host string) string {
+	zone := strings.IndexByte(host, '%')
+	if zone < 0 || !strings.Contains(host[:zone], ":") {
+		return host
+	}
+	return host[:zone]
 }
 
 // lookupIP resolves a listen hostname. Tests replace it.
@@ -326,9 +332,7 @@ func RefuseNonLoopbackListen(addr string) error {
 		host = addr
 	}
 	host = strings.Trim(host, "[]")
-	if zone := strings.IndexByte(host, '%'); zone >= 0 {
-		host = host[:zone]
-	}
+	host = stripIPv6Zone(host)
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return errors.New("listen address has no host")

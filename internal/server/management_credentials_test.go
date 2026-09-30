@@ -102,7 +102,7 @@ func TestReboundLoopbackHostCannotReachManagement(t *testing.T) {
 		t.Fatalf("rebound shutdown: %d %s", reboundRec.Code, reboundRec.Body.String())
 	}
 
-	for _, host := range []string{"evil.localhost:8791", "127.0.0.1.rebind.example:8791", "localhost.example:8791"} {
+	for _, host := range []string{"evil.localhost:8791", "127.0.0.1.rebind.example:8791", "localhost.example:8791", "localhost%evil.example:8791", "127.0.0.1%evil:8791"} {
 		req := httptest.NewRequest(http.MethodGet, "/api/accounts", nil)
 		req.RemoteAddr = "[::1]:9"
 		req.Host = host
