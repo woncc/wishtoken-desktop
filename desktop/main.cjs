@@ -7,7 +7,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { BridgeService, atomicJSON } = require('./lib/service.cjs');
-const { requireID, cleanLaunch, cleanSettings, cleanProbe, redactPublic, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection } = require('./lib/policy.cjs');
+const { requireID, cleanLaunch, cleanSettings, cleanProbe, safeError, applyPreferences, withoutSecrets, publicSnapshot, publicLogs, publicProbe, publicImport, publicLaunch, publicRestore, publicAccountAction, publicUsageResult, publicSettings, publicPreferences, publicApp, publicServiceState, publicAbout, publicSelection, rendererPayload } = require('./lib/policy.cjs');
 const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
@@ -244,7 +244,7 @@ if (lock) {
     else Menu.setApplicationMenu(null);
     ipcMain.handle('gptbridge', async (event, method, data) => {
       if (!validSender(event)) return { ok: false, error: '无效的客户端来源' };
-      try { return { ok: true, data: redactPublic(await handle(method, data)) }; }
+      try { return { ok: true, data: rendererPayload(await handle(method, data)) }; }
       catch (error) { return { ok: false, error: safeError(error) }; }
     });
     await service.start().catch(() => {}); // The UI presents a recoverable error.
