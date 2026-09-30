@@ -31,11 +31,13 @@ test('account IDs cannot escape the endpoint path; credential errors are redacte
   assert.equal(safeError(new Error('invalid eyJabc.xyz.def credential')), 'invalid [凭据已隐藏] credential');
 });
 
-test('connection probe rejects a substitute model or effort instead of rewriting it', () => {
+test('connection probe rejects a substitute model, effort, or missing channel', () => {
   assert.deepEqual(cleanProbe({ account_id: 'acc-abcdef123', model: 'gpt-5.6-terra', effort: 'low', channel: 'codex' }), { account_id: 'acc-abcdef123', model: 'gpt-5.6-terra', effort: 'low', channel: 'codex' });
   assert.throws(() => cleanProbe({ account_id: 'acc-abcdef123', model: 'gpt-5.6-terra', effort: 'max', channel: 'bps' }));
   assert.throws(() => cleanProbe({ account_id: 'acc-abcdef123', model: '', effort: 'high' }));
   assert.throws(() => cleanProbe({ account_id: 'acc-abcdef123', model: 'not a model', effort: 'high' }));
+  assert.throws(() => cleanProbe({ account_id: 'acc-abcdef123', model: 'gpt-5.6-terra', effort: 'high' }));
+  assert.throws(() => cleanProbe({ account_id: 'acc-abcdef123', model: 'gpt-5.6-terra', effort: 'high', channel: null }));
 });
 test('renderer payloads drop oauth fields and embedded JWTs', () => {
   const account = redactPublic({ id: 'acc-1', email: 'a@example.test', access_token: 'secret-token-value', refresh_token: 'refresh-token-value', has_refresh_token: true, usage: { note: 'bad eyJaaaaaaaaaa.bbbbbbbbbb.cccccccccc token' } });
@@ -65,6 +67,10 @@ test('renderer payloads drop camelCase oauth fields and credential-shaped text',
   assert.match(value.url, /cockpit-auth\/\[凭据已隐藏\]/);
   assert.equal(value.email, 'member@example.test');
   assert.equal(value.model, 'gpt-5.6-terra');
+  assert.equal(redactPublic({ response_id: 'resp_0123456789abcdef', responseId: 'resp_fedcba9876543210', ok: 1 }).response_id, undefined);
+  assert.equal(redactPublic({ responseId: 'resp_fedcba9876543210', ok: 1 }).responseId, undefined);
+  assert.equal(redactPublic('upstream response_id=resp_0123456789abcdef done').includes('resp_0123456789abcdef'), false);
+  assert.match(redactPublic('upstream response_id=resp_0123456789abcdef done'), /response_id=\[凭据已隐藏\]/);
   assert.equal(redactPublic('proxy http://user:s3cret-token@127.0.0.1:7890/path'), 'proxy http://127.0.0.1:7890/path');
   assert.equal(redactPublic('http://127.0.0.1:7890'), 'http://127.0.0.1:7890');
   assert.equal(redactPublic('socks5://alice:hunter2@10.0.0.8:1080'), 'socks5://10.0.0.8:1080');
@@ -135,10 +141,16 @@ test('renderer snapshot keeps ui fields and drops credential payloads', () => {
   assert.equal(logs.records[0].access_token, undefined);
   assert.equal(logs.records[0].account, undefined);
   assert.match(logs.records[0].error, /Bearer \[凭据已隐藏\]/);
-  const probe = publicProbe({ ok: true, model: 'gpt-6-astra', effort: 'low', duration_ms: 12, text: 'CONNECTION OK ' + jwt, account: 'raw-token' });
+  const probe = publicProbe({ ok: true, model: 'gpt-6-astra', effort: 'low', route: 'codex', duration_ms: 12, text: 'CONNECTION OK ' + jwt, account: 'raw-token', response_id: 'resp_0123456789abcdef' });
   assert.equal(probe.text, undefined);
   assert.equal(probe.account, undefined);
+  assert.equal(probe.response_id, undefined);
+  assert.equal(probe.route, 'codex');
   assert.equal(probe.ok, true);
+  const unreported = publicProbe({ ok: true, model: 'gpt-6-astra', effort: 'high', response_model: 'gpt-5.6-terra' });
+  assert.equal(unreported.route, '');
+  assert.notEqual(unreported.route, 'bps');
+  assert.equal(unreported.response_model, undefined);
   const imported = publicImport({ imported: 1, merged: 0, skipped: 1, ids: ['acc-1'], warnings: ['skipped an entry without access_token or refresh_token', 'bad ' + jwt], accounts: [{ access_token: 'raw-token' }] });
   assert.equal(imported.accounts, undefined);
   assert.match(imported.warnings[0], /access_token or refresh_token/);

@@ -94,3 +94,33 @@ test('main launch uses original Electron data and excludes isolated and child pr
   assert.equal(runtime.isMainProcess('app --user-data-dir="C:\\data\\Codex"','win32',{APPDATA:'C:\\data'}),true);
   assert.equal(runtime.isMainProcess('/Applications/Codex.app/Contents/MacOS/Codex --user-data-dir=/tmp/private','darwin'),false);
 });
+
+test('app identity URL must stay on loopback HTTP', t => {
+  const local = 'http://127.0.0.1:8792/cockpit-auth/synthetic';
+  assert.equal(runtime.loopbackIdentityURL(local), local);
+  assert.equal(runtime.loopbackIdentityURL('http://localhost:8792/cockpit-auth/synthetic'), 'http://localhost:8792/cockpit-auth/synthetic');
+  assert.equal(runtime.loopbackIdentityURL('http://[::1]:8792/cockpit-auth/synthetic'), 'http://[::1]:8792/cockpit-auth/synthetic');
+  for (const bad of ['https://127.0.0.1:8792/cockpit-auth/synthetic', 'http://evil.test/cockpit-auth/synthetic', 'http://user:pw@127.0.0.1:8792/x', 'http://127.0.0.1:8792/x?token=synthetic', local + '#frag', 'http://10.0.0.8:8792/x', 'http://127.0.0.1:8792/x`id', '']) {
+    assert.equal(runtime.loopbackIdentityURL(bad), '');
+  }
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wishtoken-identity-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const env = { PATH: 'safe', CODEX_AUTHAPI_BASE_URL: 'http://evil.test/old' };
+  assert.equal(runtime.launchEnvironment(home, 'local-test-key', env).CODEX_AUTHAPI_BASE_URL, undefined);
+  fs.writeFileSync(path.join(home, 'bridge-identity.json'), JSON.stringify({ auth_api_url: local }));
+  assert.equal(runtime.launchEnvironment(home, 'local-test-key', env).CODEX_AUTHAPI_BASE_URL, local);
+  fs.writeFileSync(path.join(home, 'bridge-identity.json'), JSON.stringify({ auth_api_url: 'https://evil.test/cockpit-auth/synthetic' }));
+  assert.throws(() => runtime.launchEnvironment(home, 'local-test-key', env), error => {
+    assert.match(error.message, /本地服务/);
+    assert.equal(error.message.includes('evil.test'), false);
+    return true;
+  });
+  fs.writeFileSync(path.join(home, 'bridge-identity.json'), 'not-json secret-token');
+  assert.throws(() => runtime.launchEnvironment(home, 'local-test-key', env), error => {
+    assert.match(error.message, /本地服务/);
+    assert.equal(error.message.includes('secret-token'), false);
+    return true;
+  });
+  const source = fs.readFileSync(path.join(__dirname, '../lib/codex-app.cjs'), 'utf8');
+  assert.doesNotMatch(source, /ConvertFrom-Json\)\.auth_api_url/);
+});

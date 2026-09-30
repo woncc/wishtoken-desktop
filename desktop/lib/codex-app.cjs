@@ -35,14 +35,34 @@ async function discoverApp(preferred) {
   for (const candidate of candidates) if ((executable = appExecutable(candidate))) return { installed: true, binary: executable };
   return { installed: false, binary: '', error: process.platform === 'linux' ? '未检测到兼容的 Codex 图形程序；Linux 可使用 Codex CLI，或手动指定已有图形客户端' : '未找到 Codex App，请安装官方客户端或手动选择应用路径' };
 }
+function loopbackIdentityURL(value) {
+  if (typeof value !== 'string' || !value || value.length > 2048 || /[\u0000-\u0020'"\`\\]/.test(value)) return '';
+  let url;
+  try { url = new URL(value); } catch { return ''; }
+  if (url.protocol !== 'http:' || url.username || url.password || url.search || url.hash) return '';
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return '';
+  return value;
+}
+// Codex sends the account token to this endpoint. A profile file can be
+// rewritten locally, so anything other than loopback HTTP is refused.
+function readIdentityURL(home) {
+  const identity = path.join(home, 'bridge-identity.json');
+  if (!fs.existsSync(identity)) return '';
+  let parsed;
+  try { parsed = JSON.parse(fs.readFileSync(identity, 'utf8')); } catch { throw new Error('主应用身份入口必须是本地服务'); }
+  const allowed = loopbackIdentityURL(parsed && parsed.auth_api_url);
+  if (!allowed) throw new Error('主应用身份入口必须是本地服务');
+  return allowed;
+}
 function launchEnvironment(home, key, env = process.env, mode = 'isolated') {
   const clean = Object.fromEntries(Object.entries(env).filter(([k]) => !/^(CODEX_|GPTBRIDGE_|ELECTRON_|NODE_OPTIONS$|OPENAI_API_KEY$|OPENAI_BASE_URL$)/i.test(k)));
-  const identity = path.join(home, 'bridge-identity.json');
-  if (fs.existsSync(identity)) clean.CODEX_AUTHAPI_BASE_URL = JSON.parse(fs.readFileSync(identity, 'utf8')).auth_api_url;
+  const identityURL = readIdentityURL(home);
+  if (identityURL) clean.CODEX_AUTHAPI_BASE_URL = identityURL;
   return { ...clean, CODEX_HOME: home, ...(mode === 'isolated' ? {CODEX_ELECTRON_USER_DATA_PATH:path.join(home,'app-data')} : {}), GPTBRIDGE_CODEX_KEY: key };
 }
 const psQuote = value => "'" + value.replaceAll("'", "''") + "'";
 async function launchStoreApp(executable, home, configPath, mode) {
+  const identityURL = readIdentityURL(home);
   const resultFile = path.join(home, `app-launch-${randomUUID()}.json`);
   // Packaged Windows APIs require package identity. Shell AppsFolder would
   // discard the selected profile, so run a hidden helper inside this package.
@@ -56,8 +76,7 @@ try {
   foreach ($k in @($psi.EnvironmentVariables.Keys)) { if ($k -match '^(CODEX_|GPTBRIDGE_|ELECTRON_|NODE_OPTIONS$|OPENAI_API_KEY$|OPENAI_BASE_URL$)') { $psi.EnvironmentVariables.Remove($k) } }
   $psi.EnvironmentVariables['CODEX_HOME'] = ${psQuote(home)}
   ${mode === 'isolated' ? "$psi.EnvironmentVariables['CODEX_ELECTRON_USER_DATA_PATH'] = " + psQuote(path.join(home, 'app-data')) : ''}
-  $identity = ${psQuote(path.join(home, 'bridge-identity.json'))}
-  if (Test-Path -LiteralPath $identity) { $psi.EnvironmentVariables['CODEX_AUTHAPI_BASE_URL'] = (Get-Content -Raw -LiteralPath $identity | ConvertFrom-Json).auth_api_url }
+  ${identityURL ? "$psi.EnvironmentVariables['CODEX_AUTHAPI_BASE_URL'] = " + psQuote(identityURL) : ''}
   $psi.EnvironmentVariables['GPTBRIDGE_CODEX_KEY'] = (Get-Content -Raw -LiteralPath ${psQuote(configPath)} | ConvertFrom-Json).api_key
   $child = [System.Diagnostics.Process]::Start($psi)
   Start-Sleep -Milliseconds 1800
@@ -133,4 +152,4 @@ async function closeMainProcesses(binary,expected) {
   }
   throw new Error('主 Codex App 尚未退出，请保存任务并完全退出后重试；本次没有切换配置');
 }
-module.exports = { discoverApp, appExecutable, launchEnvironment, launchApp, launchArguments, isMainProcess, mainProcesses, closeMainProcesses };
+module.exports = { discoverApp, appExecutable, launchEnvironment, loopbackIdentityURL, launchApp, launchArguments, isMainProcess, mainProcesses, closeMainProcesses };

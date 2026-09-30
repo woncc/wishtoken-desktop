@@ -322,13 +322,20 @@ async function testAccount(id) {
     const result = await api.test({ account_id: id, channel: $('channel').value, model: $('model').value, effort: state.effort });
     await refresh(true);
     if (!result.ok) throw new Error(result.error || '连接测试失败');
-    toast(`连接成功 · ${result.model} / ${result.effort} · ${(result.duration_ms / 1000).toFixed(1)} 秒`, 'success', 8000);
+    const seconds = wishSelection.reportedDuration(result.duration_ms);
+    toast(`连接成功 · 返回模型 ${result.model || '未报告'} · 返回档位 ${result.effort || '未报告'} · 返回通道 ${wishSelection.explicitRouteLabel(result.route)} · ${seconds ? `${seconds} 秒` : '耗时未报告'}`, 'success', 8000);
   });
 }
 async function loadLogs() {
   try {
     const data = await api.logs();
-    $('logs-list').innerHTML = data.records?.length ? `<table class="log-table"><thead><tr><th>时间</th><th>模型 / 推理</th><th>通道 / 速度</th><th>结果</th><th>耗时</th></tr></thead><tbody>${data.records.map(record => `<tr><td>${date(record.time)}</td><td><strong>${esc(record.model)}</strong><br><small>返回 ${esc(record.response_model || '未报告')}</small><br><span class="muted">${esc(record.effort)}</span></td><td><code>${esc(record.route || '未报告')}</code><br><small>请求 ${esc(record.service_tier || '未报告')} → 返回 ${esc(record.response_service_tier || '未报告')}</small></td><td class="${record.status >= 400 || record.stream_status === 'failed' ? 'danger-text' : ''}" title="${esc(record.error)}">${record.status} ${esc(record.stream_status || '连接已建立')}${record.error ? `<br><small>${esc(record.error.slice(0, 180))}</small>` : ''}</td><td>${(record.duration_ms / 1000).toFixed(1)} s</td></tr>`).join('')}</tbody></table>` : empty('暂无请求记录', '启动 Codex 或测试连接后，实际请求会显示在这里。');
+    $('logs-list').innerHTML = data.records?.length ? `<table class="log-table"><thead><tr><th>时间</th><th>模型 / 推理</th><th>通道 / 速度</th><th>结果</th><th>耗时</th></tr></thead><tbody>${data.records.map(record => {
+      const status = wishSelection.reportedStatus(record.status);
+      const stream = wishSelection.reportedStream(record.stream_status);
+      const seconds = wishSelection.reportedDuration(record.duration_ms);
+      const failed = (typeof record.status === 'number' && record.status >= 400) || record.stream_status === 'failed';
+      return `<tr><td>${date(record.time)}</td><td><strong>${esc(record.model || '未报告')}</strong><br><small>返回 ${esc(record.response_model || '未报告')}</small><br><span class="muted">${esc(record.effort || '未报告')}</span></td><td><code>${esc(record.route || '未报告')}</code><br><small>请求 ${esc(record.service_tier || '未报告')} → 返回 ${esc(record.response_service_tier || '未报告')}</small></td><td class="${failed ? 'danger-text' : ''}" title="${esc(record.error)}">${esc(status)} ${esc(stream)}${record.error ? `<br><small>${esc(record.error.slice(0, 180))}</small>` : ''}</td><td>${seconds ? `${seconds} s` : '未报告'}</td></tr>`;
+    }).join('')}</tbody></table>` : empty('暂无请求记录', '启动 Codex 或测试连接后，实际请求会显示在这里。');
   } catch (error) { toast(error.message, 'error'); }
 }
 function updateContextLabel() { document.querySelector('.advanced summary span').textContent = `${Math.round(Number($('context-window').value) / 1000)}k / ${Math.round(Number($('compact-limit').value) / 1000)}k`; }
