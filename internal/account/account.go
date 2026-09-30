@@ -110,11 +110,11 @@ func (a *Account) Identity() string {
 
 // Label is a short display name.
 func (a *Account) Label() string {
-	if a.Name != "" {
-		return a.Name
+	if name := scrubDisplay(a.Name); name != "" {
+		return name
 	}
-	if a.Email != "" {
-		return a.Email
+	if email := scrubDisplay(a.Email); email != "" {
+		return email
 	}
 	if a.AccountID != "" {
 		return MaskID(a.AccountID)
@@ -206,9 +206,9 @@ type View struct {
 // View returns the redacted representation.
 func (a *Account) View() View {
 	v := View{
-		ID: a.ID, Name: scrubDisplay(a.Name), Email: scrubDisplay(a.Email), AccountID: MaskID(a.AccountID), PlanType: a.PlanType,
+		ID: a.ID, Name: scrubDisplay(a.Name), Email: scrubDisplay(a.Email), AccountID: MaskID(a.AccountID), PlanType: scrubDisplay(a.PlanType),
 		Disabled: a.Disabled, HasRefreshToken: a.RefreshToken != "", HasAccessToken: a.AccessToken != "",
-		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: a.Source, Tags: scrubDisplayList(a.Tags),
+		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: scrubDisplay(a.Source), Tags: scrubDisplayList(a.Tags),
 		LastError: scrubDisplay(a.LastError), Usage: a.Usage, Stats: a.Stats, CreatedAt: a.CreatedAt,
 	}
 	v.ExpiresAt = formatTime(a.ExpiresAt)
@@ -252,8 +252,10 @@ func redactProxy(u string) string {
 	return httpx.Redact(u)
 }
 
-// scrubDisplay hides proxy passwords and credential-shaped values in fields
-// the management API shows. The stored proxy URL itself is redacted separately.
+// ScrubDisplay masks proxy passwords and credential-shaped text for management
+// responses. The stored proxy URL itself is redacted separately.
+func ScrubDisplay(value string) string { return scrubDisplay(value) }
+
 func scrubDisplay(value string) string {
 	value = displayName(value)
 	if value == "" {

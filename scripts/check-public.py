@@ -71,7 +71,7 @@ def strip_alias(folded):
             folded = stem[:-5] + suffix
             changed = True
             continue
-        if suffix in BACKUP_SUFFIXES or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
+        if suffix in BACKUP_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
             if stem and stem != folded:
                 folded = stem
                 changed = True
@@ -166,6 +166,7 @@ def self_test():
         '._accounts.json', 'auth.json.~1~', 'auth.json~1', 'id_rsa.old2', 'tokens.json.orig2',
         'config.json.save1', 'home/.netrc.bak3', 'Copy of auth.json', 'auth (1).json',
         'accounts copy.json', 'nested/auth.json.bak3', 'ID_ED25519.OLD2', '._.netrc',
+        'id_rsa.txt', 'accounts.json.txt', 'nested/auth.json.txt', 'credentials.txt', 'ID_ED25519.TXT',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -173,6 +174,7 @@ def self_test():
         'internal/oauth/login.go', 'docs/handover-not-private.md',
         'docs/assets/accounts.png', 'internal/localcodex/models.json', 'notes.tmp', 'script.go.swp',
         'id_rsa.pub', 'script (1).go', 'notes.bak3', 'Copy of README.md', '._script.go',
+        'notes.txt', 'docs/readme.txt', 'script.go.txt',
     )
     for rel in blocked:
         if not path_reason(rel):

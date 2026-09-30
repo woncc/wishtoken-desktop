@@ -268,15 +268,18 @@ func TestImportHidesProxyPasswordsInDisplayFields(t *testing.T) {
 	proxy := "http://user:" + password + "@127.0.0.1:7890"
 	malformed := "http://user:" + password + "%zz@127.0.0.1:7890"
 	token := sampleJWT("kept@example.com", "acct_keep")
-	raw := `{"access_token":"` + token + `","refresh_token":"rt_keep_1234567890","email":"` + proxy + `","name":"` + malformed + `","tags":["team","` + proxy + `"],"proxy_url":"` + proxy + `"}`
+	raw := `{"access_token":"` + token + `","refresh_token":"rt_keep_1234567890","email":"` + proxy + `","name":"` + malformed + `","plan_type":"` + proxy + `","source":"` + malformed + `","tags":["team","` + proxy + `"],"proxy_url":"` + proxy + `"}`
 	res, err := Parse([]byte(raw), "fixture")
 	if err != nil || len(res.Accounts) != 1 {
 		t.Fatalf("import: %v %+v", err, res)
 	}
 	acc := res.Accounts[0]
 	stored := acc.Name + "\n" + acc.Email + "\n" + strings.Join(acc.Tags, "\n")
-	if strings.Contains(stored, password) || acc.Email != "kept@example.com" || acc.ProxyURL != proxy {
+	if strings.Contains(stored, password) || acc.Email != "kept@example.com" || acc.PlanType != "plus" || acc.ProxyURL != proxy {
 		t.Fatalf("display stored a proxy password or dropped the real fields: %+v", acc)
+	}
+	if strings.Contains(acc.Label(), password) {
+		t.Fatalf("label leaked: %s", acc.Label())
 	}
 	if !strings.Contains(acc.Name, "xxxxx") || len(acc.Tags) != 2 || !strings.Contains(acc.Tags[1], "xxxxx") {
 		t.Fatalf("redacted display missing: %+v", acc)
@@ -284,7 +287,7 @@ func TestImportHidesProxyPasswordsInDisplayFields(t *testing.T) {
 	acc.LastError = "dial " + malformed
 	view := acc.View()
 	shown := view.Name + "\n" + view.Email + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.ProxyURL + "\n" + view.LastError
-	if strings.Contains(shown, password) || view.Email != "kept@example.com" || !strings.Contains(view.ProxyURL, "xxxxx") || !strings.Contains(view.LastError, "xxxxx") {
+	if strings.Contains(shown, password) || view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.ProxyURL, "xxxxx") || !strings.Contains(view.LastError, "xxxxx") {
 		t.Fatalf("view leaked: %+v", view)
 	}
 }

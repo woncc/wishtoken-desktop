@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
@@ -177,7 +178,7 @@ func Inspect(path string) Status {
 		}
 		value = strings.Trim(value, "\"'")
 		if inBridge && key == "base_url" {
-			st.BaseURL = value
+			st.BaseURL = httpx.Redact(value)
 		}
 	}
 	// Top-level keys only.

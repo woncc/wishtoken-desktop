@@ -374,7 +374,7 @@ func runAccounts(args []string) error {
 		fmt.Fprintln(tw, "ID\tEMAIL\tPLAN\tACCOUNT\tSTATUS\tEXPIRES\tSOURCE")
 		for _, acc := range list {
 			v := acc.View()
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", acc.ID, acc.Email, acc.PlanType, v.AccountID, v.Status, v.ExpiresAt, acc.Source)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", acc.ID, v.Email, v.PlanType, v.AccountID, v.Status, v.ExpiresAt, v.Source)
 		}
 		return tw.Flush()
 	case "remove", "rm", "delete":
@@ -521,7 +521,7 @@ func runCheck(args []string) error {
 	}
 	for _, acc := range store.List() {
 		v := acc.View()
-		fmt.Printf("account %-28s plan=%-8s status=%-14s expires=%s\n", acc.Label(), orNone(acc.PlanType), v.Status, orNone(v.ExpiresAt))
+		fmt.Printf("account %-28s plan=%-8s status=%-14s expires=%s\n", acc.Label(), orNone(v.PlanType), v.Status, orNone(v.ExpiresAt))
 	}
 	st := codexcfg.Inspect(codexcfg.ConfigPath())
 	fmt.Printf("codex config: %s (active provider: %s, bridge active: %v)\n", st.Path, orNone(st.ActiveProvider), st.BridgeActive)

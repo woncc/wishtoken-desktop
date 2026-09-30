@@ -130,3 +130,21 @@ func TestApplyReplacesSymlinkWithoutFollowingIt(t *testing.T) {
 		t.Fatalf("backup content: %q %v", braw, err)
 	}
 }
+
+func TestInspectHidesProxyPasswordInBaseURL(t *testing.T) {
+	const password = "s3cret-proxy"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	raw := "model_provider = \"gptbridge\"\n\n[model_providers.gptbridge]\nbase_url = \"http://user:" + password + "@127.0.0.1:8790/v1\"\nexperimental_bearer_token = \"" + password + "\"\n"
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st := Inspect(path)
+	if strings.Contains(st.BaseURL, password) || !strings.Contains(st.BaseURL, "xxxxx") || !st.BridgeActive {
+		t.Fatalf("inspect leaked or lost the bridge: %+v", st)
+	}
+	kept, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(kept), password) {
+		t.Fatalf("inspect rewrote the config: %q %v", kept, err)
+	}
+}

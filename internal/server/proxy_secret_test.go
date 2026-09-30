@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/account"
 	"github.com/xxx-holic/wishtoken-desktop/internal/config"
@@ -102,10 +103,14 @@ func TestManagementHidesProxyPasswordInDisplayFields(t *testing.T) {
 	cfg.APIKey = "synthetic-local-management-key"
 	acc := testAccount("acct_one", "one@example.test")
 	acc.Name = "note " + proxyURL
+	acc.PlanType = proxyURL
+	acc.Source = malformed
 	acc.Tags = []string{"team", malformed}
 	acc.LastError = "dial " + malformed
 	acc.ProxyURL = proxyURL
 	f := newFixture(t, cfg, acc)
+	stored := f.srv.Store.List()[0]
+	f.srv.Pool.ReportRateLimited(stored.ID, time.Minute, "dial "+malformed)
 	resp, err := http.Get(f.api.URL + "/api/accounts")
 	if err != nil {
 		t.Fatal(err)
