@@ -2,7 +2,9 @@ package account
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -162,5 +164,67 @@ func TestParseConcatenatedJSON(t *testing.T) {
 	}
 	if _, err = Parse([]byte("{"), "bad"); err == nil {
 		t.Fatal("truncated JSON accepted")
+	}
+}
+
+func TestSaveReplacesPermissiveFileAndSymlink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "accounts.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"accounts":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := "rt_store_abcdefghij123456"
+	if _, err := store.Upsert(Account{Email: "store@example.test", AccountID: "acct_store", RefreshToken: token}); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("account file mode %o", info.Mode().Perm())
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), token) {
+		t.Fatalf("stored credential missing: %q %v", raw, err)
+	}
+
+	elsewhere := filepath.Join(dir, "elsewhere.json")
+	if err := os.WriteFile(elsewhere, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, path); err != nil {
+		t.Skip(err)
+	}
+	if err := os.Symlink(elsewhere, path+".tmp"); err != nil {
+		t.Skip(err)
+	}
+	rotated := "rt_store_rotated_abcdef1234"
+	if _, err := store.Upsert(Account{Email: "store@example.test", AccountID: "acct_store", RefreshToken: rotated, LastRefresh: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(elsewhere)
+	if err != nil || string(kept) != "keep" {
+		t.Fatalf("credential write followed a symlink: %q %v", kept, err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("account file remained a symlink")
+	}
+	raw, err = os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), rotated) || strings.Contains(string(raw), "keep") {
+		t.Fatalf("replacement account file: %q %v", raw, err)
 	}
 }

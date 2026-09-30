@@ -2,7 +2,10 @@ package config
 
 import (
 	"net"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -99,5 +102,63 @@ func TestLoopbackPeerAndBoundSocket(t *testing.T) {
 	defer ln.Close()
 	if err := RequireLoopbackListener(false, ln.Addr()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSaveReplacesPermissiveFileAndIgnoresTempSymlink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := filepath.Join(dir, "stolen.json")
+	if err := os.WriteFile(elsewhere, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, path+".tmp"); err != nil {
+		t.Skip(err)
+	}
+	cfg := Default()
+	cfg.APIKey = "synthetic-local-bridge-key"
+	if err := cfg.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), cfg.APIKey) {
+		t.Fatalf("config missing key: %q %v", raw, err)
+	}
+	kept, err := os.ReadFile(elsewhere)
+	if err != nil || string(kept) != "keep" {
+		t.Fatalf("config temp symlink was followed: %q %v", kept, err)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("config mode %o", info.Mode().Perm())
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, path); err != nil {
+		t.Skip(err)
+	}
+	cfg.DefaultModel = "gpt-6-astra"
+	if err := cfg.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	kept, err = os.ReadFile(elsewhere)
+	if err != nil || string(kept) != "keep" || strings.Contains(string(kept), cfg.APIKey) {
+		t.Fatalf("config symlink was followed: %q %v", kept, err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("config path remained a symlink")
 	}
 }

@@ -92,3 +92,45 @@ func TestIsolatedConfig(t *testing.T) {
 		t.Fatal("effort was silently changed")
 	}
 }
+
+func TestPrepareAuthFileDoesNotFollowSymlink(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "profile")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stolen := filepath.Join(root, "stolen.json")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(stolen, filepath.Join(home, "auth.json")); err != nil {
+		t.Skip(err)
+	}
+	if err := os.Symlink(stolen, filepath.Join(home, "auth.json.tmp")); err != nil {
+		t.Skip(err)
+	}
+	token := "synthetic-access-token"
+	o, err := Prepare(Options{
+		Home: home, Directory: root, BaseURL: "http://127.0.0.1:8792",
+		Model: "gpt-6-astra", Effort: "high", Channel: "codex",
+		AccountID: "acc-test", AccessToken: token, AuthAPIURL: "http://127.0.0.1:8792/cockpit-auth/private",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" || strings.Contains(string(kept), token) {
+		t.Fatalf("auth write followed a symlink: %q %v", kept, err)
+	}
+	info, err := os.Lstat(filepath.Join(o.Home, "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("auth.json remained a symlink")
+	}
+	auth, err := os.ReadFile(filepath.Join(o.Home, "auth.json"))
+	if err != nil || !strings.Contains(string(auth), token) {
+		t.Fatalf("auth file: %q %v", auth, err)
+	}
+}

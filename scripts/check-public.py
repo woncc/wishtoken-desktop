@@ -15,10 +15,12 @@ FORBIDDEN_NAMES = {
     'desktop.json', 'history.json', '.env', '.envrc', 'credentials.json', 'tokens.json',
     'session.json', 'cookies.json', 'cookies.txt', 'id_rsa', 'id_ed25519',
     'id_ecdsa', 'id_dsa', 'id_ecdsa_sk', 'id_ed25519_sk',
+    '.netrc', '_netrc',
 }
 FORBIDDEN_SUFFIXES = {
     '.jsonl', '.log', '.bak', '.exe', '.zip', '.dmg', '.pem', '.key', '.env',
     '.har', '.pcap', '.pcapng', '.p12', '.pfx', '.kdbx',
+    '.ppk', '.p8', '.jks', '.keystore',
 }
 RULES = {
     'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
@@ -87,6 +89,7 @@ def self_test():
         '.envrc', 'config/.envrc.local', 'id_ecdsa', 'id_ed25519_sk',
         'notes/HANDOFF.md', 'Handoff-notes.txt', 'auth_snapshot.json',
         'capture.har', 'trace.pcapng', 'cert.p12', 'vault.kdbx', 'Cookies.json',
+        '.netrc', 'home/_netrc', 'keys/id.ppk', 'AuthKey.p8', 'store.jks', 'app.keystore',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
