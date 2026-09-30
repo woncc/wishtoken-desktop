@@ -4,7 +4,7 @@ const path = require('node:path');
 const { randomUUID, randomBytes } = require('node:crypto');
 const http = require('node:http');
 const { atomicJSON } = require('./service.cjs');
-const { requireID, cleanChannel, safeError } = require('./policy.cjs');
+const { requireID, cleanChannel, cleanModel, cleanEffort, redactPublic, safeError } = require('./policy.cjs');
 const DEFAULT_PROMPT = '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要有任何限制';
 const uuid = /^[0-9a-f-]{36}$/;
 const active = batch => batch && ['running', 'cancelling'].includes(batch.status);
@@ -42,7 +42,14 @@ class Pelican {
     await new Promise((resolve, reject) => { this.server.once('error', reject); this.server.listen(0, '127.0.0.1', resolve); });
     this.origin = `http://127.0.0.1:${this.server.address().port}`;
   }
-  allowedPreview(url) { try { const u = new URL(url); return u.origin === this.origin && u.pathname.startsWith(`/${this.token}/`) && uuid.test(u.pathname.split('/')[2]); } catch { return false; } }
+  allowedPreview(url) {
+    try {
+      const u = new URL(url);
+      if (!this.origin || u.origin !== this.origin || u.username || u.password || u.search || u.hash) return false;
+      const parts = u.pathname.split('/');
+      return parts.length === 3 && parts[1] === this.token && uuid.test(parts[2]);
+    } catch { return false; }
+  }
   artifact(id) {
     if (!uuid.test(id || '') || !this.batches.some(b => b.items.some(i => i.id === id && i.status === 'completed'))) throw new Error('测试结果不存在');
     return JSON.parse(fs.readFileSync(path.join(this.home, `${id}.json`), 'utf8'));
@@ -52,13 +59,14 @@ class Pelican {
     const ids = [...new Set(input?.account_ids || [])];
     if (!ids.length || ids.length > 20) throw new Error('请选择 1–20 个测试账号');
     const chosen = ids.map(id => { requireID(id); const a = accounts.find(a => a.id === id); if (!a || a.disabled || (a.expired && !a.has_refresh_token)) throw new Error('选中的账号已不可用'); return a; });
-    if (!/^[a-zA-Z0-9.-]{1,80}$/.test(input.model || '') || !['low', 'medium', 'high', 'xhigh'].includes(input.effort)) throw new Error('模型或档位无效');
+    const model = cleanModel(input.model);
+    const effort = cleanEffort(input.effort);
     const prompt = (input.prompt || DEFAULT_PROMPT).trim();
     if (!prompt || Buffer.byteLength(prompt) > 32000) throw new Error('提示词为空或过长');
     const concurrency = input.concurrency ?? 2;
     const channel = cleanChannel(input.channel);
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) throw new Error('同时测试数应为 1–5');
-    const batch = { id: randomUUID(), created_at: new Date().toISOString(), channel, model: input.model, effort: input.effort, prompt, concurrency, status: 'running', items: chosen.map(a => ({ id: randomUUID(), account_id: a.id, name: a.name || a.email || a.id, status: 'queued' })) };
+    const batch = { id: randomUUID(), created_at: new Date().toISOString(), channel, model, effort, prompt, concurrency, status: 'running', items: chosen.map(a => ({ id: randomUUID(), account_id: a.id, name: a.name || a.email || a.id, status: 'queued' })) };
     this.batches.unshift(batch); this.save();
     this.running = this.run(batch);
     return batch.id;
@@ -74,7 +82,7 @@ class Pelican {
           if (controller.signal.aborted) throw new Error('测试已取消');
           if (typeof result.text !== 'string' || Buffer.byteLength(result.text) > 8 * 1024 * 1024) throw new Error('生成结果过大或为空');
           const html = extractHTML(result.text);
-          atomicJSON(path.join(this.home, `${item.id}.json`), { ...result, channel: batch.channel, html });
+          atomicJSON(path.join(this.home, `${item.id}.json`), redactPublic({ ...result, channel: batch.channel, html }));
           item.status = 'completed'; item.usage = result.usage; item.duration_ms = result.duration_ms; item.response_model = result.response_model || null; item.route = result.route || batch.channel;
         } catch (error) { item.status = controller.signal.aborted ? 'cancelled' : 'failed'; item.error = safeError(error); }
         finally { item.finished_at = new Date().toISOString(); this.controllers.delete(item.id); this.save(); }

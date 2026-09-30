@@ -15,3 +15,4 @@ html[data-theme=dark]{--bg:#141b2a;--surface:#1c2638;--soft:#23314a;--line:#3041
 .community-links button{padding:9px 11px;border:1px solid transparent;background:transparent;border-radius:9px;text-align:left;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
 .community-links button:hover{background:var(--bg);border-color:var(--line);color:var(--accent)}
 .community-links button:first-child{color:var(--accent);font-weight:650}
+#model-hint,#effort-hint,#pelican-model-hint{font-size:10px;line-height:1.65;color:#929fb3;margin:7px 0 0}

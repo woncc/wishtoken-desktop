@@ -42,6 +42,11 @@ test('batch concurrency, pinned accounts, persistence, preview containment and d
  assert.match(response.headers.get('content-security-policy'),/connect-src 'none'/);
  assert.ok(text.indexOf('RTCPeerConnection') < text.indexOf('window.animation'));
  assert.equal((await fetch(`${p.origin}/wrong/${item.id}`)).status,404);
+ assert.equal(p.allowedPreview(item.preview), true);
+ assert.equal(p.allowedPreview(`${item.preview}/extra`), false);
+ assert.equal(p.allowedPreview(`${item.preview}?next=1`), false);
+ assert.equal(p.allowedPreview(`${item.preview}#frag`), false);
+ assert.equal(p.allowedPreview(`http://127.0.0.1:9/${p.token}/${item.id}`), false);
  assert.throws(()=>p.artifact('../config'));
  const recovered=new Pelican(home,()=>{}); assert.equal(recovered.batches[0].items[0].status,'completed');
  p.remove(id); assert.equal(p.snapshot().length,0); assert.throws(()=>p.artifact(item.id));
