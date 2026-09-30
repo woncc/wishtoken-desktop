@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
+const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
 
 const catalog = {
   catalog: [
@@ -62,6 +62,8 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.match(app, /speedLabel\(record\.speed\)/);
   assert.match(pelican, /dataset\.available/);
   assert.match(pelican, /resolvePelicanDefaults/);
+  assert.match(pelican, /pelicanRetryRequest/);
+  assert.doesNotMatch(pelican, /startPelican\(\{ \.\.\.b/);
   assert.match(pelican, /pelican_model/);
   assert.doesNotMatch(pelican, /channelModels\(\$\('pelican-channel'\)\.value, \$\('pelican-model'\), \$\('model'\)\.value\)/);
   assert.match(app, /replayLaunch\(record, false\)/);
@@ -101,6 +103,17 @@ test('explicit launch choices and recorded labels are not rewritten', () => {
   assert.equal(historyPlace({ directory: '/work/app' }).kind, 'directory');
   assert.equal(historyPlace({ target: 'cli', directory: '/work/app' }).text, '/work/app');
   assert.equal(historyPlace({ target: 'browser', directory: '/work/app' }).text, 'browser');
+  const retry = pelicanRetryRequest({
+    id: 'batch-1', channel: 'codex', model: 'gpt-5.6-terra', effort: 'high', prompt: 'draw', concurrency: 1,
+    items: [
+      { account_id: 'acc-done', status: 'completed', preview: 'http://127.0.0.1:9/token/item' },
+      { account_id: 'acc-failed', status: 'failed', access_token: 'raw-token', preview: 'http://127.0.0.1:9/token/other' }
+    ]
+  });
+  assert.deepEqual(retry, { account_ids: ['acc-failed'], channel: 'codex', model: 'gpt-5.6-terra', effort: 'high', prompt: 'draw', concurrency: 1 });
+  assert.equal(JSON.stringify(retry).includes('token'), false);
+  assert.equal(JSON.stringify(retry).includes('raw-token'), false);
+  assert.equal(pelicanRetryRequest(null), null);
 });
 test('a saved pelican model is not replaced by the launch-panel model', () => {
   const saved = resolvePelicanDefaults({ pelican_channel: 'bps', pelican_model: 'gpt-5.6-sol', pelican_effort: 'low' }, { model: 'gpt-6-astra', effort: 'xhigh' });

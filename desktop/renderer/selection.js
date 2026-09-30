@@ -69,6 +69,20 @@
     if (speed === 'fast') return '快速';
     return '';
   }
+  // Retry must repeat the recorded compare settings, not the preview URLs
+  // or any other item payload carried in the history snapshot.
+  function pelicanRetryRequest(batch) {
+    if (!batch || typeof batch !== 'object' || Array.isArray(batch)) return null;
+    const items = Array.isArray(batch.items) ? batch.items : [];
+    return {
+      account_ids: items.filter(item => item && item.status !== 'completed' && typeof item.account_id === 'string').map(item => item.account_id),
+      channel: batch.channel,
+      model: batch.model,
+      effort: batch.effort,
+      prompt: batch.prompt,
+      concurrency: batch.concurrency
+    };
+  }
   function historyPlace(record) {
     const value = record && typeof record === 'object' && !Array.isArray(record) ? record : {};
     const target = value.target;
@@ -127,5 +141,5 @@
     const effortValue = typeof prefs.pelican_effort === 'string' && prefs.pelican_effort ? prefs.pelican_effort : launchEffort;
     return { channel: resolveChannel(prefs.pelican_channel), model, effort: resolveEffort(effortValue) };
   }
-  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, resolvePelicanDefaults, replayLaunch };
+  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch };
 });

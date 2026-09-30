@@ -85,7 +85,7 @@ $('pelican-all').onclick = () => { pelicanState.selected = new Set((state.data?.
 $('pelican-start').onclick = () => startPelican();
 $('pelican-cancel').onclick = () => action('pelican-cancel', async () => { await api.pelicanCancel(); await loadPelican(); });
 $('pelican-history').onchange = () => { pelicanState.batch = $('pelican-history').value; renderPelican(); };
-$('pelican-retry').onclick = () => { const b = pelicanState.batches.find(b => b.id === pelicanState.batch); if (b) void startPelican({ ...b, account_ids: b.items.filter(i => i.status !== 'completed').map(i => i.account_id) }); };
+$('pelican-retry').onclick = () => { const b = pelicanState.batches.find(b => b.id === pelicanState.batch); const request = b && wishSelection.pelicanRetryRequest(b); if (request) void startPelican(request); };
 $('pelican-delete').onclick = () => {
   const id = pelicanState.batch;
   modal('<h2>删除这轮测试？</h2><p>删除本轮结果和保存的动画，账号凭据不受影响。</p><div class="modal-actions"><button id="keep-pelican" class="secondary">保留</button><button id="remove-pelican" class="primary">删除</button></div>');
