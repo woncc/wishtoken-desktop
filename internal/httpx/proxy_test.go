@@ -16,6 +16,10 @@ func TestRedactHidesProxyPassword(t *testing.T) {
 		"http://user%3A" + password + "@127.0.0.1:7890",
 		"http://user%3a" + password + "@127.0.0.1:7890",
 		"user%3A" + password + "@127.0.0.1:7890",
+		"http://user%253A" + password + "@127.0.0.1:7890",
+		"http://user%3A" + password + "%zz@127.0.0.1:7890",
+		"http://user%3A" + password + " proxy@127.0.0.1:1",
+		"http://user:" + password + "@127.0.0.1:7890/path?" + password + "=1",
 	}
 	for _, in := range cases {
 		got := Redact(in)
