@@ -267,3 +267,31 @@ test('renderer text drops proxy passwords that a URL parser would reject', () =>
   assert.equal(delivered.accounts[0].last_error, 'via http://127.0.0.1:7890 failed');
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops schemeless proxy passwords on a single-label host', () => {
+  const cases = [
+    ['user:s3cret-token@my-proxy:7890', 'my-proxy:7890'],
+    ['via user:s3cret proxy@my_proxy:1080 failed', 'via my_proxy:1080 failed'],
+    ['note user:p@ss@router:8080/path', 'note router:8080/path'],
+    ['plan socks5://alice:hunter2@prx:1080', 'plan socks5://prx:1080']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(got.includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('p@ss'), false);
+  }
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic('user:s3cret@internal'), 'user:s3cret@internal');
+  const snap = publicSnapshot({
+    accounts: [{ id: 'acc-1', name: 'note user:s3cret-token@my-proxy:7890', email: 'a@example.test', plan_type: 'team user:s3cret-token@router:8080', last_error: 'dial user:s3cret-token@my-proxy:7890' }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].plan_type, 'team router:8080');
+  assert.equal(delivered.accounts[0].last_error, 'dial my-proxy:7890');
+  assert.equal(delivered.accounts[0].name.includes('s3cret'), false);
+});
