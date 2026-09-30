@@ -324,6 +324,24 @@ func TestManagementImportAndStatus(t *testing.T) {
 	}
 }
 
+func TestImportRejectionDoesNotEchoUnstoredCredential(t *testing.T) {
+	f := newFixture(t, nil)
+	token := "rt_" + strings.Repeat("d", 30)
+	access := testutil.MakeJWT(testutil.ChatGPTClaims("hidden@example.test", "acct_hidden", "plus", time.Now().Add(time.Hour)))
+	payload := object{"text": `{"type":"` + token + `","access_token":"` + access + `","refresh_token":"` + token + `"}`}
+	resp, body := post(t, f.api.URL+"/api/accounts/import?refresh=0", payload, nil)
+	if resp.StatusCode == http.StatusOK || strings.Contains(body, token) || strings.Contains(body, access) || strings.Contains(body, "eyJ") {
+		t.Fatalf("import echoed credential: %d %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(body, "non-Codex") || f.srv.Store.Count() != 0 {
+		t.Fatalf("skip was not contained: %d %s count=%d", resp.StatusCode, body, f.srv.Store.Count())
+	}
+	resp, body = post(t, f.api.URL+"/api/accounts/import?refresh=0", object{"text": "{\n" + token + "\n" + access}, nil)
+	if resp.StatusCode == http.StatusOK || strings.Contains(body, token) || strings.Contains(body, access) || strings.Contains(body, "eyJ") {
+		t.Fatalf("invalid import echoed credential: %d %s", resp.StatusCode, body)
+	}
+}
+
 func TestToolCallRoundTripViaChat(t *testing.T) {
 	f := newFixture(t, nil, testAccount("acct_one", "one@example.com"))
 	// Replace the BPS handler behaviour: emit a run_officejs call.

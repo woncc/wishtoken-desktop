@@ -228,3 +228,37 @@ func TestSaveReplacesPermissiveFileAndSymlink(t *testing.T) {
 		t.Fatalf("replacement account file: %q %v", raw, err)
 	}
 }
+
+func TestImportWarningsOmitUnstoredCredentials(t *testing.T) {
+	refresh := "rt_" + strings.Repeat("c", 28)
+	access := sampleJWT("hidden@example.com", "acct_hidden")
+	raw := `{"type":"` + refresh + `","access_token":"` + access + `","refresh_token":"` + refresh + `","name":"` + access + `"}`
+	res, err := Parse([]byte(raw), "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Accounts) != 0 || res.Skipped != 1 {
+		t.Fatalf("expected skip, accounts=%d skipped=%d warnings=%v", len(res.Accounts), res.Skipped, res.Warnings)
+	}
+	joined := strings.Join(res.Warnings, "\n")
+	if strings.Contains(joined, refresh) || strings.Contains(joined, access) || strings.Contains(joined, "eyJ") {
+		t.Fatalf("warning leaked: %s", joined)
+	}
+	if !strings.Contains(joined, "non-Codex") {
+		t.Fatalf("warning lost context: %s", joined)
+	}
+
+	named := testutil.MakeJWT(map[string]any{"email": "solo@example.com", "exp": time.Now().Add(time.Hour).Unix()})
+	res, err = Parse([]byte(`{"name":"`+named+`","access_token":"`+named+`","tags":["team","`+refresh+`"]}`), "fixture")
+	if err != nil || len(res.Accounts) != 1 {
+		t.Fatalf("named import: %v %+v", err, res)
+	}
+	acc := res.Accounts[0]
+	if acc.Name != "" || acc.Email != "solo@example.com" || len(acc.Tags) != 1 || acc.Tags[0] != "team" {
+		t.Fatalf("display kept credential material: %+v", acc)
+	}
+	joined = strings.Join(res.Warnings, "\n")
+	if strings.Contains(joined, named) || strings.Contains(joined, refresh) || strings.Contains(joined, "eyJ") {
+		t.Fatalf("renewal warning leaked: %s", joined)
+	}
+}

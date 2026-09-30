@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 	"github.com/xxx-holic/wishtoken-desktop/internal/jwt"
 )
 
@@ -66,7 +68,33 @@ func finish(res *ImportResult) *ImportResult {
 		out = append(out, acc)
 	}
 	res.Accounts = out
+	res.Warnings = sanitizeImportWarnings(res.Warnings)
 	return res
+}
+
+var displaySecret = regexp.MustCompile(`(?i)^(sk-(?:proj-)?|rk-|rt_|github_pat_|gh[pousr]_)[A-Za-z0-9_-]{8,}$`)
+
+func displayName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || jwt.IsJWT(value) || displaySecret.MatchString(value) {
+		return ""
+	}
+	return value
+}
+
+func sanitizeImportWarnings(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	out := make([]string, len(in))
+	for i, warning := range in {
+		cleaned := httpx.SanitizeFailure(warning)
+		if cleaned == "" {
+			cleaned = "import entry omitted because it contained credential material"
+		}
+		out[i] = cleaned
+	}
+	return out
 }
 
 func decodeJSONValues(text, source string, res *ImportResult) error {
@@ -248,13 +276,13 @@ func looksLikeCredential(m map[string]any) bool {
 
 func addEntry(m map[string]any, source string, res *ImportResult) {
 	if kind := strings.ToLower(getString(m, "type", "provider", "channel")); kind != "" && kind != "codex" && kind != "openai" && kind != "chatgpt" {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("skipped a %q credential (only Codex/ChatGPT accounts are supported)", kind))
+		res.Warnings = append(res.Warnings, "skipped a non-Codex credential")
 		res.Skipped++
 		return
 	}
 	if mode := strings.ToLower(getString(m, "auth_mode", "authMode")); mode != "" && mode != "chatgpt" && mode != "oauth" {
 		if mode == "apikey" || mode == "api_key" || mode == "agentidentity" || mode == "agent_identity" {
-			res.Warnings = append(res.Warnings, fmt.Sprintf("skipped an auth_mode=%s credential: Basispoints requires a ChatGPT login", mode))
+			res.Warnings = append(res.Warnings, "skipped an unsupported auth_mode credential: Basispoints requires a ChatGPT login")
 			res.Skipped++
 			return
 		}
@@ -271,6 +299,7 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 		UserID:       getString(m, "user_id", "chatgpt_user_id", "userId"),
 		ProxyURL:     getString(m, "proxy_url", "proxyUrl", "proxy"),
 	}
+	acc.Name = displayName(acc.Name)
 	if user, ok := m["user"].(map[string]any); ok {
 		if acc.Email == "" {
 			acc.Email = getString(user, "email")
@@ -319,8 +348,10 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 	}
 	if tags, ok := m["tags"].([]any); ok {
 		for _, t := range tags {
-			if s, ok := t.(string); ok && strings.TrimSpace(s) != "" {
-				acc.Tags = append(acc.Tags, strings.TrimSpace(s))
+			if s, ok := t.(string); ok {
+				if s = displayName(s); s != "" {
+					acc.Tags = append(acc.Tags, s)
+				}
 			}
 		}
 	}
