@@ -12,6 +12,7 @@ const appRuntime = require('./lib/codex-app.cjs');
 const mainProfile = require('./lib/main-profile.cjs');
 const { Pelican, DEFAULT_PROMPT } = require('./lib/pelican.cjs');
 const { externalLink } = require('./lib/links.cjs');
+const { rendererRequestAllowed } = require('./lib/navigation.cjs');
 
 const dataHome = process.env.GPTBRIDGE_DESKTOP_HOME || path.join(os.homedir(), '.gptbridge-desktop');
 const primaryHome = mainProfile.mainHome();
@@ -227,7 +228,13 @@ if (lock) {
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', event => event.preventDefault());
     window.webContents.on('will-frame-navigate', event => { if (!event.isMainFrame && !pelican.allowedPreview(event.url)) event.preventDefault(); });
+    window.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+      let allowed = false;
+      try { allowed = rendererRequestAllowed(details.url, __dirname, url => pelican.allowedPreview(url)); } catch { allowed = false; }
+      callback({ cancel: !allowed });
+    });
     window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    window.webContents.session.setPermissionCheckHandler(() => false);
     window.on('close', event => { if (!quitting) { event.preventDefault(); window.hide(); } });
     tray = new Tray(icon.resize({ width: process.platform === 'darwin' ? 22 : 20, height: process.platform === 'darwin' ? 22 : 20 }));
     tray.setToolTip('WishToken Desktop · 本地 Codex 服务');

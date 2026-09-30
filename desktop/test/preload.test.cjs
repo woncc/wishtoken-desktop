@@ -16,6 +16,9 @@ test('preload exposes only named bridge methods and main keeps the renderer sand
   assert.match(main, /sandbox: true/);
   assert.match(main, /will-frame-navigate/);
   assert.match(main, /allowedPreview/);
+  assert.match(main, /rendererRequestAllowed\(details\.url, __dirname/);
+  assert.match(main, /webRequest\.onBeforeRequest/);
+  assert.match(main, /setPermissionCheckHandler\(\(\) => false\)/);
   assert.match(main, /redactPublic\(await handle/);
   assert.match(main, /applyPreferences/);
   assert.match(main, /publicSnapshot/);

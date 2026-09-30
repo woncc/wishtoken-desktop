@@ -1,0 +1,40 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { rendererRequestAllowed } = require('../lib/navigation.cjs');
+
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gptbridge-nav-'));
+const page = path.join(root, 'renderer', 'index.html');
+fs.mkdirSync(path.dirname(page), { recursive: true });
+fs.writeFileSync(page, '<!doctype html>');
+const preview = 'http://127.0.0.1:43123/abc123/11111111-1111-4111-8111-111111111111';
+const allowPreview = url => url === preview;
+
+test('renderer requests stay inside the app or the exact preview URL', () => {
+  assert.equal(rendererRequestAllowed(pathToFileURL(page).href, root, allowPreview), true);
+  assert.equal(rendererRequestAllowed(pathToFileURL(path.join(root, 'assets', 'icon.png')).href, root, allowPreview), true);
+  assert.equal(rendererRequestAllowed(preview, root, allowPreview), true);
+  assert.equal(rendererRequestAllowed('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>', root, allowPreview), true);
+  assert.equal(rendererRequestAllowed('blob:null/11111111-1111-4111-8111-111111111111', root, allowPreview), true);
+  assert.equal(rendererRequestAllowed('about:blank', root, allowPreview), true);
+  const outside = path.resolve(root, '..', 'accounts.json');
+  assert.equal(rendererRequestAllowed(pathToFileURL(outside).href, root, allowPreview), false);
+  const escaped = new URL('../../accounts.json', pathToFileURL(page)).href;
+  assert.equal(rendererRequestAllowed(escaped, root, allowPreview), false);
+  assert.equal(rendererRequestAllowed(`${preview}?next=1`, root, allowPreview), false);
+  assert.equal(rendererRequestAllowed(`${preview}#frag`, root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('http://127.0.0.1:8792/api/accounts', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('http://localhost:43123/abc123/11111111-1111-4111-8111-111111111111', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('https://example.test/blocked', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('ws://127.0.0.1:8792/', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('wss://example.test/socket', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('javascript:alert(1)', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed('file:///etc/passwd', root, allowPreview), false);
+  assert.equal(rendererRequestAllowed(preview, root, () => { throw new Error('bad preview'); }), false);
+  assert.equal(rendererRequestAllowed(preview, root), false);
+  assert.equal(rendererRequestAllowed('not a url', root, allowPreview), false);
+});
