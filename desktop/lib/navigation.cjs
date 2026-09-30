@@ -1,9 +1,37 @@
 'use strict';
+const fs = require('node:fs');
 const path = require('node:path');
 const { fileURLToPath } = require('node:url');
 
 const SAFE_PROTOCOLS = new Set(['data:', 'blob:', 'about:', 'devtools:', 'chrome-devtools:', 'chrome-extension:']);
 const NETWORK_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
+
+function insideRoot(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+// Lexical containment is not enough: a symlink inside the app can point at
+// another directory. Missing files may stay, but every existing ancestor,
+// including a broken symlink, has to resolve inside the real app root.
+function resolvedInside(root, candidate) {
+  let realRoot;
+  try { realRoot = fs.realpathSync(root); }
+  catch { return false; }
+  let cursor = candidate;
+  for (;;) {
+    try { fs.lstatSync(cursor); }
+    catch (error) {
+      if (error.code !== 'ENOENT') return false;
+      const parent = path.dirname(cursor);
+      if (parent === cursor) return false;
+      cursor = parent;
+      continue;
+    }
+    try { return insideRoot(realRoot, fs.realpathSync(cursor)); }
+    catch { return false; }
+  }
+}
 
 function fileInsideApp(url, appRoot) {
   if (typeof appRoot !== 'string' || !appRoot) return false;
@@ -11,8 +39,8 @@ function fileInsideApp(url, appRoot) {
   try { target = fileURLToPath(url); } catch { return false; }
   const root = path.resolve(appRoot);
   const resolved = path.resolve(target);
-  const relative = path.relative(root, resolved);
-  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  if (!insideRoot(root, resolved)) return false;
+  return resolvedInside(root, resolved);
 }
 
 // The renderer and model previews share one session. Network URLs are rejected

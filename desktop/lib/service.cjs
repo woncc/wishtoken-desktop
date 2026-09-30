@@ -7,9 +7,65 @@ const http = require('node:http');
 const { spawn } = require('node:child_process');
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+// A fixed "*.tmp" name can be planted as a symlink. Create an exclusive file
+// in the destination directory and rename it over the path instead.
 function atomicJSON(file, data) {
-  fs.writeFileSync(file + '.tmp', JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  fs.renameSync(file + '.tmp', file);
+  const dir = path.dirname(file);
+  const tmp = path.join(dir, `.${path.basename(file)}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+  const flags = fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW || 0);
+  const fd = fs.openSync(tmp, flags, 0o600);
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error('临时文件不是普通文件');
+    fs.writeFileSync(fd, JSON.stringify(data, null, 2) + '\n');
+    fs.fchmodSync(fd, 0o600);
+    fs.closeSync(fd);
+  } catch (error) {
+    try { fs.closeSync(fd); } catch { /* The write may already have closed it. */ }
+    fs.rmSync(tmp, { force: true });
+    throw error;
+  }
+  try {
+    const written = fs.lstatSync(tmp);
+    if (written.isSymbolicLink() || !written.isFile()) throw new Error('临时文件不是普通文件');
+    fs.renameSync(tmp, file);
+  } catch (error) {
+    fs.rmSync(tmp, { force: true });
+    throw error;
+  }
+}
+function openAppend(file) {
+  if (typeof file !== 'string' || file.trim() === '') throw new Error('服务日志路径无效');
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  let info;
+  try { info = fs.lstatSync(file); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (info?.isSymbolicLink()) fs.unlinkSync(file);
+  else if (info && !info.isFile()) throw new Error('服务日志不是普通文件');
+  const flags = fs.constants.O_CREAT | fs.constants.O_APPEND | fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW || 0);
+  let fd;
+  try { fd = fs.openSync(file, flags, 0o600); }
+  catch (error) {
+    if (error.code === 'ELOOP') throw new Error('服务日志是符号链接，已停止写入');
+    throw error;
+  }
+  try {
+    const opened = fs.fstatSync(fd);
+    const current = fs.lstatSync(file);
+    if (current.isSymbolicLink() || !current.isFile() || !opened.isFile()) throw new Error('服务日志是符号链接，已停止写入');
+    fs.fchmodSync(fd, 0o600);
+    return fd;
+  } catch (error) {
+    fs.closeSync(fd);
+    throw error;
+  }
+}
+// Rotation uses lstat so a symlink is not treated as a large log and renamed aside.
+function openServiceLog(file) {
+  let info;
+  try { info = fs.lstatSync(file); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (info?.isFile() && info.size > 2 * 1024 * 1024) fs.renameSync(file, file + '.1');
+  return openAppend(file);
 }
 class BridgeService {
   constructor({ home, binary, env = process.env }) {
@@ -74,12 +130,7 @@ class BridgeService {
     if (!fs.existsSync(this.binary)) throw new Error('缺少 GPTBridge 服务程序，请重新解压完整客户端');
     // Save before spawning, never put secrets in process arguments.
     atomicJSON(file, this.config);
-    try {
-      if ((await fsp.stat(this.logPath)).size > 2 * 1024 * 1024) {
-        await fsp.rename(this.logPath, this.logPath + '.1');
-      }
-    } catch (e) { if (e.code !== 'ENOENT') throw e; }
-    const log = fs.openSync(this.logPath, 'a', 0o600);
+    const log = openServiceLog(this.logPath);
     const env = Object.fromEntries(Object.entries(this.env).filter(([key]) => !/^GPTBRIDGE_/i.test(key) && !['CODEX_HOME', 'CODEX_AUTHAPI_BASE_URL'].includes(key)));
     env.GPTBRIDGE_HOME = this.home;
     if (this.env.GPTBRIDGE_CODEX_BIN) env.GPTBRIDGE_CODEX_BIN = this.env.GPTBRIDGE_CODEX_BIN;
@@ -107,4 +158,4 @@ class BridgeService {
     this.child = null;
   }
 }
-module.exports = { BridgeService, atomicJSON };
+module.exports = { BridgeService, atomicJSON, openServiceLog };
