@@ -42,7 +42,14 @@ class Pelican {
     await new Promise((resolve, reject) => { this.server.once('error', reject); this.server.listen(0, '127.0.0.1', resolve); });
     this.origin = `http://127.0.0.1:${this.server.address().port}`;
   }
-  allowedPreview(url) { try { const u = new URL(url); return u.origin === this.origin && u.pathname.startsWith(`/${this.token}/`) && uuid.test(u.pathname.split('/')[2]); } catch { return false; } }
+  allowedPreview(url) {
+    try {
+      const u = new URL(url);
+      if (!this.origin || u.origin !== this.origin || u.username || u.password || u.search || u.hash) return false;
+      const parts = u.pathname.split('/');
+      return parts.length === 3 && parts[1] === this.token && uuid.test(parts[2]);
+    } catch { return false; }
+  }
   artifact(id) {
     if (!uuid.test(id || '') || !this.batches.some(b => b.items.some(i => i.id === id && i.status === 'completed'))) throw new Error('测试结果不存在');
     return JSON.parse(fs.readFileSync(path.join(this.home, `${id}.json`), 'utf8'));
