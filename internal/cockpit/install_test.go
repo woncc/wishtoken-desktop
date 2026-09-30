@@ -62,3 +62,77 @@ func TestInstallPreservesCockpitAndIsIdempotent(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteNewReplacesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	stolen := filepath.Join(dir, "stolen.toml")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	if err := os.Symlink(stolen, path); err != nil {
+		t.Skip(err)
+	}
+	if err := writeNew(path, []byte("profile")); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" {
+		t.Fatalf("profile write followed a symlink: %q %v", kept, err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("profile file remained a symlink")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || string(raw) != "profile" {
+		t.Fatalf("profile file: %q %v", raw, err)
+	}
+	if err := writeNew(path, []byte("other")); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile(path)
+	if err != nil || string(raw) != "profile" {
+		t.Fatalf("existing profile was overwritten: %q %v", raw, err)
+	}
+}
+
+func TestAtomicWriteReplacesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	stolen := filepath.Join(dir, "stolen.json")
+	if err := os.WriteFile(stolen, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "codex_instances.json")
+	if err := os.Symlink(stolen, path); err != nil {
+		t.Skip(err)
+	}
+	if err := os.Symlink(stolen, path+".tmp"); err != nil {
+		t.Skip(err)
+	}
+	if err := atomicWrite(path, []byte(`{"instances":[]}`)); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := os.ReadFile(stolen)
+	if err != nil || string(kept) != "keep" {
+		t.Fatalf("instance write followed a symlink: %q %v", kept, err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("instance file remained a symlink")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || string(raw) != `{"instances":[]}` {
+		t.Fatalf("instance file: %q %v", raw, err)
+	}
+	tmp, err := os.Lstat(path + ".tmp")
+	if err != nil || tmp.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("temporary symlink should not be reused")
+	}
+}

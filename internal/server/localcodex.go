@@ -17,6 +17,7 @@ import (
 	"github.com/xxx-holic/wishtoken-desktop/internal/config"
 	"github.com/xxx-holic/wishtoken-desktop/internal/jwt"
 	"github.com/xxx-holic/wishtoken-desktop/internal/localcodex"
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 var launchMu sync.Mutex
@@ -62,10 +63,7 @@ func saveLaunch(rec launchRecord) error {
 		return err
 	}
 	path := filepath.Join(config.Home(), "launch-history.json")
-	if err := os.WriteFile(path+".tmp", raw, 0600); err != nil {
-		return err
-	}
-	return os.Rename(path+".tmp", path)
+	return ownerfile.Write(path, raw)
 }
 
 func (s *Server) localOptions() localcodex.Options {

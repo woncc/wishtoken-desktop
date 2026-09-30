@@ -65,5 +65,5 @@ func rememberCockpitProcess(pid int, key string) {
 		}
 	}
 	b, _ := json.Marshal(cockpitProcess{PID: pid, KeyHash: cockpitKeyHash(key)})
-	_ = os.WriteFile(path, b, 0600)
+	_ = writeOwnerFile(path, b)
 }

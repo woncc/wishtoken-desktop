@@ -15,6 +15,7 @@ import (
 
 	"github.com/xxx-holic/wishtoken-desktop/internal/config"
 	"github.com/xxx-holic/wishtoken-desktop/internal/localcodex"
+	"github.com/xxx-holic/wishtoken-desktop/internal/ownerfile"
 )
 
 type Installation struct {
@@ -128,6 +129,12 @@ http_headers = { "X-GPTBridge-Cockpit" = %s }
 }
 
 func writeNew(path string, raw []byte) error {
+	// A planted symlink must not remain in place and must not be followed.
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+	}
 	f, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if os.IsExist(e) {
 		return nil
@@ -144,10 +151,7 @@ func writeNew(path string, raw []byte) error {
 }
 
 func atomicWrite(path string, b []byte) error {
-	if e := os.WriteFile(path+".tmp", b, 0600); e != nil {
-		return e
-	}
-	return os.Rename(path+".tmp", path)
+	return ownerfile.Write(path, b)
 }
 
 func registerInstance(ins *Installation) error {
