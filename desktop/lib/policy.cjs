@@ -29,13 +29,32 @@ const SECRET_TEXT = [
   [/\brt_[A-Za-z0-9_-]{8,}\b/g, '[凭据已隐藏]'],
   [/\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g, '[凭据已隐藏]'],
   [/(cockpit-auth\/)[A-Fa-f0-9]{32,}/gi, '$1[凭据已隐藏]'],
-  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key|response_id)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]'],
-  [/\b([a-z][a-z0-9+.-]*:\/\/)[^\/\s:@]+:[^\/\s@]+@/gi, '$1']
+  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key|response_id)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]']
 ];
+// A space, newline, or extra @ defeats a normal URL parse. Those passwords are
+// removed from renderer text too. Username-only values stay; the settings
+// field is copied back after this pass so the editor can round-trip.
+const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,})(?::\\d+)?(?=$|[\\s/?#])';
+const PROXY_BOUND = '[\\s"\'()<>]';
+function redactProxyCredentials(text) {
+  const compact = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@/gi;
+  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'gi');
+  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'g');
+  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+:[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+:[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  return text
+    .replace(compact, '$1')
+    .replace(spaced, '$1')
+    .replace(relative, '$1$2')
+    .replace(relativeSpaced, '$1$2')
+    .replace(bare, '$1')
+    .replace(bareSpaced, '$1');
+}
 function redactText(value) {
   let text = String(value);
   for (const [pattern, replacement] of SECRET_TEXT) text = text.replace(pattern, replacement);
-  return text;
+  return redactProxyCredentials(text);
 }
 function blockedKey(key) {
   const name = String(key);
