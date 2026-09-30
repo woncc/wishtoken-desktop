@@ -21,8 +21,8 @@ go vet ./...
 go test ./...
 cd desktop
 npm ci
+npm run backend
 npm test
-npm run backend -- win32 x64
 npm run smoke
 ```
 

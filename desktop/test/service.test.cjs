@@ -7,7 +7,8 @@ const os = require('node:os');
 const net = require('node:net');
 const http = require('node:http');
 const { BridgeService } = require('../lib/service.cjs');
-const binary = path.resolve(__dirname, '..', 'backend', `${process.platform === 'win32' ? 'win' : 'mac'}-${process.arch}`, process.platform === 'win32' ? 'gptbridge.exe' : 'gptbridge');
+const binaryPlatform = { win32: 'win', darwin: 'mac', linux: 'linux' }[process.platform];
+const binary = path.resolve(__dirname, '..', 'backend', `${binaryPlatform}-${process.arch}`, process.platform === 'win32' ? 'gptbridge.exe' : 'gptbridge');
 async function freePort() { const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port; }
 test('real sidecar lifecycle, authenticated reuse, strict routing and isolated profile', async t => {
   await fs.access(binary);

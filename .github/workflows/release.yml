@@ -48,9 +48,9 @@ jobs:
       - run: go test ./...
       - run: npm ci --no-fund
         working-directory: desktop
-      - run: npm test
-        working-directory: desktop
       - run: npm run backend -- ${{ matrix.platform }} ${{ matrix.arch }}
+        working-directory: desktop
+      - run: npm test
         working-directory: desktop
       - run: npx electron-builder ${{ matrix.target }} --publish never
         working-directory: desktop
