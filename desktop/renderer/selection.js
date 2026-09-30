@@ -53,6 +53,22 @@
     if (channel == null || channel === '' || channel === 'bps') return 'BPS';
     return '';
   }
+  // A returned route is an observation. Missing stays unreported and is never
+  // rewritten to the legacy BPS label used for an absent saved choice.
+  function explicitRouteLabel(route) {
+    if (typeof route !== 'string' || route === '') return '未报告';
+    return channelName(route) || route;
+  }
+  function reportedDuration(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+    return (value / 1000).toFixed(1);
+  }
+  function reportedStatus(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? String(value) : '未报告';
+  }
+  function reportedStream(value) {
+    return typeof value === 'string' && value ? value : '未报告';
+  }
   function resolveChoice(value, allowed, fallback) {
     const options = Array.isArray(allowed) ? allowed : [];
     if (value == null || value === '') return { value: fallback, explicit: false, available: options.includes(fallback) };
@@ -141,5 +157,5 @@
     const effortValue = typeof prefs.pelican_effort === 'string' && prefs.pelican_effort ? prefs.pelican_effort : launchEffort;
     return { channel: resolveChannel(prefs.pelican_channel), model, effort: resolveEffort(effortValue) };
   }
-  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch };
+  return { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, explicitRouteLabel, reportedDuration, reportedStatus, reportedStream, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch };
 });

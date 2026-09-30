@@ -22,14 +22,14 @@ function cleanProbe(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('测试参数无效');
   return { account_id: requireID(input.account_id), model: cleanModel(input.model), effort: cleanEffort(input.effort), channel: cleanChannel(input.channel) };
 }
-const SECRET_KEYS = new Set(['access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'id_token', 'idtoken', 'api_key', 'apikey', 'authorization', 'password', 'secret', 'client_secret', 'clientsecret', 'cockpit_key', 'cockpitkey', 'gptbridge_codex_key', 'personal_access_token', 'personalaccesstoken', 'openai_api_key', 'openaiapikey', 'experimental_bearer_token', 'bearer_token', 'bearertoken', 'auth_token', 'authtoken']);
+const SECRET_KEYS = new Set(['access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'id_token', 'idtoken', 'api_key', 'apikey', 'authorization', 'password', 'secret', 'client_secret', 'clientsecret', 'cockpit_key', 'cockpitkey', 'gptbridge_codex_key', 'personal_access_token', 'personalaccesstoken', 'openai_api_key', 'openaiapikey', 'experimental_bearer_token', 'bearer_token', 'bearertoken', 'auth_token', 'authtoken', 'response_id', 'responseid']);
 const SECRET_TEXT = [
   [/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[凭据已隐藏]'],
   [/\bBearer\s+[A-Za-z0-9._~+/-]{12,}/gi, 'Bearer [凭据已隐藏]'],
   [/\brt_[A-Za-z0-9_-]{8,}\b/g, '[凭据已隐藏]'],
   [/\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g, '[凭据已隐藏]'],
   [/(cockpit-auth\/)[A-Fa-f0-9]{32,}/gi, '$1[凭据已隐藏]'],
-  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]'],
+  [/((?:access_token|refresh_token|id_token|api_key|cockpit_key|client_secret|personal_access_token|experimental_bearer_token|openai_api_key|response_id)["'\s:=]{1,8})[^\s"',&<]{8,}/gi, '$1[凭据已隐藏]'],
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\/\s:@]+:[^\/\s@]+@/gi, '$1']
 ];
 function redactText(value) {
@@ -247,7 +247,9 @@ function publicLogs(payload) {
 }
 function publicProbe(result) {
   const value = result && typeof result === 'object' ? result : {};
-  const out = { ok: value.ok === true, model: asString(value.model), effort: asString(value.effort), duration_ms: asNumber(value.duration_ms) };
+  // Route is the observed upstream choice. Leave it empty when missing so the
+  // renderer cannot relabel the probe as the channel currently selected.
+  const out = { ok: value.ok === true, model: asString(value.model), effort: asString(value.effort), route: asString(value.route), duration_ms: asNumber(value.duration_ms) };
   if (typeof value.error === 'string' && value.error) out.error = value.error;
   return redactPublic(out);
 }

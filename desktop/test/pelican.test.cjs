@@ -41,6 +41,7 @@ test('batch concurrency, pinned accounts, persistence, preview containment and d
  const response=await fetch(item.preview); const text=await response.text();
  assert.match(response.headers.get('content-security-policy'),/sandbox allow-scripts/);
  assert.match(response.headers.get('content-security-policy'),/connect-src 'none'/);
+ assert.match(response.headers.get('content-security-policy'),/frame-ancestors file:/);
  assert.ok(text.indexOf('RTCPeerConnection') < text.indexOf('window.animation'));
  assert.equal((await fetch(`${p.origin}/wrong/${item.id}`)).status,404);
  assert.equal(p.allowedPreview(item.preview), true);

@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
+const { modelsForChannel, resolveModelChoice, resolveChannel, resolveEffort, resolveAccountChoice, channelName, explicitRouteLabel, reportedDuration, reportedStatus, reportedStream, resolveChoice, explicitNumber, speedName, historyPlace, pelicanRetryRequest, resolvePelicanDefaults, replayLaunch } = require('../renderer/selection.js');
 
 const catalog = {
   catalog: [
@@ -81,6 +81,34 @@ test('renderer no longer falls back to the first listed model', () => {
   assert.doesNotMatch(app, /service_tier \|\| 'standard'/);
   assert.match(app, /service_tier \|\| '未报告'/);
   assert.match(app, /record\.route \|\| '未报告'/);
+  assert.doesNotMatch(app, /连接已建立/);
+  assert.doesNotMatch(app, /duration_ms \/ 1000/);
+  assert.match(app, /explicitRouteLabel\(result\.route\)/);
+  assert.match(app, /reportedDuration\(result\.duration_ms\)/);
+  assert.match(app, /reportedStatus\(record\.status\)/);
+  assert.match(app, /reportedStream\(record\.stream_status\)/);
+  assert.match(pelican, /explicitRouteLabel\(item\.route\)/);
+  assert.match(pelican, /reportedDuration\(item\.duration_ms\)/);
+  assert.doesNotMatch(pelican, /duration_ms\/1000/);
+  assert.doesNotMatch(pelican, /item\.route \? channelLabel/);
+});
+
+test('returned routes and measurements stay unreported instead of being invented', () => {
+  assert.equal(explicitRouteLabel('codex'), '原生 Codex');
+  assert.equal(explicitRouteLabel('bps'), 'BPS');
+  assert.equal(explicitRouteLabel(''), '未报告');
+  assert.equal(explicitRouteLabel(null), '未报告');
+  assert.equal(explicitRouteLabel('gateway'), 'gateway');
+  assert.notEqual(explicitRouteLabel(''), channelName(''));
+  assert.equal(reportedDuration(1500), '1.5');
+  assert.equal(reportedDuration(0), '0.0');
+  assert.equal(reportedDuration(null), '');
+  assert.equal(reportedDuration(undefined), '');
+  assert.equal(reportedStatus(200), '200');
+  assert.equal(reportedStatus(null), '未报告');
+  assert.equal(reportedStream('completed'), 'completed');
+  assert.equal(reportedStream(''), '未报告');
+  assert.notEqual(reportedStream(undefined), '连接已建立');
 });
 
 test('explicit launch choices and recorded labels are not rewritten', () => {

@@ -51,7 +51,7 @@ function extractHTML(raw) {
   if (start < 0 || end < start) throw new Error('模型未返回完整 HTML；可重试');
   return text.slice(start, end + 7);
 }
-const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox allow-scripts";
+const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; frame-ancestors file:; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox allow-scripts";
 const lockdown = `<script>for(const n of ['RTCPeerConnection','webkitRTCPeerConnection','WebTransport','WebSocket','Worker','SharedWorker','open','alert','confirm','prompt','print']){try{Object.defineProperty(window,n,{value:undefined,writable:false,configurable:false});}catch{}}</script>`;
 class Pelican {
   constructor(home, generate) {
