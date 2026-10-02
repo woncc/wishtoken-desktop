@@ -471,6 +471,11 @@ const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_
 // "&ZeroWidthSpace;", "&zwnj;", "&zwj;", "&lrm;", "&rlm;", and "&shy;" are
 // invisible marks. The semicolon is required. Otherwise
 // "user:secret@my&ZeroWidthSpace;proxy:7890" keeps the password.
+// "&NoBreak;", "&af;", "&it;", "&ic;", and the Negative*Space names are the
+// same kind of mark. Otherwise "user:secret@my&NoBreak;proxy:7890" keeps
+// the password. "&shy" may omit the semicolon when the next character does
+// not continue a name. Otherwise "user:secret@my&shy-proxy:7890" keeps the
+// password. "&shyproxy" is not a reference and stays as written.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -505,7 +510,18 @@ const HTML_NAMED = new Map([
   ['zwj', '\u200D'],
   ['lrm', '\u200E'],
   ['rlm', '\u200F'],
-  ['shy', '\u00AD']
+  ['shy', '\u00AD'],
+  ['NoBreak', '\u2060'],
+  ['ApplyFunction', '\u2061'],
+  ['af', '\u2061'],
+  ['InvisibleTimes', '\u2062'],
+  ['it', '\u2062'],
+  ['InvisibleComma', '\u2063'],
+  ['ic', '\u2063'],
+  ['NegativeMediumSpace', '\u200B'],
+  ['NegativeThickSpace', '\u200B'],
+  ['NegativeThinSpace', '\u200B'],
+  ['NegativeVeryThinSpace', '\u200B']
 ]);
 const HTML_LEGACY = ['AMP', 'amp', 'middot', 'sup1', 'sup2', 'sup3'];
 const HTML_STRICT = [...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name));
@@ -643,6 +659,9 @@ function acceptedProxyRef(literal, nextChar) {
   if (match && HTML_NAMED.has(match[1])) return HTML_NAMED.get(match[1]);
   match = /^&([A-Za-z0-9]+)$/.exec(literal);
   if (match && HTML_LEGACY.includes(match[1])) return HTML_NAMED.get(match[1]) || '';
+  // The named-character table includes "&shy" without a semicolon. A following
+  // name character or "=" means it is not a reference.
+  if (match && match[1] === 'shy' && !/[0-9A-Za-z=]/.test(nextChar || '')) return HTML_NAMED.get('shy') || '';
   return '';
 }
 const HTML_ATOM = /[A-Za-z0-9#xX;]/;
