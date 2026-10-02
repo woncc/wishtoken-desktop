@@ -34,17 +34,23 @@ const SECRET_TEXT = [
 // A space, newline, or extra @ defeats a normal URL parse. Those passwords are
 // removed from renderer text too. Username-only values stay; the settings
 // field is copied back after this pass so the editor can round-trip.
-// A single-label host counts only with an explicit port. "v1:2@beta" has no
-// port, so it stays ordinary text; "user:secret@my-proxy:7890" does not.
+// A single-label, short, hex, or decimal host counts only with an explicit
+// port. "v1:2@beta" and "user:secret@10.1" stay ordinary text.
+// %3A is a port colon too. A literal-colon host check leaves the password in
+// "user:secret@127.0.0.1%3A7890". Four numeric labels can omit the port, the
+// same way a dotted IPv4 address already can.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
 const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}「」『』【】（）《》〈〉]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@「」『』【】（）《》〈〉]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
-const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|[A-Za-z][A-Za-z0-9_-]*:\\d{2,5})(?::\\d+)?(?=$|' + PROXY_TAIL + ')';
+const proxyPort = '(?::|%3[Aa])';
+const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
+const PROXY_HOST = '(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|' + numericLabel + '(?:\\.' + numericLabel + '){3})(?:' + proxyPort + '\\d+)?|(?:' + numericLabel + '(?:\\.' + numericLabel + '){0,2}|\\d{4,10}|[A-Za-z][A-Za-z0-9_-]*)' + proxyPort + '\\d{2,5})(?=$|' + PROXY_TAIL + ')';
 function redactProxyCredentials(text) {
   // %3A is a colon. user%3Apassword decodes to a password, but a username-only
   // check never sees a separator and would leave the secret in renderer text.
+  // The same encoding hides a port in user:password@127.0.0.1%3A7890.
   // %40 is @. user:password%40host still carries the password when that is the
   // only terminator a literal-at check would look for.
   const sep = '(?::|%3[Aa])';
