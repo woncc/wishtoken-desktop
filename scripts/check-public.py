@@ -195,10 +195,12 @@ def collapse_dots(value):
     return value
 
 def strip_marks(value):
-    # Variation selectors and enclosing marks do not add a base letter.
-    # A combining accent has to go before NFKC, or it composes into a
-    # different letter and auth.json no longer matches.
-    return ''.join(ch for ch in value if unicodedata.category(ch) not in {'Mn', 'Me'})
+    # Variation selectors, enclosing marks, and spacing combining marks do
+    # not add a base letter. A combining accent has to go before NFKC, or it
+    # composes into a different letter and auth.json no longer matches.
+    # Colon and dot lookalikes are translated first, including visarga and
+    # the musical augmentation dot, so those separators survive this pass.
+    return ''.join(ch for ch in value if unicodedata.category(ch) not in {'Mn', 'Me', 'Mc'})
 
 def fold_separators(value, separators):
     # Colon and dot lookalikes are translated before marks are removed.
@@ -592,6 +594,11 @@ def self_test():
         'id_rsa\u1680', 'auth.json\u1680', 'auth\u1680.json', 'accounts\u1680.json',
         '.netrc\u1680', 'ID_RSA\u1680', 'auth.json\u1680.txt', 'nested/auth\u1680.json/extra.txt',
         'Copy of auth.json\u1680', 'notes\u1680.bak', 'credentials\u1680.json.gz',
+        'auth\u093e.json', 'accounts\u093e.json', 'credentials\u0bbe.json',
+        'id_rsa\u302e', '.netrc\u302f', 'tokens\u093e.json',
+        'auth.json\u093e', 'ID_RSA\u302e', 'auth\u093e\u302e.json',
+        'au\u093eth.json', 'nested/auth\u093e.json/extra.txt',
+        'Copy of auth\u302e.json', 'auth\u093e.json.txt', 'secrets.env\u0bbe',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -658,6 +665,8 @@ def self_test():
         'notes\u3164.txt', 'script.go\u2800', 'readme\u1160.md', 'models.json\uffa0',
         'notes\u1680.txt', 'script.go\u1680', 'id_rsa.pub\u1680', 'au\u1680th.json',
         'readme\u1680md',
+        'notes\u093e.txt', 'script\u093e.go', 'id_rsa\u093e.pub', 'readme\u302e.md',
+        'models\u302f.json', 'notes\u0bbereadme.txt',
     )
     for rel in blocked:
         if not path_reason(rel):

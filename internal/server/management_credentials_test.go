@@ -198,3 +198,25 @@ func TestManagementHidesEmbeddedDisplayCredentials(t *testing.T) {
 		t.Fatalf("embedded display credential: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesCredentialsSplitBySpacingMarks(t *testing.T) {
+	const refresh = "rt_display_123456789"
+	vowel := "rt_\u093edisplay_123456789"
+	tone := "rt_display_\u302e123456789"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.Name = "note " + vowel
+	acc.Tags = []string{"team", tone}
+	acc.LastError = "rejected " + vowel
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	for _, leaked := range []string{refresh, vowel, tone, "display_123456789"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "team") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
