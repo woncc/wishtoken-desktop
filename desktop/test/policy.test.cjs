@@ -1522,3 +1522,65 @@ test('renderer text drops proxy passwords before an encoded control', () => {
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords before an encoded period', () => {
+  const password = 's3cret-token';
+  const marks = ['.', '\uFF0E', '\uFE52', '\u2024', '\u3002', '\uFE12', '\uFF61'];
+  const nest = (value, layers) => {
+    let out = value;
+    for (let layer = 0; layer < layers; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const cases = [];
+  for (const mark of marks) {
+    const encoded = mark === '.' ? '%2E' : encodeURIComponent(mark);
+    cases.push([`user:${password}@my-proxy:7890${mark}next`, `my-proxy:7890${mark}next`]);
+    if (mark !== '.') cases.push([`note ${mark}user:${password}@10.1:8080${mark}`, `note ${mark}10.1:8080${mark}`]);
+    cases.push([`user:${password}@example.com${mark}x`, `example.com${mark}x`]);
+    cases.push([`user:${password}@router:8080${encoded}next`, `router:8080${encoded}next`]);
+    cases.push([`user:${password}@router:8080${encoded.toLowerCase()}next`, `router:8080${encoded.toLowerCase()}next`]);
+    cases.push([`user:${password}@2130706433:7890${nest(encoded, 3)}next`, `2130706433:7890${nest(encoded, 3)}next`]);
+  }
+  cases.push(
+    [`dial user:${password}@router:8080%2Enext`, 'dial router:8080%2Enext'],
+    [`socks5://alice:hunter2@my-proxy:7890%E3%80%82tmp`, 'socks5://my-proxy:7890%E3%80%82tmp'],
+    [`via user:${password} proxy@my-proxy:7890%2e failed`, 'via my-proxy:7890%2e failed'],
+    [`user:${password}/token@my-proxy:7890%2Enext`, 'my-proxy:7890%2Enext'],
+    [`//user:${password}@10.1:8080%2enext`, '//10.1:8080%2enext'],
+    [`http://example.com/?x=user:${password}@router:8080%2Enext`, 'http://example.com/?x=router:8080%2Enext'],
+    [`user\uFF1A${password}@my-proxy:7890\uFF0Enext`, 'my-proxy:7890\uFF0Enext'],
+    [`user:${password}@127%2E0%2E0%2E1:7890`, '127%2E0%2E0%2E1:7890'],
+    [`user.name:${password}@my-proxy:7890`, 'my-proxy:7890'],
+    [`two user:${password}@my-proxy:7890%2E and user:other-secret@10.1:8080\u3002next`, 'two my-proxy:7890%2E and 10.1:8080\u3002next']
+  );
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  assert.equal(redactPublic(`user:${password}@internal%2Ex`), `user:${password}@internal%2Ex`);
+  assert.equal(redactPublic(`user:${password}@my-proxy:7%2Ex`), `user:${password}@my-proxy:7%2Ex`);
+  assert.equal(redactPublic(`user:${password}@my-proxy:789012%2Enext`), `user:${password}@my-proxy:789012%2Enext`);
+  assert.equal(redactPublic(`user:${password}@my-proxy:%37%2Ex`), `user:${password}@my-proxy:%37%2Ex`);
+  assert.equal(redactPublic('member@example.test%2Enext'), 'member@example.test%2Enext');
+  assert.equal(redactPublic('note 100%2Eoff sale'), 'note 100%2Eoff sale');
+  assert.equal(redactPublic('note 100%E3%80%82off sale'), 'note 100%E3%80%82off sale');
+  assert.equal(redactPublic('score 1:2@10.5%2Ex'), 'score 1:2@10.5%2Ex');
+  assert.equal(redactPublic('http://user@127.0.0.1:7890%2Ex'), 'http://user@127.0.0.1:7890%2Ex');
+  assert.equal(redactPublic(`user:${password}@my-proxy:7890`), 'my-proxy:7890');
+  const proxy = `http://user:${password}@127.0.0.1:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@my-proxy:7890%2Enext`, email: 'a@example.test', last_error: `dial user:${password}@router:8080\u3002next failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890%2Enext');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial router:8080\u3002next failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
