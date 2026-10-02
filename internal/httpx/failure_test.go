@@ -84,3 +84,17 @@ func TestSanitizeFailureStripsProxyPasswords(t *testing.T) {
 		t.Fatal("proxy without a password was rewritten")
 	}
 }
+
+func TestSanitizeFailureStripsAtSignLookalikes(t *testing.T) {
+	const password = "s3cret-proxy"
+	const other = "other-secret"
+	text := "dial http://user:" + password + "\uFF20127.0.0.1:7890 and user:" + other + "\uFE6B10.0.0.8:1080 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, other) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("failure text: %q", got)
+	}
+	plain := "member\uFF20example.test kept"
+	if SanitizeFailure(plain) != plain {
+		t.Fatal("address with a fullwidth at was rewritten")
+	}
+}

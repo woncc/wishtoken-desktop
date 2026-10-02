@@ -266,3 +266,76 @@ func TestRedactHidesRemainingColonLookalikes(t *testing.T) {
 		t.Fatal("lookalike without a password was rewritten")
 	}
 }
+
+func TestRedactHidesAtSignLookalikes(t *testing.T) {
+	const password = "s3cret-proxy"
+	const other = "other-secret"
+	marks := []string{"\uFE6B", "\uFF20"}
+	for _, mark := range marks {
+		encoded := encodeEveryByte(mark)
+		nested := encodeEveryByte(encoded)
+		cases := []struct{ in, want string }{
+			{"http://user:" + password + mark + "127.0.0.1:7890", "http://user:xxxxx" + mark + "127.0.0.1:7890"},
+			{"user:" + password + mark + "127.0.0.1:7890", "user:xxxxx" + mark + "127.0.0.1:7890"},
+			{"http://user:" + password + encoded + "127.0.0.1:7890", "http://user:xxxxx" + encoded + "127.0.0.1:7890"},
+			{"http://user:" + password + strings.ToLower(encoded) + "127.0.0.1:7890", "http://user:xxxxx" + strings.ToLower(encoded) + "127.0.0.1:7890"},
+			{"http://user:" + password + nested + "127.0.0.1:7890", "http://user:xxxxx" + nested + "127.0.0.1:7890"},
+			{"//user:" + password + mark + "[::1]:8792", "//user:xxxxx" + mark + "[::1]:8792"},
+			{"socks5://alice:hunter2" + mark + "10.0.0.8:1080", "socks5://alice:xxxxx" + mark + "10.0.0.8:1080"},
+		}
+		for _, tc := range cases {
+			got := Redact(tc.in)
+			if got != tc.want || strings.Contains(got, password) || strings.Contains(got, "hunter2") {
+				t.Fatalf("redact %q -> %q want %q", tc.in, got, tc.want)
+			}
+			if again := Redact(got); again != got {
+				t.Fatalf("second redact changed %q -> %q", got, again)
+			}
+			if kept := PreserveProxy(tc.in, " "+got+" "); kept != tc.in {
+				t.Fatalf("preserve %q -> %q", tc.in, kept)
+			}
+		}
+	}
+	cases := []struct{ in, want string }{
+		{"http://user:" + password + "%40127.0.0.1:7890", "http://user:xxxxx%40127.0.0.1:7890"},
+		{"http://user:" + password + "%2540127.0.0.1:7890", "http://user:xxxxx%2540127.0.0.1:7890"},
+		{"user:" + password + "%252540my-proxy:7890", "user:xxxxx%252540my-proxy:7890"},
+		{"http://user:" + password + "%25252540127.0.0.1:7890", "http://user:xxxxx%25252540127.0.0.1:7890"},
+		{"http://user%3A" + password + "%40127.0.0.1:7890", "http://user%3Axxxxx%40127.0.0.1:7890"},
+		{"http://user\uFF1A" + password + "\uFF20127.0.0.1:7890", "http://user\uFF1Axxxxx\uFF20127.0.0.1:7890"},
+		{"http://user:" + password + "/token\uFF20127.0.0.1:7890", "http://user:xxxxx\uFF20127.0.0.1:7890"},
+		{"http://user:p%40ss\uFF20127.0.0.1:7890", "http://user:xxxxx\uFF20127.0.0.1:7890"},
+		{"http://example.com/?x=user:" + password + "\uFF2010.0.0.8:1080", "http://example.com/?x=user:xxxxx\uFF2010.0.0.8:1080"},
+		{"via user:" + password + " proxy\uFF2010.1.1.1:8080 failed", "via user:xxxxx\uFF2010.1.1.1:8080 failed"},
+		{"dial http://user:" + password + "@127.0.0.1:1 and http://user:" + other + "\uFF2010.0.0.8:2 failed", "dial http://user:xxxxx@127.0.0.1:1 and http://user:xxxxx\uFF2010.0.0.8:2 failed"},
+		{"two user:" + password + "\uFF20127.0.0.1:7890 and user:" + other + "\uFE6B10.0.0.8:1080.", "two user:xxxxx\uFF20127.0.0.1:7890 and user:xxxxx\uFE6B10.0.0.8:1080."},
+		{"http://user:" + password + "\uFF20127.0.0.1:7890?q=" + password, "http://user:xxxxx\uFF20127.0.0.1:7890?q=xxxxx"},
+		{"http://user:" + password + "\uFF20127.0.0.1:7890?q=" + encodeEveryByte(password), "http://user:xxxxx\uFF20127.0.0.1:7890?q=xxxxx"},
+	}
+	for _, tc := range cases {
+		got := Redact(tc.in)
+		if got != tc.want || strings.Contains(got, password) || strings.Contains(got, other) || strings.Contains(got, "p%40ss") || strings.Contains(got, "p@ss") {
+			t.Fatalf("redact %q -> %q want %q", tc.in, got, tc.want)
+		}
+		if again := Redact(got); strings.Contains(again, password) || strings.Contains(again, other) {
+			t.Fatalf("second redact leaked: %q", again)
+		}
+	}
+	unchanged := []string{
+		"member\uFF20example.test",
+		"http://user\uFF20127.0.0.1:7890",
+		"http://user%40127.0.0.1:7890",
+		"http://user%2540127.0.0.1:7890",
+		"note 100%40off sale",
+		"note 100%2540off sale",
+		"http://user@127.0.0.1:7890",
+		"member@example.test",
+		"http://user\u0705@127.0.0.1:7890",
+		"403: This request was blocked by our usage policy.",
+	}
+	for _, in := range unchanged {
+		if got := Redact(in); got != in {
+			t.Fatalf("rewrote %q into %q", in, got)
+		}
+	}
+}
