@@ -590,11 +590,12 @@ function htmlProxyChar(cp) {
   // mathematical letters, enclosed letters, outlined capitals, outlined
   // digits, circled digits, mathematical digits, segmented digits,
   // Arabic-Indic digits, NKo digits, Devanagari digits, Bengali digits,
-  // Gurmukhi digits, Gujarati digits, and Oriya digits do too. A numeric
-  // reference has to yield the same character so the label fold can see it.
+  // Gurmukhi digits, Gujarati digits, Oriya digits, Tamil digits, and
+  // Telugu digits do too. A numeric reference has to yield the same
+  // character so the label fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp)) return char;
   if (cp === 0x02D7 || cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x207B || cp === 0x208B || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -620,11 +621,17 @@ function readEncodedByte(text, index) {
 }
 function decodeUtf8Scalar(bytes) {
   const b0 = bytes[0];
+  const cont = index => bytes[index] >= 0x80 && bytes[index] <= 0xBF;
+  // ASCII percent bytes are not a UTF-8 lead. Without this check, %42%45%46
+  // becomes U+2146 and a numeric reference for a Tamil digit never reaches
+  // the HTML decoder, so the password stays.
   if (bytes.length === 2) {
+    if (b0 < 0xC2 || b0 > 0xDF || !cont(1)) return null;
     const cp = ((b0 & 0x1F) << 6) | (bytes[1] & 0x3F);
     return cp >= 0x80 ? cp : null;
   }
   if (bytes.length === 3) {
+    if (b0 < 0xE0 || b0 > 0xEF || !cont(1) || !cont(2)) return null;
     if (b0 === 0xE0 && bytes[1] < 0xA0) return null;
     if (b0 === 0xED && bytes[1] >= 0xA0) return null;
     const cp = ((b0 & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F);
@@ -632,6 +639,7 @@ function decodeUtf8Scalar(bytes) {
     return cp;
   }
   if (bytes.length !== 4) return null;
+  if (b0 < 0xF0 || b0 > 0xF4 || !cont(1) || !cont(2) || !cont(3)) return null;
   if (b0 === 0xF0 && bytes[1] < 0x90) return null;
   if (b0 === 0xF4 && bytes[1] > 0x8F) return null;
   const cp = ((b0 & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) | ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
@@ -2132,8 +2140,120 @@ function foldOriyaDigits(text) {
   }
   return out;
 }
+// Tamil digits U+0BE6..U+0BEF do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u0BE7proxy:7890" and
+// "user:secret@\u0BE7\u0BE8\u0BED.\u0BE6.\u0BE6.\u0BE7:7890" keep the
+// password. The redacted host uses an ASCII digit. U+0BD7, U+0BF0, and other
+// non-digit Tamil marks stay as written.
+function tamilDigitAscii(cp) {
+  if (cp >= 0x0BE6 && cp <= 0x0BEF) return String.fromCharCode(0x30 + (cp - 0x0BE6));
+  return '';
+}
+function isTamilDigit(cp) {
+  return tamilDigitAscii(cp) !== '';
+}
+function readEncodedTamilDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isTamilDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedTamilDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedTamilDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldTamilDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += tamilDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+// Telugu digits U+0C66..U+0C6F do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u0C67proxy:7890" and
+// "user:secret@\u0C67\u0C68\u0C6D.\u0C66.\u0C66.\u0C67:7890" keep the
+// password. The redacted host uses an ASCII digit. U+0C65, U+0C70, and other
+// non-digit Telugu marks stay as written.
+function teluguDigitAscii(cp) {
+  if (cp >= 0x0C66 && cp <= 0x0C6F) return String.fromCharCode(0x30 + (cp - 0x0C66));
+  return '';
+}
+function isTeluguDigit(cp) {
+  return teluguDigitAscii(cp) !== '';
+}
+function readEncodedTeluguDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isTeluguDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedTeluguDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedTeluguDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldTeluguDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += teluguDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
 function redactProxyCredentials(text) {
-  const decoded = foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))));
+  const decoded = foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
