@@ -637,6 +637,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleLeftBracket != needleGreater {
 		spans = append(spans, exactSecretSpans(leftBracketBase, needleLeftBracket)...)
 	}
+	// Tag right square bracket copies ']' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored right square bracket. Folding it is a
+	// separate reading. It runs on the tag-left-square-bracket reading so one
+	// secret can use both. The drop reading still runs, so an inserted tag
+	// right square bracket cannot hide a token that has no right square bracket.
+	rightBracketBase := leftBracketBase
+	if bracketed, ok := foldTagLeftSquareBracketPieces(leftBracketBase); ok {
+		rightBracketBase = bracketed
+	}
+	needleRightBracket := foldTagRightSquareBracketString(needleLeftBracket)
+	if closed, ok := foldTagRightSquareBracketPieces(rightBracketBase); ok {
+		spans = append(spans, exactSecretSpans(closed, needleRightBracket)...)
+	} else if needleRightBracket != needleLeftBracket {
+		spans = append(spans, exactSecretSpans(rightBracketBase, needleRightBracket)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1485,6 +1501,47 @@ func foldTagLeftSquareBracketString(s string) string {
 		return s
 	}
 	folded, _ := foldTagLeftSquareBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagRightSquareBracketPieces maps the Unicode tag right square bracket
+// to ASCII ']'. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored right square bracket
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagRightSquareBracketPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE005D {
+			out = append(out, secretPiece{b: ']', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagRightSquareBracketString(s string) string {
+	if !strings.ContainsRune(s, 0xE005D) {
+		return s
+	}
+	folded, _ := foldTagRightSquareBracketPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
