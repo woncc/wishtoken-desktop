@@ -816,6 +816,31 @@ def super_sub_ascii(cp):
         return 'hklmnpst'[cp - 0x2095]
     return None
 
+def modifier_ascii(cp):
+    # Modifier letters that NFKC-fold to one ASCII letter. The credential
+    # redactor uses the same set. Latin subscript letters in the phonetic
+    # blocks do the same, so they are listed too. Kelvin sign and the
+    # information source are the letterlike symbols with that one-letter
+    # fold. Hooked, turned, and non-Latin modifiers are not ASCII copies.
+    # Long s, roman numerals, and segmented digits stay out.
+    return {
+        0x02B0: 'h', 0x02B2: 'j', 0x02B3: 'r', 0x02B7: 'w', 0x02B8: 'y',
+        0x02E1: 'l', 0x02E2: 's', 0x02E3: 'x',
+        0x1D2C: 'A', 0x1D2E: 'B', 0x1D30: 'D', 0x1D31: 'E',
+        0x1D33: 'G', 0x1D34: 'H', 0x1D35: 'I', 0x1D36: 'J', 0x1D37: 'K',
+        0x1D38: 'L', 0x1D39: 'M', 0x1D3A: 'N', 0x1D3C: 'O', 0x1D3E: 'P',
+        0x1D3F: 'R', 0x1D40: 'T', 0x1D41: 'U', 0x1D42: 'W',
+        0x1D43: 'a', 0x1D47: 'b', 0x1D48: 'd', 0x1D49: 'e', 0x1D4D: 'g',
+        0x1D4F: 'k', 0x1D50: 'm', 0x1D52: 'o', 0x1D56: 'p', 0x1D57: 't',
+        0x1D58: 'u', 0x1D5B: 'v',
+        0x1D62: 'i', 0x1D63: 'r', 0x1D64: 'u', 0x1D65: 'v',
+        0x1D9C: 'c', 0x1DA0: 'f', 0x1DBB: 'z',
+        0x2C7C: 'j', 0x2C7D: 'V',
+        0xA7F2: 'C', 0xA7F3: 'F', 0xA7F4: 'Q',
+        0x107A5: 'q',
+        0x212A: 'K', 0x2139: 'i',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -867,6 +892,14 @@ def fold_content(data):
         # Superscript and subscript forms NFKC-fold to ASCII. This pass does
         # not run NFKC, so a token written with them stayed split.
         mapped = super_sub_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Modifier letters NFKC-fold to one ASCII letter. This pass does not
+        # run NFKC, so a token written with them stayed split. Phonetic
+        # modifiers that are not ASCII copies stay out.
+        mapped = modifier_ascii(cp)
         if mapped is not None:
             out.append(mapped)
             changed = True
@@ -1350,6 +1383,27 @@ def self_test():
         raise SystemExit('self-test failed: a superscript token was not detected')
     if content_reasons('m\u00b2'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u207a' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2071' * 10).encode()):
         raise SystemExit('self-test failed: ordinary superscript text was blocked')
+    if modifier_ascii(0x02B0) != 'h' or modifier_ascii(0x02B1) is not None or modifier_ascii(0x02E2) != 's' or modifier_ascii(0x1D2C) != 'A' or modifier_ascii(0x1D2D) is not None or modifier_ascii(0x1D4A) is not None or modifier_ascii(0x1D62) != 'i' or modifier_ascii(0x2C7C) != 'j' or modifier_ascii(0x2C7D) != 'V' or modifier_ascii(0xA7F2) != 'C' or modifier_ascii(0x107A5) != 'q' or modifier_ascii(0x212A) != 'K' or modifier_ascii(0x2139) != 'i' or modifier_ascii(0x017F) is not None or modifier_ascii(0x2160) is not None or modifier_ascii(0x1FBF0) is not None:
+        raise SystemExit('self-test failed: modifier ASCII fold is wrong')
+    mod_token = ('sk-' + '\u02e2' * 30).encode()
+    mod_sub = ('rt_' + '\u1d62' * 30).encode()
+    mod_q = ('ghp_' + '\U000107a5' * 30).encode()
+    mod_kelvin = ('gho_' + '\u212a' * 30).encode()
+    mod_key = ('-----BEGIN ' + '\U00001D3C\U00001D3E\U00001D31' + 'NSSH PRIVATE KEY-----').encode()
+    mod_jwt = ('\u1d49\u02b8\U00001D36' + '\u1d43' * 25 + '.' + '\u1d47' * 30 + '.' + '\u1d9c' * 15).encode()
+    mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
+    mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
+    mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
+    mod_roman = ('sk-' + 'a' * 10 + '\u2160' + 'a' * 20).encode()
+    mod_segment = ('sk-' + 'a' * 10 + '\U0001fbf0' + 'a' * 20).encode()
+    if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
+        raise SystemExit('self-test failed: a modifier token was not detected')
+    if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a modifier key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(mod_path):
+        raise SystemExit('self-test failed: a modifier personal path was not detected')
+    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons(mod_segment) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary modifier text was blocked')
 
 def main():
     self_test()
