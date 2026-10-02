@@ -595,7 +595,7 @@ function htmlProxyChar(cp) {
   // Thai digits, Lao digits, Tibetan digits, Myanmar digits, Myanmar Shan
   // digits, Khmer digits, Mongolian digits, Limbu digits, New Tai Lue
   // digits, Tai Tham Hora digits, Tai Tham Tham digits, Balinese digits,
-  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits, and circled numbers ten through twenty, do too.
+  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits, and circled numbers ten through twenty, twenty-one through thirty-five, and thirty-six through fifty, do too.
   // A numeric reference has to yield the same character so the label fold
   // can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
@@ -1658,14 +1658,17 @@ function foldCircledDigits(text) {
   return out;
 }
 
-// Circled numbers U+2469..U+2473 fold to 10..20 under NFKC. A single-digit
-// fold leaves the password in "user:secret@my\u2469proxy:7890" because the
-// host label never sees one ASCII digit. The same is true of
-// "user:secret@\u2469.0.0.1:7890" and of the percent-encoded and numeric
-// forms. The redacted host uses ASCII digits. A parenthesized number such
-// as U+2474 stays as written.
+// Circled numbers U+2469..U+2473 fold to 10..20 under NFKC. U+3251..U+325F
+// fold to 21..35 and U+32B1..U+32BF fold to 36..50. A single-digit fold
+// leaves the password in "user:secret@my\u2469proxy:7890" and
+// "user:secret@my\u3251proxy:7890" because the host label never sees one
+// ASCII digit. The same is true of a numeric host and of the percent-encoded
+// and numeric forms. The redacted host uses ASCII digits. U+3250 folds to
+// "PTE", and U+32C0 folds to a digit plus a month mark. Those stay as written.
 function circledNumberAscii(cp) {
   if (cp >= 0x2469 && cp <= 0x2473) return String(10 + (cp - 0x2469));
+  if (cp >= 0x3251 && cp <= 0x325F) return String(21 + (cp - 0x3251));
+  if (cp >= 0x32B1 && cp <= 0x32BF) return String(36 + (cp - 0x32B1));
   return '';
 }
 function isCircledNumber(cp) {
