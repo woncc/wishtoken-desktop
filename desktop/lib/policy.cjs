@@ -573,11 +573,12 @@ function htmlProxyChar(cp) {
   // U+FF21..U+FF3A and U+FF41..U+FF5A fold to ASCII letters. U+24B6..U+24E9
   // fold to ASCII letters too. Letterlike symbols that fold to one ASCII
   // letter do as well, and so do U+00AA, U+00BA, and U+017F. Modifier
-  // letters that fold to one ASCII letter do too. A numeric reference has
-  // to yield the same character so the label fold can see it.
+  // letters that fold to one ASCII letter do too, and so do superscript and
+  // subscript letters. A numeric reference has to yield the same character
+  // so the label fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp)) return char;
   if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -845,7 +846,7 @@ function foldLabelHyphens(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\uFF4Dproxy:7890" and "user:secret@ex\uFF41mple.com:8080"
-// keep the password. Superscript and subscript letters stay as written.
+// keep the password. Roman numerals stay as written.
 function readEncodedFullwidthLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -881,8 +882,8 @@ function foldFullwidthLetters(text) {
 // host already allows those letters. Their literal, percent-encoded, and
 // numeric forms kept the password too. Otherwise
 // "user:secret@my\u24DCproxy:7890" and "user:secret@ex\u24D0mple.com:8080"
-// keep the password. Parenthesized letters, circled digits, and superscript
-// or subscript letters stay as written.
+// keep the password. Parenthesized letters, circled digits, and roman numerals
+// stay as written.
 function readEncodedCircledLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -922,7 +923,7 @@ function foldCircledLetters(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u212Aproxy:7890" and "user:secret@ex\u2139mple.com:8080"
 // keep the password. Symbols that expand to more than one character, such
-// as U+2121, stay as written. Superscript and subscript letters stay as written.
+// as U+2121, stay as written. Roman numerals stay as written.
 const LETTERLIKE_ASCII = {
   '\u2102': 'C',
   '\u210A': 'g',
@@ -996,7 +997,7 @@ function foldLetterlikeLetters(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u017Fproxy:7890" and "user:secret@ex\u00AAmple.com:8080"
-// keep the password. The micro sign and superscript or subscript letters stay as written.
+// keep the password. The micro sign and roman numerals stay as written.
 const LATIN_COMPAT_ASCII = {
   '\u00AA': 'a',
   '\u00BA': 'o',
@@ -1045,7 +1046,7 @@ function foldLatinCompatLetters(text) {
 // "user:secret@my\u02B0proxy:7890" and "user:secret@ex\u1D43mple.com:8080"
 // keep the password. U+107A5 is the supplementary small q. A modifier letter
 // that expands past one ASCII letter stays as written. The micro sign and
-// superscript or subscript letters stay as written.
+// roman numerals stay as written.
 const MODIFIER_LETTER_ASCII = new Map([
   [0x02B0, 'h'],
   [0x02B2, 'j'],
@@ -1142,8 +1143,83 @@ function foldModifierLetters(text) {
   }
   return out;
 }
+// Superscript and subscript letters that fold to one ASCII letter under NFKC
+// are host letters too. U+2071 folds to "i" and U+207F folds to "n".
+// U+2090 through U+209C, U+1D62 through U+1D65, and U+2C7C are the subscript
+// letters. Their literal, percent-encoded, and numeric forms kept the
+// password. Otherwise "user:secret@my\u2071proxy:7890" and
+// "user:secret@ex\u2090mple.com:8080" keep the password. Superscript digits
+// are already port digits. The micro sign and roman numerals stay as written.
+const SUP_SUB_LETTER_ASCII = new Map([
+  [0x1D62, 'i'],
+  [0x1D63, 'r'],
+  [0x1D64, 'u'],
+  [0x1D65, 'v'],
+  [0x2071, 'i'],
+  [0x207F, 'n'],
+  [0x2090, 'a'],
+  [0x2091, 'e'],
+  [0x2092, 'o'],
+  [0x2093, 'x'],
+  [0x2095, 'h'],
+  [0x2096, 'k'],
+  [0x2097, 'l'],
+  [0x2098, 'm'],
+  [0x2099, 'n'],
+  [0x209A, 'p'],
+  [0x209B, 's'],
+  [0x209C, 't'],
+  [0x2C7C, 'j']
+]);
+function isSupSubLetter(cp) {
+  return SUP_SUB_LETTER_ASCII.has(cp);
+}
+function readEncodedSupSubLetter(text, index) {
+  if (text[index] !== '%') return null;
+  const first = readEncodedByte(text, index);
+  if (!first) return null;
+  const b0 = first.value;
+  let needed = 0;
+  if (b0 >= 0xC2 && b0 <= 0xDF) needed = 2;
+  else if (b0 >= 0xE0 && b0 <= 0xEF) needed = 3;
+  else if (b0 >= 0xF0 && b0 <= 0xF4) needed = 4;
+  if (!needed) return null;
+  const bytes = [b0];
+  let cursor = first.next;
+  for (let count = 1; count < needed; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next || next.value < 0x80 || next.value > 0xBF) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isSupSubLetter(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedSupSubLetters(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const letter = readEncodedSupSubLetter(text, index);
+    if (letter) {
+      out += letter.char;
+      index = letter.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldSupSubLetters(text) {
+  let out = '';
+  for (const char of text) {
+    const ascii = SUP_SUB_LETTER_ASCII.get(char.codePointAt(0));
+    out += ascii || char;
+  }
+  return out;
+}
 function redactProxyCredentials(text) {
-  const decoded = foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))))))));
+  const decoded = foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
