@@ -2423,3 +2423,77 @@ func TestBraceASCIIFoldsOnlyCurlyBrackets(t *testing.T) {
 		t.Fatalf("brace fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSquareBrackets(t *testing.T) {
+	secret := "code[ver]1"
+	marked := strings.NewReplacer("[", "\uFF3B", "]", "\uFF3D").Replace(secret)
+	encoded := strings.NewReplacer("[", "%EF%BC%BB", "]", "%EF%BC%BD").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.NewReplacer("[", "\uFE47", "]", "\uFE48").Replace(secret)
+	got = SanitizeFailure("rejected "+vertical+" later", secret)
+	for _, item := range []string{secret, vertical, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2045 later",
+		"see \u2046 later",
+		"see \u27e6 later",
+		"see \u3010 later",
+		"see \u301a later",
+		"see \ufe17 later",
+		"path \uff3b file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("bracket prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestBracketASCIIFoldsOnlySquareBrackets(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE47, '[', true},
+		{0xFF3B, '[', true},
+		{0xFE48, ']', true},
+		{0xFF3D, ']', true},
+		{'[', 0, false},
+		{']', 0, false},
+		{0x2045, 0, false},
+		{0x2046, 0, false},
+		{0x27E6, 0, false},
+		{0x27E7, 0, false},
+		{0x298B, 0, false},
+		{0x3010, 0, false},
+		{0x301A, 0, false},
+		{0xFE17, 0, false},
+		{0xFF5B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := bracketASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := bracketASCII(r); ok {
+			n++
+		}
+	}
+	if n != 4 {
+		t.Fatalf("bracket fold count %d", n)
+	}
+}
