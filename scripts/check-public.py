@@ -28,7 +28,8 @@ FORBIDDEN_SUFFIXES = {
     '.sqlite', '.sqlite3', '.db', '.ovpn', '.psafe3',
     '.gpg', '.pgp', '.age',
 }
-COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst'}
+COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst', '.br', '.7z', '.tar', '.tgz', '.lz4', '.lzma', '.zstd', '.rar', '.cab'}
+PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
 DOT_LIKE = {ord('\u3002'): '.'}
 BACKUP_SUFFIXES = {
@@ -108,7 +109,7 @@ def strip_alias(folded):
             folded = stem[:-5] + suffix
             changed = True
             continue
-        if suffix in BACKUP_SUFFIXES or suffix in COMPRESSED_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
+        if suffix in BACKUP_SUFFIXES or suffix in COMPRESSED_SUFFIXES or suffix in PARTIAL_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
             if stem and stem != folded:
                 folded = strip_edges(stem)
                 changed = True
@@ -222,6 +223,9 @@ def self_test():
         'auth.json\u2024', 'auth.json\u3002', 'auth\uff0ejson', '\uff41\uff55\uff54\uff48.json', '\uff41\uff43\uff43\uff4f\uff55\uff4e\uff54\uff53\uff0e\uff4a\uff53\uff4f\uff4e',
         'auth.json\uff1a$DATA', 'Copy of auth.json\u00a0', 'auth.json\u00a0.txt', 'auth .json',
         'Diagnostics\u00a0/capture.png', 'auth.json\u2028', 'accounts .json.gz',
+        'auth.json.br', 'accounts.json.7z', 'credentials.json.tar', 'auth.json.tgz', 'tokens.json.lz4',
+        'secrets.json.lzma', 'id_rsa.rar', 'nested/auth.json.cab', 'auth.json.tar.gz', 'tokens.json.zstd',
+        'auth.json.crdownload', 'auth.json.part', 'credentials.json.partial', 'accounts.json.download',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -233,6 +237,7 @@ def self_test():
         'models.json.txt', 'notes.txt.', 'readme.gz', 'script.go.xz', 'models.json.gz',
         'script.go:Zone.Identifier', 'notes\u00a0.txt', 'readme\u3002txt', 'script.go\u200b',
         'notes .txt', 'models .json.gz', 'id_rsa.pub\u200e', 'id_rsa .pub',
+        'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
     )
     for rel in blocked:
         if not path_reason(rel):
