@@ -1808,3 +1808,72 @@ func TestExclamationASCIIFoldsOnlyExclamationMarks(t *testing.T) {
 		t.Fatalf("exclamation fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsReverseSolidus(t *testing.T) {
+	secret := "code\\ver1"
+	marked := strings.ReplaceAll(secret, "\\", "\uFE68")
+	encoded := strings.ReplaceAll(secret, "\\", "%EF%BC%BC")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "\\", "\uFF3C")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2216 later",
+		"see \u29f5 later",
+		"see \u29f9 later",
+		"see \u00a5 later",
+		"see \u20a9 later",
+		"see \u244a later",
+		"path \uff3c file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("reverse solidus prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE68, '\\', true},
+		{0xFF3C, '\\', true},
+		{'\\', 0, false},
+		{0x00A5, 0, false},
+		{0x20A9, 0, false},
+		{0x2216, 0, false},
+		{0x29F5, 0, false},
+		{0x29F9, 0, false},
+		{0x244A, 0, false},
+		{0xFF0F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := reverseSolidusASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := reverseSolidusASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("reverse solidus fold count %d", n)
+	}
+}
