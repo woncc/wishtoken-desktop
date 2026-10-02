@@ -348,6 +348,17 @@ SEPARATOR_LIKE = {
     ord('\U0001f67d'): '/',
     # The dotted solidus does not NFKC-fold to a slash either.
     ord('\u2e4a'): '/',
+    # Katakana no, Old Coptic esh, and the slash radical skeleton to a solidus
+    # and do not NFKC-fold to one. The radical's ideograph is that same
+    # prototype. Halfwidth katakana no folds to katakana no, so the post-NFKC
+    # translate covers it. The dot radical and its ideograph skeleton to a
+    # reverse solidus instead.
+    ord('\u30ce'): '/',
+    ord('\u4e3f'): '/',
+    ord('\u2f03'): '/',
+    ord('\u2cc6'): '/',
+    ord('\u4e36'): '/',
+    ord('\u2f02'): '/',
 }
 
 def normalized_rel(rel):
@@ -555,6 +566,10 @@ def self_test():
         'nested/id_rsa\U0001f67dx', 'Diagnostics\U0001f67ccapture.png', 'tokens.json\U0001f67dextra.txt',
         'auth.json\u2e4asecret.txt', 'credentials\u2e4atoken.txt', 'notes\u2e4aid_rsa',
         'nested/id_rsa\u2e4ax', 'Diagnostics\u2e4acapture.png', 'tokens.json\u2e4aextra.txt',
+        'auth.json\u30cesecret.txt', 'credentials\u4e3ftoken.txt', 'notes\u2f03id_rsa',
+        'nested/id_rsa\u2cc6x', 'tokens.json\u4e36extra.txt', 'auth.json\u2f02secret.txt',
+        'notes\uff89id_rsa', 'accounts.json\u4e3fnotes.txt', 'readme\u30ceauth.json',
+        'file\u2cc6.netrc', 'ID_RSA\u4e36x', 'credentials\uff89token.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -626,6 +641,9 @@ def self_test():
         'models.json\U0001f67dreadme.txt',
         'notes\u2e4areadme.txt', 'script.go\u2e4aZone.Identifier', 'id_rsa.pub\u2e4afoo.txt',
         'models.json\u2e4areadme.txt',
+        'notes\u30cereadme.txt', 'script.go\u4e3fZone.Identifier', 'id_rsa.pub\u2f03foo.txt',
+        'models.json\u2cc6readme.txt', 'notes\u4e36readme.txt', 'script.go\u2f02Zone.Identifier',
+        'id_rsa.pub\uff89foo.txt', 'readme\u30cemd',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
