@@ -932,17 +932,74 @@ func escapeASCII(r rune) (byte, bool) {
 
 // foldCredentialPieces maps compatibility letters, digits, and token
 // punctuation, including the percent sign, exclamation mark, reverse
-// solidus, number sign, dollar sign, ampersand, asterisk, and question
-// mark, to ASCII. Credential redaction does not run NFKC. The percent fold
-// is part of this result because the decode loop consumes it: a
-// compatibility percent or hex digit still starts the next escape layer.
+// solidus, number sign, dollar sign, ampersand, asterisk, question mark,
+// and semicolon, to ASCII. Credential redaction does not run NFKC. The
+// percent fold is part of this result because the decode loop consumes it:
+// a compatibility percent or hex digit still starts the next escape layer.
 // Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))
+	return foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))
+	return foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))
+}
+
+// foldSemicolonPieces maps the Greek question mark and vertical, small, and
+// fullwidth semicolons to ASCII ';'. NFKC folds them, and this pass does not
+// run NFKC, so a stored secret written with those forms would stay visible.
+// Arabic, Ethiopic, reversed, and turned semicolons do not fold to ';', so
+// they stay out. One output piece covers the original rune.
+func foldSemicolonPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := semicolonASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldSemicolonString(s string) string {
+	if !semicolonFolded(s) {
+		return s
+	}
+	return renderPieces(foldSemicolonPieces(rawPieces(s)))
+}
+
+func semicolonFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := semicolonASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func semicolonASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x037E, 0xFE14, 0xFE54, 0xFF1B:
+		return ';', true
+	default:
+		return 0, false
+	}
 }
 
 // foldQuestionPieces maps vertical, small, and fullwidth question marks to

@@ -2205,3 +2205,74 @@ func TestQuestionASCIIFoldsOnlyQuestionMarks(t *testing.T) {
 		t.Fatalf("question fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSemicolons(t *testing.T) {
+	secret := "code;ver1"
+	marked := strings.ReplaceAll(secret, ";", "\uFE54")
+	encoded := strings.ReplaceAll(secret, ";", "%EF%BC%9B")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	greek := strings.ReplaceAll(secret, ";", "\u037E")
+	vertical := strings.ReplaceAll(secret, ";", "\uFE14")
+	full := strings.ReplaceAll(secret, ";", "\uFF1B")
+	got = SanitizeFailure("rejected "+greek+" "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, greek, vertical, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u061b later",
+		"see \u1364 later",
+		"see \u204f later",
+		"see \u2e35 later",
+		"see \u037e later",
+		"path \uff1b file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("semicolon prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSemicolonASCIIFoldsOnlySemicolons(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x037E, ';', true},
+		{0xFE14, ';', true},
+		{0xFE54, ';', true},
+		{0xFF1B, ';', true},
+		{';', 0, false},
+		{0x061B, 0, false},
+		{0x1364, 0, false},
+		{0x204F, 0, false},
+		{0x2E35, 0, false},
+		{0x061F, 0, false},
+		{0xFF1F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := semicolonASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := semicolonASCII(r); ok {
+			n++
+		}
+	}
+	if n != 4 {
+		t.Fatalf("semicolon fold count %d", n)
+	}
+}
