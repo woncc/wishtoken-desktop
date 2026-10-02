@@ -116,6 +116,8 @@ const SECRET_TEXT = [
 // colon lookalikes. Mongolian and Manchu full stops are the same kind of
 // separator. Otherwise "user:secret@my-proxy:7890%3Anext" and
 // "user:secret@my-proxy\u18037890" keep the password.
+// Proportion and squared four-dot punctuation are the same kind of separator.
+// Otherwise "user:secret@my-proxy\u22377890" keeps the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -137,10 +139,13 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
 // U+1803 and U+1809 do not fold to ":" either. They still divide userinfo
 // and a port, or "user:secret@my-proxy\u18037890" keeps the password.
+// U+2237 and U+2E2C do not fold to ":". They are confusable with "::"
+// and still divide userinfo and a port, or "user:secret@my-proxy\u22377890"
+// keeps the password.
 // Percent-encoding of those UTF-8 bytes, including extra %25 layers, and a
 // nested ASCII colon such as %253A, are separators as well. A lookalike in
 // the port is a separator too, or the same mark before the port keeps the password.
-const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809'];
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C'];
 function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
