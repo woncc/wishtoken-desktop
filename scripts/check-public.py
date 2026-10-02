@@ -55,6 +55,10 @@ COLON_LIKE = {
     ord('\u205a'): ':',
     ord('\u1804'): ':',
     ord('\ua6f4'): ':',
+    # These NFKC-fold to the modifier colons above. Listing them keeps a raw
+    # superscript from hiding the stream split if normalization is reordered.
+    ord('\U00010781'): ':',
+    ord('\U00010782'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -328,6 +332,8 @@ def self_test():
         'notes:ID_RSA', 'file:.netrc', 'readme:auth.json.txt',
         'readme\u1804auth.json', 'notes\ua6f4id_rsa', 'auth.json\u1804secret',
         'docs\ua6f4credentials.json', 'nested/file\u1804accounts.json', 'ID_RSA\ua6f4x',
+        'readme\U00010781auth.json', 'notes\U00010782id_rsa', 'auth.json\U00010781secret',
+        'docs\U00010782credentials.json', 'nested/file\U00010781accounts.json', 'ID_RSA\U00010782x',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -348,6 +354,7 @@ def self_test():
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
         'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
         'notes\u1804readme.txt', 'script.go\ua6f4Zone.Identifier', 'models.json\u1804readme.txt',
+        'notes\U00010781readme.txt', 'script.go\U00010782Zone.Identifier', 'models.json\U00010781readme.txt',
         'models.json\u0589readme',
     )
     for rel in blocked:
