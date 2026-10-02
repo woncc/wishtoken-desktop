@@ -3753,3 +3753,86 @@ func TestDigitStopASCIIFoldsOnlyFullStops(t *testing.T) {
 		t.Fatalf("digit stop fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsDigitCommas(t *testing.T) {
+	pairs := []struct {
+		secret string
+		digits string
+		mark   string
+	}{
+		{"rt_Zz9q0,7f3a", "0,", "\U0001F101"},
+		{"rt_Aa8k5,7f3a", "5,", "\U0001F106"},
+		{"rt_Bb7m9,7f3a", "9,", "\U0001F10A"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.digits, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.digits)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "0,", "%F0%9F%84%81")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[2].secret, "9,", "\U0001F10A")
+	got = SanitizeFailure("rejected "+pairs[2].secret+" later", stored)
+	for _, item := range []string{pairs[2].secret, stored, "Bb7m", "9,", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U0001F101 later",
+		"see \U0001F10A later",
+		"see \u060C later",
+		"see \u3001 later",
+		"see \u2488 later",
+		"see \uFE50 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("digit comma prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDigitCommaASCIIFoldsOnlyDigitCommas(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x1F101, "0,"},
+		{0x1F106, "5,"},
+		{0x1F10A, "9,"},
+	}
+	for _, check := range checks {
+		got, ok := digitCommaASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{',', '0', '9', 0x1F100, 0x1F10B, 0xFE10, 0xFE50, 0xFF0C, 0x060C, 0x3001, 0x2488} {
+		if _, ok := digitCommaASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := digitCommaASCII(r); ok {
+			n++
+		}
+	}
+	if n != 10 {
+		t.Fatalf("digit comma fold count %d", n)
+	}
+}

@@ -1477,3 +1477,37 @@ func TestRedactHidesDigitStopInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesDigitCommaInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9q0,7f3a"
+	zero := strings.ReplaceAll(password, "0,", "\U0001F101")
+	nine := strings.ReplaceAll("rt_Zz9q9,7f3a", "9,", "\U0001F10A")
+	encoded := strings.ReplaceAll(password, "0,", "%F0%9F%84%81")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + zero,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, zero, encoded, "Zz9q", "0,", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9q9,7f3a"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + nine)
+	for _, leaked := range []string{other, nine, "9,"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("nine leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\U0001F101example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
