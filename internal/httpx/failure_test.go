@@ -5798,3 +5798,51 @@ func TestTagAsteriskFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag question mark was treated as an asterisk")
 	}
 }
+
+func TestSanitizeFailureStripsTagAmpersand(t *testing.T) {
+	secret := "code&verifier12"
+	mark := "code\U000E0026verifier12"
+	encoded := "code%F3%A0%80%A6verifier12"
+	inserted := "code&\U000E0026verifier12"
+	mixedSecret := "rt*Zz9q&ab7f"
+	mixed := "rt\U000E002AZz9q\U000E0026ab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code&verifier12code&verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E0026verifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag ampersand leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0026 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag ampersand prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagAmpersandFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagAmpersandPieces(rawPieces("code\U000E0026verifier12"))
+	if !ok || renderPieces(folded) != "code&verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagAmpersandPieces(rawPieces("code&verifier12")); ok {
+		t.Fatalf("ascii ampersand was folded")
+	}
+	if foldTagAmpersandString("code\U000E002Averifier12") != "code\U000E002Averifier12" {
+		t.Fatalf("tag asterisk was treated as an ampersand")
+	}
+}

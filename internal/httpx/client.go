@@ -749,6 +749,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleAsterisk != needleQuestion {
 		spans = append(spans, exactSecretSpans(asteriskBase, needleAsterisk)...)
 	}
+	// Tag ampersand copies '&' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored ampersand. Folding it is a separate reading. It runs
+	// on the tag-asterisk reading so one secret can use both. The drop reading
+	// still runs, so an inserted tag ampersand cannot hide a token that has no
+	// ampersand.
+	ampersandBase := asteriskBase
+	if asterisked, ok := foldTagAsteriskPieces(asteriskBase); ok {
+		ampersandBase = asterisked
+	}
+	needleAmpersand := foldTagAmpersandString(needleAsterisk)
+	if amped, ok := foldTagAmpersandPieces(ampersandBase); ok {
+		spans = append(spans, exactSecretSpans(amped, needleAmpersand)...)
+	} else if needleAmpersand != needleAsterisk {
+		spans = append(spans, exactSecretSpans(ampersandBase, needleAmpersand)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1880,6 +1896,46 @@ func foldTagAsteriskString(s string) string {
 		return s
 	}
 	folded, _ := foldTagAsteriskPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagAmpersandPieces maps the Unicode tag ampersand to ASCII '&'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored ampersand written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagAmpersandPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0026 {
+			out = append(out, secretPiece{b: '&', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagAmpersandString(s string) string {
+	if !strings.ContainsRune(s, 0xE0026) {
+		return s
+	}
+	folded, _ := foldTagAmpersandPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
