@@ -1189,3 +1189,91 @@ func TestSegmentedASCIIFoldsOnlyDigits(t *testing.T) {
 		t.Fatalf("segmented fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsRomanNumerals(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"i", "\u2170",
+		"c", "\u217d",
+		"d", "\u217e",
+		"I", "\u2160",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "i", "%E2%85%B0", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"c", "\u217d",
+		"i", "\u2170",
+		"d", "\u217e",
+		"V", "\u2164",
+	).Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2161 later",
+		"see \u2163 later",
+		"see \u2171 later",
+		"archaic \u2180 later",
+		"chapter \u2160 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("roman prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestRomanASCIIFoldsOnlySingleLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x215F, 0, false},
+		{0x2160, 'I', true},
+		{0x2161, 0, false},
+		{0x2163, 0, false},
+		{0x2164, 'V', true},
+		{0x2169, 'X', true},
+		{0x216C, 'L', true},
+		{0x216D, 'C', true},
+		{0x216E, 'D', true},
+		{0x216F, 'M', true},
+		{0x2170, 'i', true},
+		{0x2171, 0, false},
+		{0x2174, 'v', true},
+		{0x2179, 'x', true},
+		{0x217C, 'l', true},
+		{0x217D, 'c', true},
+		{0x217E, 'd', true},
+		{0x217F, 'm', true},
+		{0x2180, 0, false},
+		{0x2183, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := romanASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := romanASCII(r); ok {
+			n++
+		}
+	}
+	if n != 14 {
+		t.Fatalf("roman fold count %d", n)
+	}
+}
