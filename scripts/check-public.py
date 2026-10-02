@@ -437,6 +437,17 @@ def component_private(part):
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
     # auth.json/payload.txt and a backslash twin are the same leak.
+    # Soft hyphen is a format character. Stripping it keeps a split auth.json
+    # blocked, but it also joins launch-history.json into one word. The hyphen
+    # reading is tried only after that strip reading fails.
+    if reason := component_path_reason(rel):
+        return reason
+    shy = chr(0x00AD)
+    if shy not in rel:
+        return ''
+    return component_path_reason(rel.replace(shy, '-'))
+
+def component_path_reason(rel):
     for part in Path(normalized_rel(rel)).parts:
         if component_private(part):
             return 'private state or generated artifact path'
@@ -513,6 +524,8 @@ def self_test():
         'codex_instances.json.gptbridge\U00010191backup-1', 'Copy of cache.sqlite\u2cbbwal',
         'launch\u1bf3history.json', 'cockpit\uaa7dprocess.json', 'nested/vault.db\u2cbashm/extra.txt',
         'auth.json.gptbridge\u174dbackup-1',
+        'launch\u00adhistory.json', 'cache.sqlite\u00adwal', 'vault.db\u00adjournal',
+        'nested/cockpit\u00adintegration.json', 'au\u00adth.json', 'Copy of cache.sqlite\u00adwal',
         'accounts.json.bak3', 'auth.json.backup2', 'credentials.json.1', '._auth.json',
         '._accounts.json', 'auth.json.~1~', 'auth.json~1', 'id_rsa.old2', 'tokens.json.orig2',
         'config.json.save1', 'home/.netrc.bak3', 'Copy of auth.json', 'auth (1).json',
@@ -706,6 +719,7 @@ def self_test():
         'models\u302f.json', 'notes\u0bbereadme.txt',
         'notes\u2010readme.txt', 'au\u2010th.json', 'script.go\u2212extra',
         'readme\u2014md', 'auth\u174djson',
+        'notes\u00ad.txt', 'script.go\u00adextra',
     )
     for rel in blocked:
         if not path_reason(rel):

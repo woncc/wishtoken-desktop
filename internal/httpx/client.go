@@ -364,6 +364,12 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	needle := foldHyphenString(secret)
 	folded := foldHyphenPieces(pieces)
 	spans := exactSecretSpans(folded, needle)
+	// Soft hyphen is a format character, so the drop pass below removes it.
+	// That joins a hyphenated token and misses the stored '-'. Folding it to
+	// '-' is a separate reading; the drop reading still runs.
+	if soft, ok := foldSoftHyphenPieces(folded); ok {
+		spans = append(spans, exactSecretSpans(soft, foldSoftHyphenString(needle))...)
+	}
 	dropped := dropMarkPieces(folded)
 	if len(dropped) != len(folded) {
 		spans = append(spans, exactSecretSpans(dropped, needle)...)
@@ -438,6 +444,41 @@ func hyphenFolded(s string) bool {
 		}
 	}
 	return false
+}
+
+func foldSoftHyphenPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == '\u00ad' {
+			out = append(out, secretPiece{b: '-', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldSoftHyphenString(s string) string {
+	if !strings.ContainsRune(s, '\u00ad') {
+		return s
+	}
+	folded, _ := foldSoftHyphenPieces(rawPieces(s))
+	return renderPieces(folded)
 }
 
 func hyphenLike(r rune) bool {

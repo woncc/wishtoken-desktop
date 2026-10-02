@@ -368,6 +368,17 @@ func TestSanitizeFailureStripsHyphenLookalikes(t *testing.T) {
 	if got := SanitizeFailure("re\u2014try later"); got != "re\u2014try later" {
 		t.Fatalf("em dash prose changed: %q", got)
 	}
+	shy := "code\u00adverifier12"
+	got = SanitizeFailure("rejected "+shy+" later", secret)
+	if strings.Contains(got, secret) || strings.Contains(got, shy) || strings.Contains(got, "verifier12") {
+		t.Fatalf("soft hyphen leaked: %q", got)
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("soft hyphen context lost: %q", got)
+	}
+	if plain := SanitizeFailure("slow\u00addown"); !strings.Contains(plain, "slow") || !strings.Contains(plain, "down") || strings.Contains(plain, "[redacted]") {
+		t.Fatalf("soft hyphen prose changed: %q", plain)
+	}
 	if got := SanitizeFailure("session_revoked_because_of_security_event"); got != "session_revoked_because_of_security_event" {
 		t.Fatalf("operator reason changed: %q", got)
 	}
