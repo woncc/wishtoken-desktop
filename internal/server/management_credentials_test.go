@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -241,5 +243,48 @@ func TestRedactHidesSecretsSplitBySpacingMarks(t *testing.T) {
 	}
 	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") {
 		t.Fatalf("note was rewritten: %s", out)
+	}
+}
+
+func TestManagementHidesJSONEscapedOAuthSecrets(t *testing.T) {
+	refresh := "rt_quote\"x<secret\\value\nzzTAIL99"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = refresh
+	acc.Name = "note " + refresh
+	acc.LastError = "rejected " + refresh[:8] + "\u093e" + refresh[8:]
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	if status != http.StatusOK || !json.Valid([]byte(body)) {
+		t.Fatalf("accounts: %d %s", status, body)
+	}
+	for _, leaked := range []string{refresh, "zzTAIL99", "x<secret", "quote\\\"x", "secret\\\\value"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, "one@example.test") || !strings.Contains(body, "note") || !strings.Contains(body, "rejected") {
+		t.Fatalf("context lost: %s", body)
+	}
+
+	note := "see " + refresh[:6] + "\u093e" + refresh[6:]
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(map[string]string{"error": note}); err != nil {
+		t.Fatal(err)
+	}
+	out := string(f.srv.redactManagementBody(buf.Bytes()))
+	if !json.Valid([]byte(out)) {
+		t.Fatalf("redacted log is not json: %s", out)
+	}
+	for _, leaked := range []string{"zzTAIL99", "x<secret", "\\\"x<secret", "secret\\\\value", refresh} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("log leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, "see") || !strings.Contains(out, "[redacted]") {
+		t.Fatalf("log context lost: %s", out)
 	}
 }
