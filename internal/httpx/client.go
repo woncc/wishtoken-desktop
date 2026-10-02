@@ -935,23 +935,81 @@ func escapeASCII(r rune) (byte, bool) {
 // solidus, number sign, dollar sign, ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
 // greater-than signs, the grave accent, the circumflex accent, the vertical
-// line, and the apostrophe, to ASCII. Credential redaction does not run NFKC.
+// line, the apostrophe, and the quotation mark, to ASCII. Credential
+// redaction does not run NFKC.
 // The percent fold is part of this result because the decode loop consumes
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))
+	return foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))
+	return foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))
 }
 
-// foldApostrophePieces maps the fullwidth apostrophe to ASCII '\”.
+// foldQuotationPieces maps the fullwidth quotation mark to ASCII quotation mark.
+// NFKC folds it, and this pass does not run NFKC, so a stored secret written
+// with that form would stay visible. Curly double quotes, the double prime,
+// and quotation ornaments do not fold to a quotation mark, so they stay out.
+// One output piece covers the original rune.
+func foldQuotationPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := quotationASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldQuotationString(s string) string {
+	if !quotationFolded(s) {
+		return s
+	}
+	return renderPieces(foldQuotationPieces(rawPieces(s)))
+}
+
+func quotationFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := quotationASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func quotationASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFF02:
+		return '"', true
+	default:
+		return 0, false
+	}
+}
+
+// foldApostrophePieces maps the fullwidth apostrophe to ASCII apostrophe.
 // NFKC folds it, and this pass does not run NFKC, so a stored secret written
 // with that form would stay visible. Curly single quotes, the modifier
-// apostrophe, prime, and the Armenian apostrophe do not fold to '\”, so
-// they stay out. One output piece covers the original rune.
+// apostrophe, prime, and the Armenian apostrophe do not fold to apostrophe,
+// so they stay out. One output piece covers the original rune.
 func foldApostrophePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

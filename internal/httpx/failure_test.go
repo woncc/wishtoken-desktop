@@ -2820,3 +2820,64 @@ func TestApostropheASCIIFoldsOnlyApostrophes(t *testing.T) {
 		t.Fatalf("apostrophe fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsQuotationMarks(t *testing.T) {
+	secret := "code\"ver\"1"
+	marked := strings.NewReplacer("\"", "\uFF02").Replace(secret)
+	encoded := strings.NewReplacer("\"", "%EF%BC%82").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u201C later",
+		"see \u201D later",
+		"see \u201E later",
+		"see \u2033 later",
+		"see \u301D later",
+		"see \u275D later",
+		"path \uFF02 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("quotation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestQuotationASCIIFoldsOnlyQuotationMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF02, '"', true},
+		{'"', 0, false},
+		{0x201C, 0, false},
+		{0x201D, 0, false},
+		{0x201E, 0, false},
+		{0x2033, 0, false},
+		{0x301D, 0, false},
+		{0x275D, 0, false},
+		{0xFF07, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := quotationASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := quotationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("quotation fold count %d", n)
+	}
+}
