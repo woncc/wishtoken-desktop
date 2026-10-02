@@ -749,9 +749,10 @@ func rupeeASCII(r rune) (string, bool) {
 // foldSquarePieces maps CJK square symbols to the ASCII sequences NFKC
 // produces. This pass does not run NFKC, so a stored secret written with
 // those forms would stay visible. Each output byte keeps the original
-// rune's range. Squares whose compatibility decomposition is not ASCII
-// stay out. The rupee sign is folded separately. Double colon equal and
-// the vertical two-dot leader stay out; the leader is read as a colon
+// rune's range. Squares that decompose through a division slash emit an
+// ASCII solidus instead. Squares whose remaining decomposition is not
+// ASCII stay out. The rupee sign is folded separately. Double colon equal
+// and the vertical two-dot leader stay out; the leader is read as a colon
 // when a proxy password is split.
 func foldSquarePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -900,6 +901,10 @@ func squareASCII(r rune) (string, bool) {
 		return "m3", true
 	case 0x33A6:
 		return "km3", true
+	case 0x33A7:
+		return "m/s", true
+	case 0x33A8:
+		return "m/s2", true
 	case 0x33A9:
 		return "Pa", true
 	case 0x33AA:
@@ -910,6 +915,10 @@ func squareASCII(r rune) (string, bool) {
 		return "GPa", true
 	case 0x33AD:
 		return "rad", true
+	case 0x33AE:
+		return "rad/s", true
+	case 0x33AF:
+		return "rad/s2", true
 	case 0x33B0:
 		return "ps", true
 	case 0x33B1:
@@ -944,6 +953,8 @@ func squareASCII(r rune) (string, bool) {
 		return "cc", true
 	case 0x33C5:
 		return "cd", true
+	case 0x33C6:
+		return "C/kg", true
 	case 0x33C7:
 		return "Co.", true
 	case 0x33C8:
@@ -990,6 +1001,10 @@ func squareASCII(r rune) (string, bool) {
 		return "Sv", true
 	case 0x33DD:
 		return "Wb", true
+	case 0x33DE:
+		return "V/m", true
+	case 0x33DF:
+		return "A/m", true
 	case 0x33FF:
 		return "gal", true
 	default:

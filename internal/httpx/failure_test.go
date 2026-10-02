@@ -4302,11 +4302,15 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 		{0x33A4, "cm3"},
 		{0x33A5, "m3"},
 		{0x33A6, "km3"},
+		{0x33A7, "m/s"},
+		{0x33A8, "m/s2"},
 		{0x33A9, "Pa"},
 		{0x33AA, "kPa"},
 		{0x33AB, "MPa"},
 		{0x33AC, "GPa"},
 		{0x33AD, "rad"},
+		{0x33AE, "rad/s"},
+		{0x33AF, "rad/s2"},
 		{0x33B0, "ps"},
 		{0x33B1, "ns"},
 		{0x33B3, "ms"},
@@ -4324,6 +4328,7 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 		{0x33C3, "Bq"},
 		{0x33C4, "cc"},
 		{0x33C5, "cd"},
+		{0x33C6, "C/kg"},
 		{0x33C7, "Co."},
 		{0x33C8, "dB"},
 		{0x33C9, "Gy"},
@@ -4347,9 +4352,11 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 		{0x33DB, "sr"},
 		{0x33DC, "Sv"},
 		{0x33DD, "Wb"},
+		{0x33DE, "V/m"},
+		{0x33DF, "A/m"},
 		{0x33FF, "gal"},
 	}
-	if len(checks) != 95 {
+	if len(checks) != 102 {
 		t.Fatalf("square table %d", len(checks))
 	}
 	for _, check := range checks {
@@ -4358,7 +4365,7 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
 		}
 	}
-	for _, r := range []rune{'k', 'g', '.', 0x20A8, 0x2A74, 0xFE30, 0x3382, 0x338C, 0x33C0, 0x1F190, 0x1F14A} {
+	for _, r := range []rune{'k', 'g', '/', '.', 0x2215, 0x20A8, 0x2A74, 0xFE30, 0x3328, 0x3382, 0x338C, 0x33C0, 0x1F190, 0x1F14A} {
 		if _, ok := squareASCII(r); ok {
 			t.Fatalf("U+%04X should stay out", r)
 		}
@@ -4369,8 +4376,64 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 			n++
 		}
 	}
-	if n != 95 {
+	if n != 102 {
 		t.Fatalf("square fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsSquareDivisionSlashes(t *testing.T) {
+	pairs := []struct {
+		secret string
+		plain  string
+		mark   string
+	}{
+		{"rt_Zz9qm/s7f3a", "m/s", "\u33A7"},
+		{"rt_Aa8krad/s2x", "rad/s2", "\u33AF"},
+		{"rt_Bb7mC/kg7f3", "C/kg", "\u33C6"},
+		{"rt_Cc6nV/m7f3a", "V/m", "\u33DE"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.plain, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.plain)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "m/s", "%E3%8E%A7")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[1].secret, "rad/s2", "\u33AF")
+	got = SanitizeFailure("rejected "+pairs[1].secret+" later", stored)
+	for _, item := range []string{pairs[1].secret, stored, "Aa8k", "rad/s2", "x"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u33A7 later",
+		"see \u33A8 later",
+		"see \u33AE later",
+		"see \u33AF later",
+		"see \u33C6 later",
+		"see \u33DE later",
+		"see \u33DF later",
+		"see \u2215 later",
+		"see m/s later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("square slash prose changed: %q -> %q", prose, got)
+		}
 	}
 }
 
