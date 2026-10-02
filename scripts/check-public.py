@@ -57,6 +57,14 @@ DOT_LIKE = {
     ord('\ua4f8'): '.',
     ord('\U00010a50'): '.',
     ord('\uabec'): '.',
+    # Unicode confusables map these to FULL STOP, and none of them NFKC-fold
+    # to '.'. Arabic-indic zero and the extended zero are the digit forms.
+    # The siyaq half maps through that zero, and the musical augmentation
+    # dot is a combining mark rather than a letter.
+    ord('\u0660'): '.',
+    ord('\u06f0'): '.',
+    ord('\U0001ecae'): '.',
+    ord('\U0001d16d'): '.',
 }
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
 # Mongolian colon and Bamum colon are the same kind of separator.
@@ -137,6 +145,12 @@ COLON_LIKE = {
     ord('\U000119DF'): ':',
     ord('\U00011A39'): ':',
     ord('\U00011C3E'): ':',
+    # These symbols do not NFKC-fold to ':'. Ethiopic short rikrik, musical
+    # repeat dots, and Tolong Siki sela still separate a following private
+    # name. Greek acrophonic two is a letter-number and stays unmapped.
+    ord('\u1393'): ':',
+    ord('\U0001d108'): ':',
+    ord('\U00011dd9'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -277,6 +291,9 @@ SEPARATOR_LIKE = {
     ord('\u2572'): '/',
     ord('\u27cb'): '/',
     ord('\u27cd'): '/',
+    # The caret insertion point does not NFKC-fold to a slash, but it is
+    # confusable with one and still splits a private name from the next part.
+    ord('\u2041'): '/',
 }
 
 def normalized_rel(rel):
@@ -464,6 +481,16 @@ def self_test():
         'auth\ua4f8json', 'accounts\U00010a50json', 'credentials\uabecjson',
         '\U00010a50netrc', 'id_rsa\ua4f8txt', 'Copy of auth\uabecjson',
         'nested/tokens\ua4f8json/extra.txt', 'auth\ua4f8\ua4f8json',
+        'auth\u0660json', 'accounts\u06f0json', 'credentials\U0001ecaejson',
+        '\u0660netrc', '\u06f0env', 'id_rsa\U0001d16dtxt', 'secrets\u06f0env',
+        'auth\u0660json.txt', 'Copy of auth\u06f0json', 'auth\u0660\u0660json',
+        'nested/tokens\U0001ecaejson/extra.txt', 'ID_ED25519\u0660TXT',
+        'auth.json\u2041secret.txt', 'credentials\u2041token.txt', 'notes\u2041id_rsa',
+        'nested/id_rsa\u2041x', 'Diagnostics\u2041capture.png', 'tokens.json\u2041extra.txt',
+        'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
+        'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
+        'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
+        'readme\u1393auth\u0660json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -505,6 +532,9 @@ def self_test():
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
         'models.json\u0589readme',
+        'notes\u0660txt', 'script\u06f0go', 'models\U0001ecaejson', 'id_rsa\u0660pub', 'readme\U0001d16dmd',
+        'notes\u2041readme.txt', 'script.go\u2041Zone.Identifier', 'id_rsa.pub\u2041foo.txt',
+        'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
     )
     for rel in blocked:
         if not path_reason(rel):

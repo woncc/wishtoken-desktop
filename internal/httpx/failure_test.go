@@ -121,6 +121,15 @@ func TestSanitizeFailureStripsVisarga(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsSignColons(t *testing.T) {
+	const password = "s3cret-proxy"
+	text := "dial http://user\u1393" + password + "@127.0.0.1:7890 and http://user\U0001D108" + password + "\uFF2010.0.0.8:1080 and http://user\U00011DD9" + password + "@10.0.0.8:1080 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, "\u1393"+password) || strings.Contains(got, "\U0001D108"+password) || strings.Contains(got, "\U00011DD9"+password) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("proxy failure: %q", got)
+	}
+}
+
 func TestSanitizeFailureStripsAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"
