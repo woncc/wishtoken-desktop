@@ -126,6 +126,11 @@ const SECRET_TEXT = [
 // A colon before the username is a boundary too, including those lookalikes.
 // Otherwise "note :user:secret@10.1:8080" and
 // "note \u0705user:secret@10.1:8080" keep the password.
+// U+1365 and U+1366 are the Ethiopic colon and preface colon. They do not
+// fold to ":". Otherwise "user\u1365secret@127.0.0.1:7890" and
+// "user:secret@my-proxy\u13657890" keep the password.
+// A colon before the username is a boundary too, including these marks.
+// Otherwise "note \u1365user:secret@10.1:8080" keeps the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -139,7 +144,7 @@ const SECRET_TEXT = [
 // U+3002 does not fold to ".". U+FE12 and U+FF61 fold to U+3002. Those marks
 // already end a host, but "user:secret@127%E3%80%820%E3%80%820%E3%80%821:7890"
 // kept the password because they did not split labels.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393]';
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
@@ -156,7 +161,10 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // U+0705 through U+0709 are the remaining Syriac colons. They do not fold to
 // ":" either. A colon before the username is a boundary too, including these
 // marks, or "note :user:secret@10.1:8080" keeps the password.
-const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709'];
+// U+1365 and U+1366 are the Ethiopic colon and preface colon. They do not fold
+// to ":" either. A colon before the username is a boundary too, including
+// these marks, or "note \u1365user:secret@10.1:8080" keeps the password.
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u1365', '\u1366'];
 function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
