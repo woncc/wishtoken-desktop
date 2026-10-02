@@ -85,6 +85,15 @@ func TestSanitizeFailureStripsProxyPasswords(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsColonOperators(t *testing.T) {
+	const password = "s3cret-proxy"
+	text := "dial http://user\u205d" + password + "@127.0.0.1:7890 and http://user\u2254" + password + "\uFF2010.0.0.8:1080 and http://user\u2af6" + password + "@10.0.0.8:1080 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, "\u205d"+password) || strings.Contains(got, "\u2254"+password) || strings.Contains(got, "\u2af6"+password) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("proxy failure: %q", got)
+	}
+}
+
 func TestSanitizeFailureStripsAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"

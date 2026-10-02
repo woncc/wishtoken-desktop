@@ -62,6 +62,14 @@ COLON_LIKE = {
     # NFKC expands this to '::=', which leaves '=' stuck to the next name.
     # Fold it before normalization so the stream split still sees that name.
     ord('\u2a74'): ':',
+    # These do not NFKC-fold to ':'. Tricolon, colon-equals, equals-colon,
+    # the Z notation type colon, and the triple colon operator still separate
+    # a following private name.
+    ord('\u205d'): ':',
+    ord('\u2254'): ':',
+    ord('\u2255'): ':',
+    ord('\u2982'): ':',
+    ord('\u2af6'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -343,6 +351,8 @@ def self_test():
         'docs\U00010782credentials.json', 'nested/file\U00010781accounts.json', 'ID_RSA\U00010782x',
         'readme\u2a74auth.json', 'notes\u2a74id_rsa', 'docs\u2a74credentials.json',
         'nested/file\u2a74accounts.json', 'ID_RSA\u2a74x', 'file\u2a74.netrc',
+        'readme\u205dauth.json', 'notes\u2254id_rsa', 'file\u2255credentials.json',
+        'docs\u2982accounts.json', 'nested/file\u2af6.netrc', 'ID_RSA\u205dx',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -365,6 +375,7 @@ def self_test():
         'notes\u1804readme.txt', 'script.go\ua6f4Zone.Identifier', 'models.json\u1804readme.txt',
         'notes\U00010781readme.txt', 'script.go\U00010782Zone.Identifier', 'models.json\U00010781readme.txt',
         'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
+        'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
         'models.json\u0589readme',
     )
     for rel in blocked:
