@@ -383,9 +383,10 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	}
 }
 
-// dropMarkPieces removes variation selectors and other marks that do not add
-// a base letter. The original byte range of a match still covers a mark that
-// was sitting inside the secret.
+// dropMarkPieces removes characters that do not add a base letter: variation
+// selectors and other nonspacing or enclosing marks, plus format characters
+// such as zero-width spaces, joiners, and byte-order marks. The original byte
+// range of a match still covers one that was sitting inside the secret.
 func dropMarkPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -397,7 +398,7 @@ func dropMarkPieces(in []secretPiece) []secretPiece {
 		if size <= 0 {
 			break
 		}
-		if r != utf8.RuneError && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r)) {
+		if r != utf8.RuneError && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Cf, r)) {
 			i += size
 			continue
 		}

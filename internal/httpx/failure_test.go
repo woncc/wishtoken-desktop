@@ -187,3 +187,33 @@ func TestSanitizeFailureStripsMarksInsideCredentials(t *testing.T) {
 		t.Fatalf("operator text changed: %q", SanitizeFailure(plain))
 	}
 }
+
+func TestSanitizeFailureStripsFormatCharactersInsideCredentials(t *testing.T) {
+	secret := "code+verifier12"
+	markedSecret := "code+\u200Bverifier12"
+	refresh := "rt_submitted_123456"
+	zwsp := "rt_\u200Bsubmitted_123456"
+	joiner := "rt_sub\u2060mitted_123456"
+	bom := "rt_submitted_\uFEFF123456"
+	encoded := "rt_%E2%80%8Bsubmitted_123456"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u200DdXJl"
+	text := "rejected " + markedSecret + " " + zwsp + " " + joiner + " " + bom + " " + encoded + " " + markedJWT + " later"
+	got := SanitizeFailure(text, secret)
+	for _, leaked := range []string{secret, markedSecret, refresh, zwsp, joiner, bom, encoded, "submitted_123456", jwt, "eyJ", "c2lnbmF0dXJl"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	plain := "slow\u200Bdown"
+	if SanitizeFailure(plain) != plain {
+		t.Fatalf("operator text changed: %q", SanitizeFailure(plain))
+	}
+	snake := "session_revoked_\u200Bbecause_of_security_event"
+	if SanitizeFailure(snake) != snake {
+		t.Fatalf("operator reason changed: %q", SanitizeFailure(snake))
+	}
+}
