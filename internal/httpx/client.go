@@ -4354,7 +4354,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // the dot radical, the very heavy reverse solidus, the Greek notation
 // slashes, and the kana repeat lower half. This pass does not run NFKC.
 // Forward solidus lookalikes fold to '/'. The dot radical's ideograph
-// folds here too. Letters and other ideographs stay out.
+// folds here too. Reverse solidus preceding subset expands to a backslash
+// plus a syllabic letter and does not NFKC-fold to a backslash. It stays
+// one backslash so that letter cannot glue the token back together.
+// The syllabic letter itself stays out. Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -4401,7 +4404,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
+	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
 		return '\\', true
 	default:
 		return 0, false
@@ -4679,7 +4682,9 @@ func parenASCII(r rune) (byte, bool) {
 // Greek notation slashes and the kana repeat lower half. The full vertical
 // kana repeat stays out. Katakana no and Old Coptic esh fold to '/'.
 // Hiragana no stays out. Coptic old Nubian full stop expands to two
-// reverse solidi, so it stays out. Other letters stay out.
+// reverse solidi, so it stays out. Superset preceding solidus expands
+// to a syllabic letter plus a slash and stays one slash. The syllabic
+// letters stay out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -4728,7 +4733,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
