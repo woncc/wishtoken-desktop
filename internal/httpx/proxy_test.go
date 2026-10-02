@@ -1192,3 +1192,26 @@ func TestRedactHidesColonInProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesCommercialAtInProxyPassword(t *testing.T) {
+	const password = "s3cret@proxy"
+	full := strings.NewReplacer("@", "\uFF20").Replace(password)
+	small := strings.NewReplacer("@", "\uFE6B").Replace(password)
+	encoded := strings.NewReplacer("@", "%EF%BC%A0").Replace(password)
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + full,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, full, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+}

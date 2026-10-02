@@ -935,17 +935,74 @@ func escapeASCII(r rune) (byte, bool) {
 // solidus, number sign, dollar sign, ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
 // greater-than signs, the grave accent, the circumflex accent, the vertical
-// line, the apostrophe, the quotation mark, and the colon, to ASCII.
-// Credential redaction does not run NFKC.
+// line, the apostrophe, the quotation mark, the colon, and the commercial
+// at, to ASCII. Credential redaction does not run NFKC.
 // The percent fold is part of this result because the decode loop consumes
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))
+}
+
+// foldCommercialAtPieces maps the small and fullwidth commercial at to
+// ASCII '@'. NFKC folds them, and this pass does not run NFKC, so a stored
+// secret written with those forms would stay visible. This pass does not
+// decide where a proxy password ends. No other character NFKC-folds to '@',
+// so at-shaped marks stay out. One output piece covers the original rune.
+func foldCommercialAtPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := commercialAtASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldCommercialAtString(s string) string {
+	if !commercialAtFolded(s) {
+		return s
+	}
+	return renderPieces(foldCommercialAtPieces(rawPieces(s)))
+}
+
+func commercialAtFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := commercialAtASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func commercialAtASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE6B, 0xFF20:
+		return '@', true
+	default:
+		return 0, false
+	}
 }
 
 // foldColonPieces maps vertical, small, and fullwidth colons to ASCII ':'.
