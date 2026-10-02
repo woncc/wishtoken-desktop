@@ -4351,8 +4351,9 @@ func numberSignASCII(r rune) (byte, bool) {
 // backslash do not, but a management response can still hide a stored
 // backslash with them. Falling diagonals do not either: the box drawing, the
 // mathematical falling diagonal, the squared falling diagonal, CJK stroke D,
-// the dot radical, and the very heavy reverse solidus. This pass does not
-// run NFKC. Forward solidus lookalikes fold to '/'. Ideographs stay out.
+// the dot radical, the very heavy reverse solidus, and the Greek notation
+// slashes. This pass does not run NFKC. Forward solidus lookalikes fold to
+// '/'. Letters, kana, and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -4399,7 +4400,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x31D4, 0xFE68, 0xFF3C, 0x1F67D:
+	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x31D4, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
 		return '\\', true
 	default:
 		return 0, false
@@ -4667,10 +4668,11 @@ func parenASCII(r rune) (byte, bool) {
 // diagonal, CJK strokes P and SP, the slash radical, and the double and
 // triple solidus operators. Each of those stays one slash, so an expanded
 // form cannot glue the token back together. This pass does not run NFKC.
-// A reverse solidus folds to a backslash on its own pass. Greek notation
-// slashes and the kana repeat mark stay out. Tilde operator, swung dash,
-// and wave dash do not fold to '~'. Small tilde expands to a space plus a
-// mark, so it stays out. One output piece covers the original rune.
+// A reverse solidus folds to a backslash on its own pass, including the
+// Greek notation slashes. The kana repeat mark stays out. Letters stay out.
+// Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
+// expands to a space plus a mark, so it stays out. One output piece covers
+// the original rune.
 func foldSolidusTildePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

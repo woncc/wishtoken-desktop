@@ -1682,6 +1682,28 @@ func TestSanitizeFailureStripsDiagonalSlashes(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsGreekNotationSlashes(t *testing.T) {
+	secret := "code\\ver\\1"
+	vocal := strings.ReplaceAll(secret, "\\", "\U0001d20f")
+	inst47 := strings.ReplaceAll(secret, "\\", "\U0001d23a")
+	inst48 := strings.ReplaceAll(secret, "\\", "\U0001d23b")
+	encoded := strings.ReplaceAll(secret, "\\", "%F0%9D%88%8F")
+	got := SanitizeFailure("rejected "+vocal+" "+encoded+" "+inst47+" "+inst48+" later", secret)
+	for _, item := range []string{secret, vocal, inst47, inst48, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001d20f later", "see \u3035 later", "see \u30ce later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("greek prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
 func TestSanitizeFailureStripsParentheses(t *testing.T) {
 	secret := "code(ver)1"
 	marked := strings.NewReplacer("(", "\u207d", ")", "\u208e").Replace(secret)
@@ -1968,10 +1990,14 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x29C5, '\\', true},
 		{0x2F02, '\\', true},
 		{0x31D4, '\\', true},
+		{0x1D20F, '\\', true},
+		{0x1D23A, '\\', true},
+		{0x1D23B, '\\', true},
 		{0x1F67D, '\\', true},
 		{'\\', 0, false},
 		{0x2215, 0, false},
 		{0x2044, 0, false},
+		{0x3035, 0, false},
 		{0x4E36, 0, false},
 		{0xFF0F, 0, false},
 	}
@@ -1987,7 +2013,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 15 {
+	if n != 18 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
