@@ -417,3 +417,61 @@ test('renderer text drops proxy passwords hidden by an encoded at-sign', () => {
   assert.equal(delivered.accounts[0].last_error, 'dial http://127.0.0.1:7890 failed');
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops schemeless proxy passwords on an encoded port or an alternate numeric host', () => {
+  const cases = [
+    ['user:s3cret-token@127.0.0.1%3A7890', '127.0.0.1%3A7890'],
+    ['user:s3cret-token@127.0.0.1%3a7890', '127.0.0.1%3a7890'],
+    ['(user:s3cret-token@127.0.0.1%3A7890)', '(127.0.0.1%3A7890)'],
+    ['user:s3cret-token%40my-proxy%3A7890).', 'my-proxy%3A7890).'],
+    ['//user:s3cret-token@10.0.0.8%3A1080', '//10.0.0.8%3A1080'],
+    ['via user:s3cret proxy@127.0.0.1%3A8080 failed', 'via 127.0.0.1%3A8080 failed'],
+    ['via user:s3cret proxy%4010.1.1.1%3A8080 failed', 'via 10.1.1.1%3A8080 failed'],
+    ['user:p@ss@127.0.0.1%3A7890', '127.0.0.1%3A7890'],
+    ['note user:s3cret-token@[::1]%3A8792', 'note [::1]%3A8792'],
+    ['user:s3cret-token@127.1:7890', '127.1:7890'],
+    ['(user:s3cret-token@127.0.1:80)', '(127.0.1:80)'],
+    ['dial user:s3cret-token@10.1:8080 failed', 'dial 10.1:8080 failed'],
+    ['user:s3cret-token@0x7f000001:7890', '0x7f000001:7890'],
+    ['user:s3cret-token@0X7F000001:7890', '0X7F000001:7890'],
+    ['user:s3cret-token@2130706433:7890', '2130706433:7890'],
+    ['user:s3cret-token@0177.0.0.1:7890', '0177.0.0.1:7890'],
+    ['user:s3cret-token@0x7f.0.0.1:7890', '0x7f.0.0.1:7890'],
+    ['two user:s3cret-token@127.1:7890) and user:other-secret@10.0.0.8%3A1080.', 'two 127.1:7890) and 10.0.0.8%3A1080.'],
+    ['http://user:s3cret-token@127.1:7890/x', 'http://127.1:7890/x'],
+    ['socks5://alice:hunter2@2130706433:1080', 'socks5://2130706433:1080']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('other-secret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('p@ss'), false);
+  }
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic('Build v1:2%40beta'), 'Build v1:2%40beta');
+  assert.equal(redactPublic('user:s3cret@internal'), 'user:s3cret@internal');
+  assert.equal(redactPublic('user:s3cret%40internal'), 'user:s3cret%40internal');
+  assert.equal(redactPublic('user:s3cret@127.1'), 'user:s3cret@127.1');
+  assert.equal(redactPublic('user:s3cret@10.1'), 'user:s3cret@10.1');
+  assert.equal(redactPublic('user:s3cret@2130706433'), 'user:s3cret@2130706433');
+  assert.equal(redactPublic('user:s3cret@0x7f000001'), 'user:s3cret@0x7f000001');
+  assert.equal(redactPublic('score 1:2@10.5'), 'score 1:2@10.5');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic('note 100%40off sale'), 'note 100%40off sale');
+  assert.equal(redactPublic('http://user@127.0.0.1%3A7890'), 'http://user@127.0.0.1%3A7890');
+  assert.equal(redactPublic('http://user%3A@127.0.0.1%3A7890'), 'http://user%3A@127.0.0.1%3A7890');
+  const proxy = 'http://user:s3cret-token@127.0.0.1:7890';
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: 'note user:s3cret-token@127.1:7890', email: 'a@example.test', last_error: 'dial user:s3cret-token@127.0.0.1%3A7890 failed' }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note 127.1:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial 127.0.0.1%3A7890 failed');
+  assert.equal(snap.settings.proxy_url, proxy);
+});
