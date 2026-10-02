@@ -1023,6 +1023,16 @@ def fold_content(data):
             out.append(mapped)
             changed = True
             continue
+        # Hyphen lookalikes are the same set the path check uses. This pass
+        # does not run NFKC, so a token, JWT, or PEM header written with one
+        # stayed split. Fold them before marks are dropped: a spacing hyphen
+        # would otherwise disappear, and the header would no longer match.
+        # Soft hyphen is format, not in this table, and stays on its own fold.
+        mapped = HYPHEN_LIKE.get(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
         # visible to the byte patterns. Cc and line separators stay, so a
         # wrapped line is not joined.
@@ -1608,6 +1618,22 @@ def self_test():
         raise SystemExit('self-test failed: a low line JWT was not detected')
     if content_reasons('see \u2017 later'.encode()) or content_reasons('see \u02cd later'.encode()) or content_reasons('low \uff3f line'.encode()) or content_reasons(('sk-' + '\ufe4d' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2017' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u02cd' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary low line text was blocked')
+    if len(HYPHEN_LIKE) != 37 or HYPHEN_LIKE[0x2011] != '-' or HYPHEN_LIKE[0x2013] != '-' or HYPHEN_LIKE[0x2014] != '-' or HYPHEN_LIKE[0x2015] != '-' or HYPHEN_LIKE[0x2212] != '-' or HYPHEN_LIKE[0x05BE] != '-' or HYPHEN_LIKE[0x207B] != '-' or HYPHEN_LIKE[0x208B] != '-' or HYPHEN_LIKE[0x2E3A] != '-' or HYPHEN_LIKE[0x301C] != '-' or HYPHEN_LIKE[0xFF0D] != '-' or HYPHEN_LIKE.get(0x2016) is not None or HYPHEN_LIKE.get(0x00AD) is not None or HYPHEN_LIKE.get(ord('-')) is not None:
+        raise SystemExit('self-test failed: hyphen lookalike table is wrong')
+    hy_nb = ('rt_sub' + '\u2011' + 'mitted_' + 'a' * 14).encode()
+    hy_minus = ('sk-' + 'a' * 10 + '\u2212' + 'a' * 14).encode()
+    hy_maqaf = ('ghp_' + 'a' * 10 + '\u05be' + 'a' * 14).encode()
+    hy_super = ('gho_' + 'a' * 12 + '\u207b' + 'a' * 12).encode()
+    hy_wave = ('eyJ' + 'a' * 20 + '\u301c' + 'a' * 4 + '.' + 'b' * 30 + '.' + 'c' * 15).encode()
+    hy_pem = ('\u2014' * 5 + 'BEGIN OPENSSH PRIVATE KEY' + '\u2014' * 5).encode()
+    if content_reasons(hy_nb) != ['secret token literal'] or content_reasons(hy_minus) != ['secret token literal'] or content_reasons(hy_maqaf) != ['secret token literal'] or content_reasons(hy_super) != ['secret token literal']:
+        raise SystemExit('self-test failed: a hyphen-lookalike token was not detected')
+    if content_reasons(hy_wave) != ['JWT literal']:
+        raise SystemExit('self-test failed: a hyphen-lookalike JWT was not detected')
+    if content_reasons(hy_pem) != ['private key']:
+        raise SystemExit('self-test failed: a hyphen-lookalike private key was not detected')
+    if content_reasons('re\u2013try later'.encode()) or content_reasons('re\u2014try later'.encode()) or content_reasons('re\u05betry later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2016' + 'a' * 20).encode()) or content_reasons(('----' + '\u00ad' + 'BEGIN OPENSSH PRIVATE KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary hyphen text was blocked')
 
 def main():
     self_test()
