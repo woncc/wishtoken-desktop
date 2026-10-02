@@ -320,7 +320,7 @@ func MaskEncodedSecret(s, secret, repl string) string {
 		// layer. Spans keep the original indexes, so the surrounding text
 		// is not rewritten.
 		folded := foldCredentialPieces(pieces)
-		next := decodePieces(folded)
+		next := decodePieces(foldTagPercentDecode(folded))
 		if len(next) == len(folded) {
 			break
 		}
@@ -475,6 +475,39 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 		spans = append(spans, exactSecretSpans(equaled, needleEquals)...)
 	} else if needleEquals != needlePlus {
 		spans = append(spans, exactSecretSpans(equalsBase, needleEquals)...)
+	}
+	// Tag percent copies '%' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That misses a stored
+	// percent. Folding it is a separate reading and is not part of
+	// foldCredentialPieces: that fold is what the drop reading sees, and an
+	// inserted tag percent must still disappear instead of becoming '%'.
+	// Decode applies the same map to a copy so an escape written with a tag
+	// percent still opens the next layer.
+	percentBase := equalsBase
+	if equaled, ok := foldTagEqualsPieces(equalsBase); ok {
+		percentBase = equaled
+	}
+	needlePercent := foldTagPercentString(needleEquals)
+	if percented, ok := foldTagPercentPieces(percentBase); ok {
+		spans = append(spans, exactSecretSpans(percented, needlePercent)...)
+	} else if needlePercent != needleEquals {
+		spans = append(spans, exactSecretSpans(percentBase, needlePercent)...)
+	}
+	// Tag commercial at copies '@' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits an address
+	// or token and misses the stored at sign. Folding it is a separate
+	// reading. It runs on the tag-percent reading so one secret can use both.
+	// The drop reading still runs, so an inserted tag at sign cannot hide a
+	// token that has no at sign.
+	atBase := percentBase
+	if percented, ok := foldTagPercentPieces(percentBase); ok {
+		atBase = percented
+	}
+	needleAt := foldTagCommercialAtString(needlePercent)
+	if ated, ok := foldTagCommercialAtPieces(atBase); ok {
+		spans = append(spans, exactSecretSpans(ated, needleAt)...)
+	} else if needleAt != needlePercent {
+		spans = append(spans, exactSecretSpans(atBase, needleAt)...)
 	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
@@ -913,6 +946,96 @@ func foldTagEqualsString(s string) string {
 		return s
 	}
 	folded, _ := foldTagEqualsPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagPercentPieces maps the Unicode tag percent sign to ASCII '%'. It
+// does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored percent written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagPercentPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0025 {
+			out = append(out, secretPiece{b: '%', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagPercentString(s string) string {
+	if !strings.ContainsRune(s, 0xE0025) {
+		return s
+	}
+	folded, _ := foldTagPercentPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagPercentDecode maps tag percent signs for the percent-decoder only.
+// The drop reading keeps the original pieces, so an inserted tag percent is
+// still removed instead of becoming a literal '%'.
+func foldTagPercentDecode(in []secretPiece) []secretPiece {
+	if folded, ok := foldTagPercentPieces(in); ok {
+		return folded
+	}
+	return in
+}
+
+// foldTagCommercialAtPieces maps the Unicode tag commercial at to ASCII '@'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored at sign written with a tag would
+// stay visible. One output piece covers the original rune. The drop reading
+// still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagCommercialAtPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0040 {
+			out = append(out, secretPiece{b: '@', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagCommercialAtString(s string) string {
+	if !strings.ContainsRune(s, 0xE0040) {
+		return s
+	}
+	folded, _ := foldTagCommercialAtPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
@@ -1811,6 +1934,12 @@ func escapeFolded(s string) bool {
 }
 
 func escapeASCII(r rune) (byte, bool) {
+	// Tag percent is a format character. It stays out of percentASCII so the
+	// credential drop reading can still remove an inserted one. This fold is
+	// only used to find a percent-encoded colon in proxy userinfo.
+	if r == 0xE0025 {
+		return '%', true
+	}
 	if b, ok := percentASCII(r); ok {
 		return b, true
 	}

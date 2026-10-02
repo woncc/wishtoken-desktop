@@ -106,7 +106,7 @@ func maskCredentialPatterns(detail string) string {
 			spans = append(spans, credentialPatternSpans(rendered, dropped)...)
 			spans = append(spans, gluedBearerSpans(rendered, dropped)...)
 		}
-		next := decodePieces(folded)
+		next := decodePieces(foldTagPercentDecode(folded))
 		if len(next) == len(folded) {
 			break
 		}
