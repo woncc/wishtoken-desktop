@@ -360,10 +360,11 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Fold first, then drop
-	// marks. Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(secret))
-	folded := foldDotPieces(foldHyphenPieces(pieces))
+	// token together and miss the stored ASCII byte. Fullwidth letters and
+	// digits are folded first. Then drop marks. Spacing marks shaped like
+	// full stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(secret)))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(pieces)))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -511,6 +512,62 @@ func hyphenLike(r rune) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// foldFullwidthPieces maps fullwidth letters and digits to ASCII.
+// NFKC folds them, and this pass does not run NFKC, so a stored token or a
+// JWT written with those forms would stay visible. Fullwidth punctuation is
+// left to the separator folds. One output piece covers the original rune.
+func foldFullwidthPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := fullwidthASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldFullwidthString(s string) string {
+	if !fullwidthFolded(s) {
+		return s
+	}
+	return renderPieces(foldFullwidthPieces(rawPieces(s)))
+}
+
+func fullwidthFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := fullwidthASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func fullwidthASCII(r rune) (byte, bool) {
+	switch {
+	case r >= '\uff10' && r <= '\uff19', r >= '\uff21' && r <= '\uff3a', r >= '\uff41' && r <= '\uff5a':
+		return byte(r - 0xfee0), true
+	default:
+		return 0, false
 	}
 }
 

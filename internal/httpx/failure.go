@@ -83,13 +83,14 @@ func maskCredentialPatterns(detail string) string {
 	pieces := rawPieces(detail)
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
-		// Fold hyphen lookalikes and full stops before the ASCII token
-		// classes run, and before marks are dropped. A non-breaking hyphen
-		// is not itself a mark, but a spacing mark shaped like one has to
+		// Fold fullwidth letters and digits, hyphen lookalikes, and full
+		// stops before the ASCII token classes run, and before marks are
+		// dropped. This pass does not run NFKC. A non-breaking hyphen is
+		// not itself a mark, but a spacing mark shaped like one has to
 		// become '-' first. A full stop has to become '.' or the JWT
 		// pattern misses the token. Spacing marks shaped like full stops
 		// are a second reading so an inserted mark can still be dropped.
-		folded := foldDotPieces(foldHyphenPieces(pieces))
+		folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(pieces)))
 		spans = append(spans, credentialPatternSpans(renderPieces(folded), folded)...)
 		if spacing, ok := foldSpacingStopPieces(folded); ok {
 			spans = append(spans, credentialPatternSpans(renderPieces(spacing), spacing)...)

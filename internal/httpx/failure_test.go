@@ -585,3 +585,25 @@ func TestSanitizeFailureStripsOtherFullStops(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsFullwidthLetters(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer("e", "\uff45", "J", "\uff2a", "y", "\uff59", "1", "\uff11").Replace(jwt)
+	encoded := strings.Replace(jwt, "e", "%EF%BD%85", 1)
+	secret := "codeVerifier12"
+	markedSecret := "code\uff36erifier\uff11\uff12"
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" "+markedSecret+" later", secret)
+	for _, item := range []string{jwt, marked, encoded, secret, markedSecret, "eyJ", "c2lnbmF0dXJl", "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"\uff48\uff45\uff4c\uff4c\uff4f", "build \uff11 stays", "see \uff21 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("fullwidth prose changed: %q -> %q", prose, got)
+		}
+	}
+}
