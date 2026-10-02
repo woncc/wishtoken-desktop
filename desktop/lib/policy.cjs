@@ -147,6 +147,13 @@ const SECRET_TEXT = [
 // and "user:secret@my-proxy\u16EC7890" keep the password. A colon before
 // the username is a boundary too, or "note \u205Auser:secret@10.1:8080"
 // keeps the password.
+// U+2254, U+29F4, and U+2A74 are one mark that confuses with a colon plus
+// more. U+2A74 folds to "::=" under NFKC, but the raw character does not,
+// and U+2254 and U+29F4 do not fold to ":". U+2255 confuses with "=:" and
+// does not fold to ":". Otherwise "user\u2254secret@127.0.0.1:7890" and
+// "user:secret@my-proxy\u2A747890" keep the password. A colon before the
+// username is a boundary too, or "note \u2255user:secret@10.1:8080" keeps
+// the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -160,7 +167,7 @@ const SECRET_TEXT = [
 // U+3002 does not fold to ".". U+FE12 and U+FF61 fold to U+3002. Those marks
 // already end a host, but "user:secret@127%E3%80%820%E3%80%820%E3%80%821:7890"
 // kept the password because they did not split labels.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD]';
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD\u2254\u2255\u29F4\u2A74]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
@@ -191,7 +198,12 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // boundary, but it still has to divide userinfo and a port. Otherwise
 // "user\u05C3secret@127.0.0.1:7890" and "user:secret@my-proxy\uFE307890"
 // keep the password.
-const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u1365', '\u1366', '\u1804', '\u02D1', '\u05C3', '\u0831', '\u0903', '\u0A83', '\u1361', '\u16EC', '\u205A', '\uA4FD', '\uFE30'];
+// U+2254 maps to ":=", U+29F4 maps to a colon and an arrow, and U+2A74 maps
+// to "::=". U+2A74 folds to "::=" under NFKC; the other two do not fold to
+// ":". U+2255 maps to "=:". They still divide userinfo and a port, or
+// "user\u2254secret@127.0.0.1:7890" and "user:secret@my-proxy\u2A747890"
+// keep the password.
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u1365', '\u1366', '\u1804', '\u02D1', '\u05C3', '\u0831', '\u0903', '\u0A83', '\u1361', '\u16EC', '\u205A', '\uA4FD', '\uFE30', '\u2254', '\u2255', '\u29F4', '\u2A74'];
 function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
