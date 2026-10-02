@@ -399,7 +399,10 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 // NFKC-fold to hyphen-minus. Non-breaking hyphen folds to U+2010, and small
 // em dash folds to an em dash, so both have to be listed. The em dash and
 // the horizontal bar do not fold. Vertical em dash folds to an em dash, and
-// this pass does not run NFKC, so that form is listed too. Arabic full stop
+// this pass does not run NFKC, so that form is listed too. Script hyphens,
+// including maqaf and the Yezidi hyphenation mark, do not fold either.
+// Two-em dash, three-em dash, wave dash, and wavy dash do not fold either.
+// Arabic full stop
 // stays a dot elsewhere in this codebase and is not a hyphen here. Spacing
 // marks that skeleton to a hyphen are folded before dropMarkPieces, or the
 // stored hyphen would disappear and the token would no longer match. One
@@ -487,6 +490,9 @@ func hyphenLike(r rune) bool {
 	switch r {
 	case '\u2010', '\u2011', '\u2012', '\u2013', '\ufe58',
 		'\u2014', '\u2015', '\ufe31',
+		'\u058a', '\u05be', '\u1400', '\u1806',
+		'\u2e17', '\u2e1a', '\u2e40', '\u2e5d', '\u30a0', '\U00010ead',
+		'\u2e3a', '\u2e3b', '\u301c', '\u3030',
 		'\u2043', '\u02d7', '\u2212', '\u2796', '\U00010191',
 		'\u2cba', '\u2cbb', '\u174d', '\u1bf3', '\uaa7d':
 		return true

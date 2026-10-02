@@ -555,3 +555,47 @@ func TestViewHidesCredentialsSplitByEmDashes(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsSplitByScriptHyphens(t *testing.T) {
+	refresh := "rt_display-123456789"
+	armenian := "rt_display" + "\u058a" + "123456789"
+	maqaf := "rt_" + "\u05be" + "display-123456789"
+	yezidi := "rt_display" + "\U00010ead" + "123456789"
+	acc := Account{
+		Name: "note " + armenian, Email: "kept@example.com", PlanType: "plus",
+		RefreshToken: refresh, Source: "from " + maqaf, Tags: []string{"team", yezidi},
+		LastError: "rejected " + armenian, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, armenian, maqaf, yezidi, "display-123456789", "123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}
+
+func TestViewHidesCredentialsSplitByLongAndWaveDashes(t *testing.T) {
+	refresh := "rt_display-123456789"
+	two := "rt_display" + "\u2e3a" + "123456789"
+	wave := "rt_" + "\u301c" + "display-123456789"
+	wavy := "rt_display" + "\u3030" + "123456789"
+	acc := Account{
+		Name: "note " + two, Email: "kept@example.com", PlanType: "plus",
+		RefreshToken: refresh, Source: "from " + wave, Tags: []string{"team", wavy},
+		LastError: "rejected " + two, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, two, wave, wavy, "display-123456789", "123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}

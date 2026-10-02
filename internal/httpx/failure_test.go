@@ -406,3 +406,61 @@ func TestSanitizeFailureStripsEmDashes(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsScriptHyphens(t *testing.T) {
+	secret := "code-verifier12"
+	refresh := "rt_sub-mitted_123456"
+	hyphens := []rune{'\u058a', '\u05be', '\u1400', '\u1806', '\u2e17', '\u2e1a', '\u2e40', '\u2e5d', '\u30a0', '\U00010ead'}
+	var parts []string
+	var leaked []string
+	for _, r := range hyphens {
+		marked := "code" + string(r) + "verifier12"
+		token := "rt_sub" + string(r) + "mitted_123456"
+		parts = append(parts, marked, token)
+		leaked = append(leaked, marked, token)
+	}
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secret)
+	for _, item := range append([]string{secret, refresh, "verifier12", "mitted_123456"}, leaked...) {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, r := range hyphens {
+		prose := "re" + string(r) + "try later"
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("script hyphen prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsLongAndWaveDashes(t *testing.T) {
+	secret := "code-verifier12"
+	refresh := "rt_sub-mitted_123456"
+	dashes := []rune{'\u2e3a', '\u2e3b', '\u301c', '\u3030'}
+	var parts []string
+	var leaked []string
+	for _, r := range dashes {
+		marked := "code" + string(r) + "verifier12"
+		token := "rt_sub" + string(r) + "mitted_123456"
+		parts = append(parts, marked, token)
+		leaked = append(leaked, marked, token)
+	}
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secret)
+	for _, item := range append([]string{secret, refresh, "verifier12", "mitted_123456"}, leaked...) {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, r := range dashes {
+		prose := "re" + string(r) + "try later"
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("dash prose changed: %q -> %q", prose, got)
+		}
+	}
+}

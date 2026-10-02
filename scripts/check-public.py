@@ -192,6 +192,25 @@ HYPHEN_LIKE = {
     ord('\u174D'): '-',
     ord('\u1BF3'): '-',
     ord('\uAA7D'): '-',
+    # These script hyphens do not NFKC-fold to '-'. Maqaf, the oblique and
+    # double hyphens, and the Yezidi hyphenation mark still split
+    # launch-history.json and the sqlite sidecars.
+    ord('\u058A'): '-',
+    ord('\u05BE'): '-',
+    ord('\u1400'): '-',
+    ord('\u1806'): '-',
+    ord('\u2E17'): '-',
+    ord('\u2E1A'): '-',
+    ord('\u2E40'): '-',
+    ord('\u2E5D'): '-',
+    ord('\u30A0'): '-',
+    ord('\U00010EAD'): '-',
+    # Two-em and three-em dashes, the wave dash, and the wavy dash do not
+    # NFKC-fold to '-'. Each one still splits a hyphenated private name.
+    ord('\u2E3A'): '-',
+    ord('\u2E3B'): '-',
+    ord('\u301C'): '-',
+    ord('\u3030'): '-',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -530,6 +549,12 @@ def self_test():
         'launch\u1bf3history.json', 'cockpit\uaa7dprocess.json', 'nested/vault.db\u2cbashm/extra.txt',
         'auth.json.gptbridge\u174dbackup-1',
         'launch\u2014history.json', 'cache.sqlite\u2014wal', 'vault.db\u2015journal',
+        'launch\u058ahistory.json', 'cache.sqlite\u05bewal', 'vault.db\u1400journal',
+        'launch\u1806history.json', 'cockpit\u2e17integration.json', 'bridge\u2e1aidentity.json',
+        'state.sqlite3\u2e40shm', 'cache.sqlite\u2e5dwal', 'nested/vault.db\u30a0journal/extra.txt',
+        'launch\U00010eadhistory.json', 'Copy of cache.sqlite\u058awal',
+        'launch\u2e3ahistory.json', 'cache.sqlite\u2e3bwal', 'vault.db\u301cjournal',
+        'nested/cockpit\u3030integration.json', 'Copy of cache.sqlite\u2e3awal',
         'nested/cockpit\u2014integration.json', 'bridge\ufe31identity.json',
         'state.sqlite3\u2015shm', 'Copy of cache.sqlite\ufe31wal',
         'launch\u00adhistory.json', 'cache.sqlite\u00adwal', 'vault.db\u00adjournal',
@@ -727,6 +752,10 @@ def self_test():
         'models\u302f.json', 'notes\u0bbereadme.txt',
         'notes\u2010readme.txt', 'au\u2010th.json', 'script.go\u2212extra',
         'readme\u2014md', 'au\u2014th.json', 'script.go\u2015extra', 'notes\ufe31.txt',
+        'au\u058ath.json', 'au\u05beth.json', 'au\u1400th.json', 'au\u1806th.json',
+        'script.go\u2e17extra', 'notes\u2e1a.txt', 'readme\u2e40md', 'notes\u2e5d.txt',
+        'script.go\u30a0extra', 'au\U00010eadth.json',
+        'au\u2e3ath.json', 'au\u2e3bth.json', 'script.go\u301cextra', 'notes\u3030.txt',
         'auth\u174djson',
         'notes\u00ad.txt', 'script.go\u00adextra',
     )
