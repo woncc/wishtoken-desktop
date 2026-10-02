@@ -4364,7 +4364,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // cannot glue the token back together. Circled reverse solidus is a
 // backslash inside a circle and does not NFKC-fold to a backslash either.
 // It stays one backslash so the circle cannot glue the token back together.
-// APL circle backslash and the circled division sign stay out.
+// APL circle backslash is that same slash inside an APL circle and does
+// not NFKC-fold to a backslash either. It stays one backslash so the
+// circle cannot glue the token back together. The circled division sign
+// and the combining enclosing circle backslash stay out.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4412,7 +4415,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
+	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
 		return '\\', true
 	default:
 		return 0, false
@@ -4698,8 +4701,9 @@ func parenASCII(r rune) (byte, bool) {
 // one slash so the square cannot glue the token back together. Circled
 // division slash is a slash inside a circle and does not NFKC-fold to a
 // slash either. It stays one slash so the circle cannot glue the token
-// back together. APL circle backslash and the circled division sign stay
-// out. Other letters stay out.
+// back together. APL circle backslash is a backslash inside a circle.
+// It folds to a backslash on its own pass. The circled division sign
+// stays out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
