@@ -1146,3 +1146,72 @@ func TestRedactHidesApostropheInProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesQuotationInProxyPassword(t *testing.T) {
+	const password = "s3cret\"proxy"
+	marked := strings.NewReplacer("\"", "\uFF02").Replace(password)
+	encoded := strings.NewReplacer("\"", "%EF%BC%82").Replace(password)
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") {
+			t.Fatalf("host lost: %q", got)
+		}
+	}
+}
+
+func TestRedactHidesColonInProxyPassword(t *testing.T) {
+	const password = "s3cret:proxy"
+	full := strings.NewReplacer(":", "\uFF1A").Replace(password)
+	small := strings.NewReplacer(":", "\uFE55").Replace(password)
+	vertical := strings.NewReplacer(":", "\uFE13").Replace(password)
+	encoded := strings.NewReplacer(":", "%EF%BC%9A").Replace(password)
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + full,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + vertical,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, full, small, vertical, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") {
+			t.Fatalf("host lost: %q", got)
+		}
+	}
+}
+
+func TestRedactHidesCommercialAtInProxyPassword(t *testing.T) {
+	const password = "s3cret@proxy"
+	full := strings.NewReplacer("@", "\uFF20").Replace(password)
+	small := strings.NewReplacer("@", "\uFE6B").Replace(password)
+	encoded := strings.NewReplacer("@", "%EF%BC%A0").Replace(password)
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + full,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, full, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+}

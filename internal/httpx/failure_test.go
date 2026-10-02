@@ -2820,3 +2820,200 @@ func TestApostropheASCIIFoldsOnlyApostrophes(t *testing.T) {
 		t.Fatalf("apostrophe fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsQuotationMarks(t *testing.T) {
+	secret := "code\"ver\"1"
+	marked := strings.NewReplacer("\"", "\uFF02").Replace(secret)
+	encoded := strings.NewReplacer("\"", "%EF%BC%82").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u201C later",
+		"see \u201D later",
+		"see \u201E later",
+		"see \u2033 later",
+		"see \u301D later",
+		"see \u275D later",
+		"path \uFF02 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("quotation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestQuotationASCIIFoldsOnlyQuotationMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF02, '"', true},
+		{'"', 0, false},
+		{0x201C, 0, false},
+		{0x201D, 0, false},
+		{0x201E, 0, false},
+		{0x2033, 0, false},
+		{0x301D, 0, false},
+		{0x275D, 0, false},
+		{0xFF07, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := quotationASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := quotationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("quotation fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsCompatibilityColons(t *testing.T) {
+	secret := "code:ver:1"
+	vertical := strings.NewReplacer(":", "\uFE13").Replace(secret)
+	small := strings.NewReplacer(":", "\uFE55").Replace(secret)
+	full := strings.NewReplacer(":", "\uFF1A").Replace(secret)
+	encoded := strings.NewReplacer(":", "%EF%BC%9A").Replace(secret)
+	got := SanitizeFailure("rejected "+full+" "+encoded+" later", secret)
+	for _, item := range []string{secret, full, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+vertical+" "+small+" later", secret)
+	for _, item := range []string{secret, vertical, small, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("small leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2236 later",
+		"see \u02D0 later",
+		"see \uA789 later",
+		"see \uFE30 later",
+		"see \u1804 later",
+		"see \u0589 later",
+		"path \uFF1A file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("colon prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestColonASCIIFoldsOnlyCompatibilityColons(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE13, ':', true},
+		{0xFE55, ':', true},
+		{0xFF1A, ':', true},
+		{':', 0, false},
+		{0x2236, 0, false},
+		{0x02D0, 0, false},
+		{0x02D1, 0, false},
+		{0xA789, 0, false},
+		{0xFE30, 0, false},
+		{0x1804, 0, false},
+		{0x0589, 0, false},
+		{0x205A, 0, false},
+		{0xFF1B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := colonASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := colonASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("colon fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsCommercialAtSigns(t *testing.T) {
+	secret := "code@ver@1"
+	small := strings.NewReplacer("@", "\uFE6B").Replace(secret)
+	full := strings.NewReplacer("@", "\uFF20").Replace(secret)
+	encoded := strings.NewReplacer("@", "%EF%BC%A0").Replace(secret)
+	got := SanitizeFailure("rejected "+full+" "+encoded+" later", secret)
+	for _, item := range []string{secret, full, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+small+" later", secret)
+	for _, item := range []string{secret, small, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("small leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \uFE69 later",
+		"see \u24B6 later",
+		"path \uFF20 file",
+		"path \uFE6B file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("commercial at prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestCommercialAtASCIIFoldsOnlyCommercialAt(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE6B, '@', true},
+		{0xFF20, '@', true},
+		{'@', 0, false},
+		{0xFE69, 0, false},
+		{0xFF03, 0, false},
+		{0x24B6, 0, false},
+		{0x0040, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := commercialAtASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := commercialAtASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("commercial at fold count %d", n)
+	}
+}
