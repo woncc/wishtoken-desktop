@@ -385,11 +385,12 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 
 // dropMarkPieces removes characters that do not add a base letter: variation
 // selectors and other nonspacing or enclosing marks, format characters such
-// as zero-width spaces, controls other than ordinary spacing, and blank
-// fillers that are letters or symbols. Hangul fillers and the braille blank
-// pattern have no ink. U+3164 and U+FFA0 fold to U+1160 under NFKC and stay
-// letters, so a category check never drops them. Tab, newline, and carriage
-// return still separate operator text. The original byte range of a match
+// as zero-width spaces, controls other than ordinary spacing, blank fillers,
+// and Unicode spaces other than ASCII space. Hangul fillers and the braille
+// blank pattern have no ink. U+3164 and U+FFA0 fold to U+1160 under NFKC and
+// stay letters, so a category check never drops them. Ogham space is a real
+// space separator that does not NFKC-fold. Tab, newline, carriage return, and
+// ASCII space still separate operator text. The original byte range of a match
 // still covers a dropped character that was sitting inside the secret.
 func dropMarkPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -420,6 +421,12 @@ func ignorableCredentialRune(r rune) bool {
 		return true
 	}
 	if unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
+		return true
+	}
+	// ASCII space still separates words. The other space separators, including
+	// Ogham space which does not NFKC-fold, have to come out before a token is
+	// matched or they hide the secret.
+	if r != ' ' && unicode.Is(unicode.Zs, r) {
 		return true
 	}
 	if unicode.Is(unicode.Cc, r) && !unicode.IsSpace(r) {

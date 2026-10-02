@@ -7,10 +7,13 @@ import (
 )
 
 var (
-	jwtPattern      = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`)
-	bearerPattern   = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._~+/-]+=*`)
-	prefixedPattern = regexp.MustCompile(`(?i)(?:sk-(?:proj-)?|rk-|rt_|github_pat_|gh[pousr]_)[A-Za-z0-9_-]{8,}`)
-	opaquePattern   = regexp.MustCompile(`[A-Za-z0-9_+/=\-]{32,}`)
+	jwtPattern    = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`)
+	bearerPattern = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._~+/-]+=*`)
+	// Used only after Unicode spaces have been removed. The ordinary bearer
+	// pattern still requires a real space, so "BearerAuth" is left alone.
+	bearerGluedPattern = regexp.MustCompile(`(?i)\bbearer[A-Za-z0-9._~+/-]+=*`)
+	prefixedPattern    = regexp.MustCompile(`(?i)(?:sk-(?:proj-)?|rk-|rt_|github_pat_|gh[pousr]_)[A-Za-z0-9_-]{8,}`)
+	opaquePattern      = regexp.MustCompile(`[A-Za-z0-9_+/=\-]{32,}`)
 )
 
 // SanitizeFailure removes credential-shaped material from an operator-facing
@@ -82,7 +85,9 @@ func maskCredentialPatterns(detail string) string {
 	for layer := 0; layer < 5; layer++ {
 		spans = append(spans, credentialPatternSpans(renderPieces(pieces), pieces)...)
 		if dropped := dropMarkPieces(pieces); len(dropped) != len(pieces) {
-			spans = append(spans, credentialPatternSpans(renderPieces(dropped), dropped)...)
+			rendered := renderPieces(dropped)
+			spans = append(spans, credentialPatternSpans(rendered, dropped)...)
+			spans = append(spans, gluedBearerSpans(rendered, dropped)...)
 		}
 		next := decodePieces(pieces)
 		if len(next) == len(pieces) {
@@ -91,6 +96,25 @@ func maskCredentialPatterns(detail string) string {
 		pieces = next
 	}
 	return applySecretSpans(detail, spans, "[redacted]")
+}
+
+func gluedBearerSpans(rendered string, pieces []secretPiece) [][2]int {
+	if rendered == "" || len(pieces) != len(rendered) {
+		return nil
+	}
+	var spans [][2]int
+	for _, loc := range bearerGluedPattern.FindAllStringIndex(rendered, -1) {
+		if loc[0] < 0 || loc[1] > len(pieces) || loc[0]+6 >= loc[1] {
+			continue
+		}
+		// "BearerAuth" plus a later dropped space must not count. A space or
+		// mark has to have been removed immediately after the word bearer.
+		if pieces[loc[0]+5].end == pieces[loc[0]+6].start {
+			continue
+		}
+		spans = append(spans, [2]int{pieces[loc[0]].start, pieces[loc[1]-1].end})
+	}
+	return spans
 }
 
 func credentialPatternSpans(rendered string, pieces []secretPiece) [][2]int {

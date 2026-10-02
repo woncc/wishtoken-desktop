@@ -276,3 +276,38 @@ func TestSanitizeFailureStripsBlankFillersInsideCredentials(t *testing.T) {
 		t.Fatalf("operator reason changed: %q", SanitizeFailure(snake))
 	}
 }
+
+func TestSanitizeFailureStripsUnicodeSpacesInsideCredentials(t *testing.T) {
+	secret := "code+verifier12"
+	markedSecret := "code+\u1680verifier12"
+	refresh := "rt_submitted_123456"
+	nbsp := "rt_\u00a0submitted_123456"
+	ideo := "rt_sub\u3000mitted_123456"
+	encoded := "rt_%C2%A0submitted_123456"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u202fdXJl"
+	bearer := "bearer\u00a0shortToken1"
+	text := "rejected " + markedSecret + " " + nbsp + " " + ideo + " " + encoded + " " + markedJWT + " " + bearer + " later"
+	got := SanitizeFailure(text, secret)
+	for _, leaked := range []string{secret, markedSecret, refresh, nbsp, ideo, encoded, "submitted_123456", jwt, "eyJ", "c2lnbmF0dXJl", "shortToken1", bearer} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	if got := SanitizeFailure("slow\u00a0down"); got != "slow down" {
+		t.Fatalf("operator text changed: %q", got)
+	}
+	if got := SanitizeFailure("BearerAuth"); got != "BearerAuth" {
+		t.Fatalf("glued word changed: %q", got)
+	}
+	if got := SanitizeFailure("BearerAuth\u00a0rejected"); got != "BearerAuth rejected" {
+		t.Fatalf("glued word changed: %q", got)
+	}
+	snake := "session_revoked_\u00a0because_of_security_event"
+	if got := SanitizeFailure(snake); got != "session_revoked_ because_of_security_event" {
+		t.Fatalf("operator reason changed: %q", got)
+	}
+}
