@@ -2,6 +2,7 @@ package account
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -289,5 +290,29 @@ func TestImportHidesProxyPasswordsInDisplayFields(t *testing.T) {
 	shown := view.Name + "\n" + view.Email + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.ProxyURL + "\n" + view.LastError
 	if strings.Contains(shown, password) || view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.ProxyURL, "xxxxx") || !strings.Contains(view.LastError, "xxxxx") {
 		t.Fatalf("view leaked: %+v", view)
+	}
+}
+
+func TestViewHidesEmbeddedCredentials(t *testing.T) {
+	refresh := "rt_display_123456789"
+	var encoded strings.Builder
+	for i := 0; i < len(refresh); i++ {
+		fmt.Fprintf(&encoded, "%%%02X", refresh[i])
+	}
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	acc := Account{
+		Name: "note " + refresh + " " + encoded.String(), Email: "kept@example.com", PlanType: "plus",
+		Source: "from " + jwt, Tags: []string{"team", "see " + refresh}, LastError: "rejected " + encoded.String(),
+		AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, encoded.String(), jwt, "eyJ"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") {
+		t.Fatalf("display context lost: %+v", view)
 	}
 }

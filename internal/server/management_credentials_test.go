@@ -184,3 +184,17 @@ func getRaw(t *testing.T, f *fixture, route string) (int, string) {
 	n, _ := resp.Body.Read(buf)
 	return resp.StatusCode, string(buf[:n])
 }
+
+func TestManagementHidesEmbeddedDisplayCredentials(t *testing.T) {
+	const refresh = "rt_display_123456789"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.Name = "note " + refresh
+	acc.LastError = "rejected " + refresh
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	if status != http.StatusOK || strings.Contains(body, refresh) || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") {
+		t.Fatalf("embedded display credential: %d %s", status, body)
+	}
+}
