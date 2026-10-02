@@ -171,7 +171,7 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // would otherwise be returned with its password intact. The Go core has no
 // Unicode normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u1804\ua6f4\u2a74"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -202,6 +202,11 @@ func foldUserinfoColons(s string) string {
 		"\u1804", ":",
 		"\ua6f4", ":",
 		"\u2a74", ":",
+		"\u205d", ":",
+		"\u2254", ":",
+		"\u2255", ":",
+		"\u2982", ":",
+		"\u2af6", ":",
 	).Replace(s)
 }
 
