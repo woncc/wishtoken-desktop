@@ -595,12 +595,12 @@ function htmlProxyChar(cp) {
   // Thai digits, Lao digits, Tibetan digits, Myanmar digits, Myanmar Shan
   // digits, Khmer digits, Mongolian digits, Limbu digits, New Tai Lue
   // digits, Tai Tham Hora digits, Tai Tham Tham digits, Balinese digits,
-  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits do too.
+  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits, and circled numbers ten through twenty, twenty-one through thirty-five, and thirty-six through fifty, do too.
   // A numeric reference has to yield the same character so the label fold
   // can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp) || isMyanmarShanDigit(cp) || isKhmerDigit(cp) || isMongolianDigit(cp) || isLimbuDigit(cp) || isNewTaiLueDigit(cp) || isTaiThamHoraDigit(cp) || isTaiThamThamDigit(cp) || isBalineseDigit(cp) || isSundaneseDigit(cp) || isLepchaDigit(cp) || isOlChikiDigit(cp) || isVaiDigit(cp) || isSaurashtraDigit(cp) || isKayahLiDigit(cp) || isJavaneseDigit(cp) || isMyanmarTaiLaingDigit(cp) || isChamDigit(cp) || isMeeteiMayekDigit(cp) || isOsmanyaDigit(cp) || isHanifiRohingyaDigit(cp) || isGarayDigit(cp) || isBrahmiDigit(cp) || isSoraSompengDigit(cp) || isChakmaDigit(cp) || isSharadaDigit(cp) || isKhudawadiDigit(cp) || isNewaDigit(cp) || isTirhutaDigit(cp) || isModiDigit(cp) || isTakriDigit(cp) || isAhomDigit(cp) || isWarangCitiDigit(cp) || isDivesAkuruDigit(cp) || isBhaiksukiDigit(cp) || isMasaramGondiDigit(cp) || isGunjalaGondiDigit(cp) || isTolongSikiDigit(cp) || isKawiDigit(cp) || isGurungKhemaDigit(cp) || isMroDigit(cp) || isTangsaDigit(cp) || isPahawhHmongDigit(cp) || isKiratRaiDigit(cp) || isNyiakengPuachueHmongDigit(cp) || isWanchoDigit(cp) || isNagMundariDigit(cp) || isOlOnalDigit(cp) || isAdlamDigit(cp) || isMyanmarPaoDigit(cp) || isEasternPwoKarenDigit(cp) || isSunuwarDigit(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp) || isMyanmarShanDigit(cp) || isKhmerDigit(cp) || isMongolianDigit(cp) || isLimbuDigit(cp) || isNewTaiLueDigit(cp) || isTaiThamHoraDigit(cp) || isTaiThamThamDigit(cp) || isBalineseDigit(cp) || isSundaneseDigit(cp) || isLepchaDigit(cp) || isOlChikiDigit(cp) || isVaiDigit(cp) || isSaurashtraDigit(cp) || isKayahLiDigit(cp) || isJavaneseDigit(cp) || isMyanmarTaiLaingDigit(cp) || isChamDigit(cp) || isMeeteiMayekDigit(cp) || isOsmanyaDigit(cp) || isHanifiRohingyaDigit(cp) || isGarayDigit(cp) || isBrahmiDigit(cp) || isSoraSompengDigit(cp) || isChakmaDigit(cp) || isSharadaDigit(cp) || isKhudawadiDigit(cp) || isNewaDigit(cp) || isTirhutaDigit(cp) || isModiDigit(cp) || isTakriDigit(cp) || isAhomDigit(cp) || isWarangCitiDigit(cp) || isDivesAkuruDigit(cp) || isBhaiksukiDigit(cp) || isMasaramGondiDigit(cp) || isGunjalaGondiDigit(cp) || isTolongSikiDigit(cp) || isKawiDigit(cp) || isGurungKhemaDigit(cp) || isMroDigit(cp) || isTangsaDigit(cp) || isPahawhHmongDigit(cp) || isKiratRaiDigit(cp) || isNyiakengPuachueHmongDigit(cp) || isWanchoDigit(cp) || isNagMundariDigit(cp) || isOlOnalDigit(cp) || isAdlamDigit(cp) || isMyanmarPaoDigit(cp) || isEasternPwoKarenDigit(cp) || isSunuwarDigit(cp) || isCircledNumber(cp)) return char;
   if (cp === 0x02D7 || cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x207B || cp === 0x208B || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -903,7 +903,7 @@ function foldLabelHyphens(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\uFF4Dproxy:7890" and "user:secret@ex\uFF41mple.com:8080"
-// keep the password. A circled number past one digit, such as U+2469, stays as written.
+// keep the password. A parenthesized number, such as U+2474, stays as written.
 function readEncodedFullwidthLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -939,8 +939,7 @@ function foldFullwidthLetters(text) {
 // host already allows those letters. Their literal, percent-encoded, and
 // numeric forms kept the password too. Otherwise
 // "user:secret@my\u24DCproxy:7890" and "user:secret@ex\u24D0mple.com:8080"
-// keep the password. Parenthesized letters stay as written. A circled number
-// past one digit, such as U+2469, stays as written.
+// keep the password. Parenthesized letters stay as written. A parenthesized number, such as U+2474, stays as written.
 function readEncodedCircledLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -980,7 +979,7 @@ function foldCircledLetters(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u212Aproxy:7890" and "user:secret@ex\u2139mple.com:8080"
 // keep the password. Symbols that expand to more than one character, such
-// as U+2121, stay as written. A circled number past one digit, such as U+2469, stays as written.
+// as U+2121, stay as written. A parenthesized number, such as U+2474, stays as written.
 const LETTERLIKE_ASCII = {
   '\u2102': 'C',
   '\u210A': 'g',
@@ -1054,7 +1053,7 @@ function foldLetterlikeLetters(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u017Fproxy:7890" and "user:secret@ex\u00AAmple.com:8080"
-// keep the password. The micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
+// keep the password. The micro sign stays as written. A parenthesized number, such as U+2474, stays as written.
 const LATIN_COMPAT_ASCII = {
   '\u00AA': 'a',
   '\u00BA': 'o',
@@ -1103,7 +1102,7 @@ function foldLatinCompatLetters(text) {
 // "user:secret@my\u02B0proxy:7890" and "user:secret@ex\u1D43mple.com:8080"
 // keep the password. U+107A5 is the supplementary small q. A modifier letter
 // that expands past one ASCII letter stays as written. The micro sign stays
-// as written. A circled number past one digit, such as U+2469, stays as written.
+// as written. A parenthesized number, such as U+2474, stays as written.
 const MODIFIER_LETTER_ASCII = new Map([
   [0x02B0, 'h'],
   [0x02B2, 'j'],
@@ -1206,7 +1205,7 @@ function foldModifierLetters(text) {
 // letters. Their literal, percent-encoded, and numeric forms kept the
 // password. Otherwise "user:secret@my\u2071proxy:7890" and
 // "user:secret@ex\u2090mple.com:8080" keep the password. Superscript digits
-// are already port digits. The micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
+// are already port digits. The micro sign stays as written. A parenthesized number, such as U+2474, stays as written.
 const SUP_SUB_LETTER_ASCII = new Map([
   [0x1D62, 'i'],
   [0x1D63, 'r'],
@@ -1281,7 +1280,7 @@ function foldSupSubLetters(text) {
 // Otherwise "user:secret@my\u2160proxy:7890" and
 // "user:secret@ex\u2170mple.com:8080" keep the password. A numeral that
 // expands to more than one letter, such as U+2161, stays as written. The
-// micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
+// micro sign stays as written. A parenthesized number, such as U+2474, stays as written.
 const ROMAN_LETTER_ASCII = new Map([
   [0x2160, 'I'],
   [0x2164, 'V'],
@@ -1349,8 +1348,7 @@ function foldRomanLetters(text) {
 // host letters too. U+1D400 folds to "A" and U+1D433 folds to "z". The italic
 // h hole at U+1D455 is not a letter. Their literal, percent-encoded, and
 // numeric forms kept the password. Otherwise a bold or monospace letter
-// inside the host keeps the password. Greek mathematical letters stay as written. A circled
-// number past one digit, such as U+2469, stays as written.
+// inside the host keeps the password. Greek mathematical letters stay as written. A parenthesized number, such as U+2474, stays as written.
 const MATH_LETTER_RANGES = [
   [0x1D400, 0x1D419, 0x41],
   [0x1D41A, 0x1D433, 0x61],
@@ -1449,7 +1447,7 @@ function foldMathLetters(text) {
 // U+1F130 through U+1F149 are the squared capitals. U+1F12B and U+1F12C are
 // the circled italic C and R. Their literal, percent-encoded, and numeric
 // forms kept the password. Otherwise "user:secret@my\u{1F130}proxy:7890"
-// keeps the password. A circled number past one digit, such as U+2469, stays as written.
+// keeps the password. A parenthesized number, such as U+2474, stays as written.
 const ENCLOSED_LETTER_RANGES = [
   [0x1F12B, 0x1F12B, 0x43],
   [0x1F12C, 0x1F12C, 0x52],
@@ -1509,8 +1507,7 @@ function foldEnclosedLetters(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u{1CCD6}proxy:7890" and
-// "user:secret@ex\u{1CCD6}mple.com:8080" keep the password. A circled number
-// past one digit, such as U+2469, stays as written.
+// "user:secret@ex\u{1CCD6}mple.com:8080" keep the password. A parenthesized number, such as U+2474, stays as written.
 function outlinedLetterAscii(cp) {
   if (cp >= 0x1CCD6 && cp <= 0x1CCEF) return String.fromCharCode(0x41 + (cp - 0x1CCD6));
   return '';
@@ -1562,8 +1559,7 @@ function foldOutlinedLetters(text) {
 // host, a dotted host, a numeric host, and a port already allow those digits.
 // Their literal, percent-encoded, and numeric forms kept the password too.
 // Otherwise "user:secret@my\u{1CCF0}proxy:7890" and
-// "user:secret@ex\u{1CCF1}ample.com:8080" keep the password. A circled number
-// past one digit, such as U+2469, stays as written.
+// "user:secret@ex\u{1CCF1}ample.com:8080" keep the password. A parenthesized number, such as U+2474, stays as written.
 function outlinedDigitAscii(cp) {
   if (cp >= 0x1CCF0 && cp <= 0x1CCF9) return String.fromCharCode(0x30 + (cp - 0x1CCF0));
   return '';
@@ -1615,8 +1611,9 @@ function foldOutlinedDigits(text) {
 // single-label host, a dotted host, a numeric host, and a port already allow
 // those digits. Their literal, percent-encoded, and numeric forms kept the
 // password too. Otherwise "user:secret@my\u24EAproxy:7890" and
-// "user:secret@ex\u2460ample.com:8080" keep the password. A circled number
-// that expands past one digit, such as U+2469, stays as written.
+// "user:secret@ex\u2460ample.com:8080" keep the password. U+2469..U+2473
+// expand to 10..20 and are folded separately. A parenthesized number, such
+// as U+2474, stays as written.
 function circledDigitAscii(cp) {
   if (cp === 0x24EA) return '0';
   if (cp >= 0x2460 && cp <= 0x2468) return String.fromCharCode(0x31 + (cp - 0x2460));
@@ -1660,12 +1657,63 @@ function foldCircledDigits(text) {
   }
   return out;
 }
+
+// Circled numbers U+2469..U+2473 fold to 10..20 under NFKC. U+3251..U+325F
+// fold to 21..35 and U+32B1..U+32BF fold to 36..50. A single-digit fold
+// leaves the password in "user:secret@my\u2469proxy:7890" and
+// "user:secret@my\u3251proxy:7890" because the host label never sees one
+// ASCII digit. The same is true of a numeric host and of the percent-encoded
+// and numeric forms. The redacted host uses ASCII digits. U+3250 folds to
+// "PTE", and U+32C0 folds to a digit plus a month mark. Those stay as written.
+function circledNumberAscii(cp) {
+  if (cp >= 0x2469 && cp <= 0x2473) return String(10 + (cp - 0x2469));
+  if (cp >= 0x3251 && cp <= 0x325F) return String(21 + (cp - 0x3251));
+  if (cp >= 0x32B1 && cp <= 0x32BF) return String(36 + (cp - 0x32B1));
+  return '';
+}
+function isCircledNumber(cp) {
+  return circledNumberAscii(cp) !== '';
+}
+function readEncodedCircledNumber(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isCircledNumber(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedCircledNumbers(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const number = readEncodedCircledNumber(text, index);
+    if (number) {
+      out += number.char;
+      index = number.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldCircledNumbers(text) {
+  let out = '';
+  for (const char of text) {
+    out += circledNumberAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
 // Mathematical digits U+1D7CE..U+1D7FF fold to 0-9 under NFKC. A single-label
 // host, a dotted host, a numeric host, and a port already allow those digits.
 // Their literal, percent-encoded, and numeric forms kept the password too.
 // Otherwise "user:secret@my\u{1D7CE}proxy:7890" and
-// "user:secret@ex\u{1D7CF}ample.com:8080" keep the password. A circled number
-// past one digit, such as U+2469, stays as written.
+// "user:secret@ex\u{1D7CF}ample.com:8080" keep the password. A parenthesized number, such as U+2474, stays as written.
 function mathDigitAscii(cp) {
   if (cp >= 0x1D7CE && cp <= 0x1D7FF) return String.fromCharCode(0x30 + ((cp - 0x1D7CE) % 10));
   return '';
@@ -1717,8 +1765,7 @@ function foldMathDigits(text) {
 // host, a dotted host, a numeric host, and a port already allow those digits.
 // Their literal, percent-encoded, and numeric forms kept the password too.
 // Otherwise "user:secret@my\u{1FBF0}proxy:7890" and
-// "user:secret@ex\u{1FBF1}ample.com:8080" keep the password. A circled number
-// past one digit, such as U+2469, stays as written.
+// "user:secret@ex\u{1FBF1}ample.com:8080" keep the password. A parenthesized number, such as U+2474, stays as written.
 function segmentedDigitAscii(cp) {
   if (cp >= 0x1FBF0 && cp <= 0x1FBF9) return String.fromCharCode(0x30 + (cp - 0x1FBF0));
   return '';
@@ -5537,7 +5584,7 @@ function foldGarayDigits(text) {
 }
 
 function redactProxyCredentials(text) {
-  const decoded = foldSunuwarDigits(foldEasternPwoKarenDigits(foldMyanmarPaoDigits(foldAdlamDigits(foldOlOnalDigits(foldNagMundariDigits(foldWanchoDigits(foldNyiakengPuachueHmongDigits(foldKiratRaiDigits(foldPahawhHmongDigits(foldTangsaDigits(foldMroDigits(foldGurungKhemaDigits(foldKawiDigits(foldTolongSikiDigits(foldGunjalaGondiDigits(foldMasaramGondiDigits(foldBhaiksukiDigits(foldDivesAkuruDigits(foldWarangCitiDigits(foldAhomDigits(foldTakriDigits(foldModiDigits(foldTirhutaDigits(foldNewaDigits(foldKhudawadiDigits(foldSharadaDigits(foldChakmaDigits(foldSoraSompengDigits(foldBrahmiDigits(foldGarayDigits(foldHanifiRohingyaDigits(foldOsmanyaDigits(foldMeeteiMayekDigits(foldChamDigits(foldMyanmarTaiLaingDigits(foldJavaneseDigits(foldKayahLiDigits(foldSaurashtraDigits(foldVaiDigits(foldOlChikiDigits(foldLepchaDigits(foldSundaneseDigits(foldBalineseDigits(foldTaiThamThamDigits(foldTaiThamHoraDigits(foldNewTaiLueDigits(foldLimbuDigits(foldMongolianDigits(foldKhmerDigits(foldMyanmarShanDigits(foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedMyanmarShanDigits(decodeEncodedKhmerDigits(decodeEncodedMongolianDigits(decodeEncodedLimbuDigits(decodeEncodedNewTaiLueDigits(decodeEncodedTaiThamHoraDigits(decodeEncodedTaiThamThamDigits(decodeEncodedBalineseDigits(decodeEncodedSundaneseDigits(decodeEncodedLepchaDigits(decodeEncodedOlChikiDigits(decodeEncodedVaiDigits(decodeEncodedSaurashtraDigits(decodeEncodedKayahLiDigits(decodeEncodedJavaneseDigits(decodeEncodedMyanmarTaiLaingDigits(decodeEncodedChamDigits(decodeEncodedMeeteiMayekDigits(decodeEncodedOsmanyaDigits(decodeEncodedSunuwarDigits(decodeEncodedEasternPwoKarenDigits(decodeEncodedMyanmarPaoDigits(decodeEncodedAdlamDigits(decodeEncodedOlOnalDigits(decodeEncodedNagMundariDigits(decodeEncodedWanchoDigits(decodeEncodedNyiakengPuachueHmongDigits(decodeEncodedKiratRaiDigits(decodeEncodedPahawhHmongDigits(decodeEncodedTangsaDigits(decodeEncodedMroDigits(decodeEncodedGurungKhemaDigits(decodeEncodedKawiDigits(decodeEncodedTolongSikiDigits(decodeEncodedGunjalaGondiDigits(decodeEncodedMasaramGondiDigits(decodeEncodedBhaiksukiDigits(decodeEncodedDivesAkuruDigits(decodeEncodedWarangCitiDigits(decodeEncodedAhomDigits(decodeEncodedTakriDigits(decodeEncodedModiDigits(decodeEncodedTirhutaDigits(decodeEncodedNewaDigits(decodeEncodedKhudawadiDigits(decodeEncodedSharadaDigits(decodeEncodedChakmaDigits(decodeEncodedSoraSompengDigits(decodeEncodedBrahmiDigits(decodeEncodedGarayDigits(decodeEncodedHanifiRohingyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  const decoded = foldCircledNumbers(foldSunuwarDigits(foldEasternPwoKarenDigits(foldMyanmarPaoDigits(foldAdlamDigits(foldOlOnalDigits(foldNagMundariDigits(foldWanchoDigits(foldNyiakengPuachueHmongDigits(foldKiratRaiDigits(foldPahawhHmongDigits(foldTangsaDigits(foldMroDigits(foldGurungKhemaDigits(foldKawiDigits(foldTolongSikiDigits(foldGunjalaGondiDigits(foldMasaramGondiDigits(foldBhaiksukiDigits(foldDivesAkuruDigits(foldWarangCitiDigits(foldAhomDigits(foldTakriDigits(foldModiDigits(foldTirhutaDigits(foldNewaDigits(foldKhudawadiDigits(foldSharadaDigits(foldChakmaDigits(foldSoraSompengDigits(foldBrahmiDigits(foldGarayDigits(foldHanifiRohingyaDigits(foldOsmanyaDigits(foldMeeteiMayekDigits(foldChamDigits(foldMyanmarTaiLaingDigits(foldJavaneseDigits(foldKayahLiDigits(foldSaurashtraDigits(foldVaiDigits(foldOlChikiDigits(foldLepchaDigits(foldSundaneseDigits(foldBalineseDigits(foldTaiThamThamDigits(foldTaiThamHoraDigits(foldNewTaiLueDigits(foldLimbuDigits(foldMongolianDigits(foldKhmerDigits(foldMyanmarShanDigits(foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedMyanmarShanDigits(decodeEncodedKhmerDigits(decodeEncodedMongolianDigits(decodeEncodedLimbuDigits(decodeEncodedNewTaiLueDigits(decodeEncodedTaiThamHoraDigits(decodeEncodedTaiThamThamDigits(decodeEncodedBalineseDigits(decodeEncodedSundaneseDigits(decodeEncodedLepchaDigits(decodeEncodedOlChikiDigits(decodeEncodedVaiDigits(decodeEncodedSaurashtraDigits(decodeEncodedKayahLiDigits(decodeEncodedJavaneseDigits(decodeEncodedMyanmarTaiLaingDigits(decodeEncodedChamDigits(decodeEncodedMeeteiMayekDigits(decodeEncodedOsmanyaDigits(decodeEncodedCircledNumbers(decodeEncodedSunuwarDigits(decodeEncodedEasternPwoKarenDigits(decodeEncodedMyanmarPaoDigits(decodeEncodedAdlamDigits(decodeEncodedOlOnalDigits(decodeEncodedNagMundariDigits(decodeEncodedWanchoDigits(decodeEncodedNyiakengPuachueHmongDigits(decodeEncodedKiratRaiDigits(decodeEncodedPahawhHmongDigits(decodeEncodedTangsaDigits(decodeEncodedMroDigits(decodeEncodedGurungKhemaDigits(decodeEncodedKawiDigits(decodeEncodedTolongSikiDigits(decodeEncodedGunjalaGondiDigits(decodeEncodedMasaramGondiDigits(decodeEncodedBhaiksukiDigits(decodeEncodedDivesAkuruDigits(decodeEncodedWarangCitiDigits(decodeEncodedAhomDigits(decodeEncodedTakriDigits(decodeEncodedModiDigits(decodeEncodedTirhutaDigits(decodeEncodedNewaDigits(decodeEncodedKhudawadiDigits(decodeEncodedSharadaDigits(decodeEncodedChakmaDigits(decodeEncodedSoraSompengDigits(decodeEncodedBrahmiDigits(decodeEncodedGarayDigits(decodeEncodedHanifiRohingyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
