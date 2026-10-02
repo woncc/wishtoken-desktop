@@ -30,6 +30,9 @@ FORBIDDEN_SUFFIXES = {
 }
 COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst', '.br', '.7z', '.tar', '.tgz', '.lz4', '.lzma', '.zstd', '.rar', '.cab'}
 PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
+# Hangul fillers and the braille blank are letters or symbols, so they are not
+# format characters. U+3164 and U+FFA0 NFKC-fold to U+1160. None of them has ink.
+BLANK_FILLERS = frozenset('\u115f\u1160\u3164\uffa0\u2800')
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
 # These other full stops do not NFKC-fold to '.' either. Armenian full stop is a
 # colon lookalike and is folded with the colons instead.
@@ -212,9 +215,10 @@ def normalize_component(name):
     # Colon lookalikes are folded first: double colon equal expands to '::='
     # and would otherwise leave '=' glued to the following stream name.
     # Format, control, and line-separator characters can sit inside a name
-    # without changing how a person reads it.
+    # without changing how a person reads it. Blank fillers are letters or
+    # symbols, so the category check does not remove them.
     folded = fold_separators(name, {}).casefold()
-    cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
+    cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'} and ch not in BLANK_FILLERS)
     return collapse_dots(cleaned)
 
 def strip_edges(value):
@@ -294,6 +298,8 @@ def secret_alias(name):
 # separators, must split a path before any component is judged. Set minus,
 # the reverse solidus operator, and big reverse solidus do not NFKC-fold
 # to a backslash, so they must be listed beside their forward twins.
+# Solidus with overbar and reverse solidus with a horizontal stroke are the
+# same kind of operator and do not NFKC-fold to a slash either.
 SEPARATOR_LIKE = {
     ord('\\'): '/',
     ord('\u00a5'): '/',
@@ -302,6 +308,8 @@ SEPARATOR_LIKE = {
     ord('\u2215'): '/',
     ord('\u2216'): '/',
     ord('\u29f5'): '/',
+    ord('\u29f6'): '/',
+    ord('\u29f7'): '/',
     ord('\u29f8'): '/',
     ord('\u29f9'): '/',
     ord('\ufe68'): '/',
@@ -334,6 +342,12 @@ SEPARATOR_LIKE = {
     ord('\U0001d23a'): '/',
     ord('\U0001d20f'): '/',
     ord('\U0001d23b'): '/',
+    # Very heavy solidus and very heavy reverse solidus do not NFKC-fold
+    # to a slash, but each one still splits the next component.
+    ord('\U0001f67c'): '/',
+    ord('\U0001f67d'): '/',
+    # The dotted solidus does not NFKC-fold to a slash either.
+    ord('\u2e4a'): '/',
 }
 
 def normalized_rel(rel):
@@ -473,6 +487,8 @@ def self_test():
         'auth.json:secret/file.txt', 'auth.json\\notes.txt', 'credentials\\token.txt',
         'auth.json\u2044secret.txt', 'auth.json\u2215secret.txt', 'accounts.json\u29f8extra.txt',
         'auth.json\u2216secret.txt', 'accounts.json\u29f5extra.txt', 'tokens.json\u29f9notes.txt',
+        'auth.json\u29f6secret.txt', 'credentials\u29f7token.txt', 'notes\u29f6id_rsa',
+        'nested/id_rsa\u29f7x', 'Diagnostics\u29f6capture.png', 'tokens.json\u29f7extra.txt',
         'Diagnostics\u2216capture.png', 'credentials\u29f9token.txt', 'nested/id_rsa\u29f5x',
         'auth.json\u1735secret.txt', 'credentials\u2571token.txt', 'notes\u27cbid_rsa',
         'tokens.json\u2572extra.txt', 'accounts.json\u27cdnotes.txt', 'Diagnostics\u2571capture.png',
@@ -535,6 +551,10 @@ def self_test():
         'nested/id_rsa\u31d2x', 'Diagnostics\u31d3capture.png', 'tokens.json\u31d4extra.txt',
         'auth.json\u3033secret.txt', 'credentials\U0001d23atoken.txt', 'notes\U0001d20fid_rsa',
         'nested/id_rsa\U0001d23bx', 'Diagnostics\u3033capture.png', 'tokens.json\U0001d23aextra.txt',
+        'auth.json\U0001f67csecret.txt', 'credentials\U0001f67dtoken.txt', 'notes\U0001f67cid_rsa',
+        'nested/id_rsa\U0001f67dx', 'Diagnostics\U0001f67ccapture.png', 'tokens.json\U0001f67dextra.txt',
+        'auth.json\u2e4asecret.txt', 'credentials\u2e4atoken.txt', 'notes\u2e4aid_rsa',
+        'nested/id_rsa\u2e4ax', 'Diagnostics\u2e4acapture.png', 'tokens.json\u2e4aextra.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -547,6 +567,10 @@ def self_test():
         'tokens.json\u20e3', 'auth.json\u0301', 'a\u0301uth.json', 'auth\u180c.json',
         'Copy of auth.json\ufe0f', 'nested/auth\ufe0e.json/extra.txt',
         'accounts.json\u180d.txt', 'secrets.env\u20dd', 'id_rsa\ufe0f.txt',
+        'auth\u3164.json', 'auth.json\u3164', 'auth\uffa0.json', 'id_rsa\u2800', 'credentials.json\u115f',
+        '.netrc\u1160', 'tokens.json\u2800', 'ID_RSA\uffa0',
+        'nested/auth\u3164.json/extra.txt', 'Copy of auth\u2800.json', 'auth.json\u3164.txt',
+        'secrets.env\u115f', 'auth\u115f.json\u2800',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -564,6 +588,8 @@ def self_test():
         'notes\\readme.txt', 'readme\u2044notes.txt', 'script.go\u00a5extra.txt',
         'models.json\uff0freadme.txt',
         'readme\u2216notes.txt', 'script.go\u29f5extra.txt', 'models.json\u29f9readme.txt',
+        'notes\u29f6readme.txt', 'script.go\u29f7extra.txt', 'id_rsa.pub\u29f6foo.txt',
+        'models.json\u29f7readme.txt',
         'readme\u2571notes.txt', 'script.go\u27cbextra.txt', 'models.json\u2572readme.txt',
         'id_rsa.pub\u1735foo.txt', 'notes\u27cdreadme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
@@ -596,11 +622,16 @@ def self_test():
         'notes\u31d2readme.txt', 'script.go\u31d3Zone.Identifier', 'id_rsa.pub\u31d4foo.txt',
         'notes\u3033readme.txt', 'script.go\U0001d23aZone.Identifier', 'id_rsa.pub\U0001d20ffoo.txt',
         'models.json\U0001d23breadme.txt',
+        'notes\U0001f67creadme.txt', 'script.go\U0001f67dZone.Identifier', 'id_rsa.pub\U0001f67cfoo.txt',
+        'models.json\U0001f67dreadme.txt',
+        'notes\u2e4areadme.txt', 'script.go\u2e4aZone.Identifier', 'id_rsa.pub\u2e4afoo.txt',
+        'models.json\u2e4areadme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
         'script.go\ufe0e', 'id_rsa.pub\ufe0f', 'notes\u0301.txt', 'readme\u20dd.md',
         'models.json\u0332', 'notes\u180b.txt',
+        'notes\u3164.txt', 'script.go\u2800', 'readme\u1160.md', 'models.json\uffa0',
     )
     for rel in blocked:
         if not path_reason(rel):
