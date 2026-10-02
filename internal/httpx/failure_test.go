@@ -4883,3 +4883,51 @@ func TestTagLowLineFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag letter was treated as a low line")
 	}
 }
+
+func TestSanitizeFailureStripsTagPlus(t *testing.T) {
+	secret := "code+verifier12"
+	mark := "code\U000E002Bverifier12"
+	encoded := "code%F3%A0%80%ABverifier12"
+	inserted := "code+\U000E002Bverifier12"
+	mixedSecret := "rt_Zz9q+ab7f"
+	mixed := "rt\U000E005FZz9q\U000E002Bab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code+verifier12code+verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E002Bverifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag plus leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E002B later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag plus prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagPlusFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagPlusPieces(rawPieces("code\U000E002Bverifier12"))
+	if !ok || renderPieces(folded) != "code+verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagPlusPieces(rawPieces("code+verifier12")); ok {
+		t.Fatalf("ascii plus was folded")
+	}
+	if foldTagPlusString("id\U000E005Frsa") != "id\U000E005Frsa" {
+		t.Fatalf("tag low line was treated as a plus")
+	}
+}

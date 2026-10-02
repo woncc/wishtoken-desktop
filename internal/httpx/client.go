@@ -444,6 +444,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleLowLine != needleDigits {
 		spans = append(spans, exactSecretSpans(lowLineBase, needleLowLine)...)
 	}
+	// Tag plus copies '+' and does not NFKC-fold. It is a format character,
+	// so the drop pass below removes it. That joins a base64 or PKCE token
+	// and misses the stored plus. Folding it is a separate reading. It runs
+	// on the tag-low-line reading so one secret can use a tag low line and a
+	// tag plus. The drop reading still runs, so an inserted tag plus cannot
+	// hide a token that has no plus.
+	plusBase := lowLineBase
+	if lowered, ok := foldTagLowLinePieces(lowLineBase); ok {
+		plusBase = lowered
+	}
+	needlePlus := foldTagPlusString(needleLowLine)
+	if plused, ok := foldTagPlusPieces(plusBase); ok {
+		spans = append(spans, exactSecretSpans(plused, needlePlus)...)
+	} else if needlePlus != needleLowLine {
+		spans = append(spans, exactSecretSpans(plusBase, needlePlus)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -801,6 +817,46 @@ func foldTagLowLineString(s string) string {
 		return s
 	}
 	folded, _ := foldTagLowLinePieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagPlusPieces maps the Unicode tag plus sign to ASCII '+'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored plus written with a tag would stay visible.
+// One output piece covers the original rune. The drop reading still runs on
+// the unfolded pieces. Other tag characters stay out.
+func foldTagPlusPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE002B {
+			out = append(out, secretPiece{b: '+', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagPlusString(s string) string {
+	if !strings.ContainsRune(s, 0xE002B) {
+		return s
+	}
+	folded, _ := foldTagPlusPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
