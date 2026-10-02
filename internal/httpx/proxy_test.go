@@ -2098,3 +2098,33 @@ func TestRedactHidesTagQuotationInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesTagApostropheInProxyPassword(t *testing.T) {
+	const password = "rt'Zz9qab7f3a"
+	mark := strings.ReplaceAll(password, "'", "\U000E0027")
+	encoded := strings.ReplaceAll(password, "'", "%F3%A0%80%A7")
+	userinfo := url.PathEscape(password)
+	for _, query := range []string{mark, encoded} {
+		got := Redact("http://user:" + userinfo + "@127.0.0.1:7890?q=" + query)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "ab7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact leaked %q in %q", leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	mixed := "rt'Zz9q\"ab7f3a"
+	mixedMark := "rt\U000E0027Zz\U000E0039q\U000E0022ab7f3a"
+	got := Redact("http://user:" + url.PathEscape(mixed) + "@127.0.0.1:7890?q=" + mixedMark)
+	for _, leaked := range []string{mixed, mixedMark, "Zz9q", "ab7f3a"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("mixed tag leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\U000E0027example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
