@@ -3658,3 +3658,267 @@ func TestDotLeaderASCIIFoldsOnlyLeaders(t *testing.T) {
 		t.Fatalf("dot leader fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsDigitStops(t *testing.T) {
+	pairs := []struct {
+		secret string
+		digits string
+		mark   string
+	}{
+		{"rt_Zz9q0.7f3a", "0.", "\U0001F100"},
+		{"rt_Zz9q1.7f3a", "1.", "\u2488"},
+		{"rt_Aa8k10.7f3a", "10.", "\u2491"},
+		{"rt_Bb7m20.7f3a", "20.", "\u249B"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.digits, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.digits)
+	}
+	bearer := "Bearer q7.Zz9q1.token7"
+	bearerMarked := strings.ReplaceAll(bearer, "1.", "\u2488")
+	parts = append(parts, bearerMarked)
+	leaked = append(leaked, bearer, bearerMarked, "token7")
+	jwt := "eyJhbGciOi1.eyJzdWIiOiJ1.c2lnbmF0dXJl"
+	jwtMarked := strings.ReplaceAll(jwt, "1.", "\u2488")
+	parts = append(parts, jwtMarked)
+	leaked = append(leaked, jwt, jwtMarked, "c2lnbmF0dXJl")
+	encoded := strings.ReplaceAll(pairs[1].secret, "1.", "%E2%92%88")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[2].secret, "10.", "\u2491")
+	got = SanitizeFailure("rejected "+pairs[2].secret+" later", stored)
+	for _, item := range []string{pairs[2].secret, stored, "Zz9q", "10.", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U0001F100 later",
+		"see \u2488 later",
+		"see \u2491 later",
+		"see \u249B later",
+		"see \U0001F101 later",
+		"see \u2474 later",
+		"see \u2469 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("digit stop prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDigitStopASCIIFoldsOnlyFullStops(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x1F100, "0."},
+		{0x2488, "1."},
+		{0x2490, "9."},
+		{0x2491, "10."},
+		{0x249B, "20."},
+	}
+	for _, check := range checks {
+		got, ok := digitStopASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'.', '0', '1', 0x2487, 0x249C, 0x2469, 0x2474, 0x1F101, 0x2024, 0xFF11} {
+		if _, ok := digitStopASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := digitStopASCII(r); ok {
+			n++
+		}
+	}
+	if n != 21 {
+		t.Fatalf("digit stop fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsDigitCommas(t *testing.T) {
+	pairs := []struct {
+		secret string
+		digits string
+		mark   string
+	}{
+		{"rt_Zz9q0,7f3a", "0,", "\U0001F101"},
+		{"rt_Aa8k5,7f3a", "5,", "\U0001F106"},
+		{"rt_Bb7m9,7f3a", "9,", "\U0001F10A"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.digits, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.digits)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "0,", "%F0%9F%84%81")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[2].secret, "9,", "\U0001F10A")
+	got = SanitizeFailure("rejected "+pairs[2].secret+" later", stored)
+	for _, item := range []string{pairs[2].secret, stored, "Bb7m", "9,", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U0001F101 later",
+		"see \U0001F10A later",
+		"see \u060C later",
+		"see \u3001 later",
+		"see \u2488 later",
+		"see \uFE50 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("digit comma prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDigitCommaASCIIFoldsOnlyDigitCommas(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x1F101, "0,"},
+		{0x1F106, "5,"},
+		{0x1F10A, "9,"},
+	}
+	for _, check := range checks {
+		got, ok := digitCommaASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{',', '0', '9', 0x1F100, 0x1F10B, 0xFE10, 0xFE50, 0xFF0C, 0x060C, 0x3001, 0x2488} {
+		if _, ok := digitCommaASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := digitCommaASCII(r); ok {
+			n++
+		}
+	}
+	if n != 10 {
+		t.Fatalf("digit comma fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsParenNumbers(t *testing.T) {
+	pairs := []struct {
+		secret string
+		digits string
+		mark   string
+	}{
+		{"rt_Zz9q(1)7f3a", "(1)", "\u2474"},
+		{"rt_Aa8k(9)7f3a", "(9)", "\u247C"},
+		{"rt_Bb7m(10)7f", "(10)", "\u247D"},
+		{"rt_Cc6n(20)7f", "(20)", "\u2487"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.digits, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.digits)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "(1)", "%E2%91%B4")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[3].secret, "(20)", "\u2487")
+	got = SanitizeFailure("rejected "+pairs[3].secret+" later", stored)
+	for _, item := range []string{pairs[3].secret, stored, "Cc6n", "(20)", "7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2474 later",
+		"see \u247C later",
+		"see \u247D later",
+		"see \u2487 later",
+		"see \u249C later",
+		"see \u3200 later",
+		"see \u2488 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("paren number prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestParenNumberASCIIFoldsOnlyNumbers(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2474, "(1)"},
+		{0x247C, "(9)"},
+		{0x247D, "(10)"},
+		{0x2487, "(20)"},
+	}
+	for _, check := range checks {
+		got, ok := parenNumberASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'(', ')', '1', 0x2473, 0x2488, 0x249C, 0x3200, 0xFF08, 0x2460, 0x1F100} {
+		if _, ok := parenNumberASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := parenNumberASCII(r); ok {
+			n++
+		}
+	}
+	if n != 20 {
+		t.Fatalf("paren number fold count %d", n)
+	}
+}
