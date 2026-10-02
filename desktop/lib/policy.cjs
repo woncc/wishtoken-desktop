@@ -57,7 +57,7 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // nested ASCII colon such as %253A, are separators as well. A lookalike in
 // the port is a separator too, or the same mark before the port keeps the password.
 const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589'];
-function percentColon(char) {
+function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
     return `%${hex.toUpperCase().split('').map(cls).join('')}`;
@@ -72,12 +72,25 @@ function colonSeparator() {
   const parts = [':', '%3[Aa]', '%25(?:25){0,2}3[Aa]'];
   for (const char of COLON_CHARS) {
     parts.push(char);
-    const encoded = percentColon(char);
+    const encoded = percentBytes(char);
     for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
   }
   return `(?:${parts.join('|')})`;
 }
 const COLON_SEP = colonSeparator();
+// U+FE6B and U+FF20 fold to "@" under NFKC. A nested %2540 hides the same
+// terminator, so user:password%2540host still carries the password.
+const AT_CHARS = ['\uFE6B', '\uFF20'];
+function atSeparator() {
+  const parts = ['@', '%40', '%25(?:25){0,2}40'];
+  for (const char of AT_CHARS) {
+    parts.push(char);
+    const encoded = percentBytes(char);
+    for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
+  }
+  return `(?:${parts.join('|')})`;
+}
+const AT_SEP = atSeparator();
 const SCHEME_USER = '[^\\s/?#:@' + COLON_CHARS.join('') + ']+';
 const proxyPort = COLON_SEP;
 const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
@@ -90,18 +103,20 @@ function redactProxyCredentials(text) {
   // check never sees a separator and would leave the secret in renderer text.
   // The same encoding hides a port in user:password@127.0.0.1%3A7890.
   // %40 is @. user:password%40host still carries the password when that is the
-  // only terminator a literal-at check would look for.
+  // only terminator a literal-at check would look for. A fullwidth or small
+  // commercial at, and a nested %2540, hide that terminator too.
   // / ? # inside a password would end a real URL authority. Only the schemeless
   // pass can consume them, and a slash there cannot start "//" or it would eat
   // the scheme of "http://user@host".
   const sep = COLON_SEP;
   const bareUser = PROXY_USER.slice(0, -1) + COLON_CHARS.join('') + ']';
-  const at = '(?:@|%40)';
+  const at = AT_SEP;
   const userinfo = String.raw`[^\s\/?#@]+(?:${at}[^\s\/?#@]+)*${at}`;
   // A later colon after / ? # means this match ran into the next credential
   // (host:port#user:secret). Reject that start so the inner password can match.
   const tightPiece = String.raw`(?:[^\s@/]|/(?!/))`;
-  const tightGuard = String.raw`(?![^\s@]*(?:[/?#])[^\s@]*${COLON_SEP})`;
+  const tightScan = String.raw`(?:(?!${at})[^\s])`;
+  const tightGuard = String.raw`(?!${tightScan}*(?:[/?#])${tightScan}*${COLON_SEP})`;
   const tightPassword = String.raw`(${tightGuard}${tightPiece}+(?:${at}${tightPiece}+)*)`;
   const tightSpaced = String.raw`(${tightGuard}(?:[^\s/]|/(?!/))*\s(?:[^\s/]|/(?!/)){0,200}?)`;
   const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)${SCHEME_USER}${sep}${userinfo}`, 'gi');
