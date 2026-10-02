@@ -118,6 +118,8 @@ const SECRET_TEXT = [
 // "user:secret@my-proxy\u18037890" keep the password.
 // Proportion and squared four-dot punctuation are the same kind of separator.
 // Otherwise "user:secret@my-proxy\u22377890" keeps the password.
+// Ethiopic short rikrik, musical repeat dots, and Tolong Siki sela are separators too.
+// Otherwise "user:secret@my-proxy\u13937890" keeps the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -157,9 +159,13 @@ function nestPercent(pattern, extra) {
   for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
   return out;
 }
+// U+1393, U+1D108, and U+11DD9 do not fold to ":". The last two are
+// supplementary, so they stay out of the character classes and are only
+// separators. Otherwise "user:secret@my-proxy\u13937890" keeps the password.
+const SIGN_COLONS = ['\u1393', '\u{1D108}', '\u{11DD9}'];
 function colonSeparator() {
   const parts = [':', '%3[Aa]', '%25(?:25){0,2}3[Aa]'];
-  for (const char of COLON_CHARS) {
+  for (const char of COLON_CHARS.concat(SIGN_COLONS)) {
     parts.push(char);
     const encoded = percentBytes(char);
     for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
