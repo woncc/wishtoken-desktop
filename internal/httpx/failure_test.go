@@ -859,3 +859,101 @@ func TestEnclosedASCIIFoldsOnlySingleLetters(t *testing.T) {
 		t.Fatalf("enclosed fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSuperSubLetters(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"e", "\u2091",
+		"i", "\u2071",
+		"n", "\u207f",
+		"o", "\u00ba",
+		"1", "\u00b9",
+		"2", "\u00b2",
+		"0", "\u2080",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "e", "%E2%82%91", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"e", "\u2091",
+		"i", "\u2071",
+		"o", "\u00ba",
+		"1", "\u00b9",
+		"2", "\u2082",
+	).Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("short secret context lost: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u00b2 later",
+		"n\u00ba 3",
+		"x\u2094 later",
+		"a\u207a b",
+		"slow\u207bdown",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("superscript prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSuperSubASCIIFoldsOnlyLettersAndDigits(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x00AA, 'a', true},
+		{0x00BA, 'o', true},
+		{0x00B2, '2', true},
+		{0x00B3, '3', true},
+		{0x00B9, '1', true},
+		{0x2070, '0', true},
+		{0x2071, 'i', true},
+		{0x2072, 0, false},
+		{0x2074, '4', true},
+		{0x2079, '9', true},
+		{0x207A, 0, false},
+		{0x207B, 0, false},
+		{0x207F, 'n', true},
+		{0x2080, '0', true},
+		{0x2089, '9', true},
+		{0x208A, 0, false},
+		{0x2090, 'a', true},
+		{0x2091, 'e', true},
+		{0x2093, 'x', true},
+		{0x2094, 0, false},
+		{0x2095, 'h', true},
+		{0x2096, 'k', true},
+		{0x209C, 't', true},
+	}
+	for _, check := range checks {
+		got, ok := superSubASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := superSubASCII(r); ok {
+			n++
+		}
+	}
+	if n != 36 {
+		t.Fatalf("superscript fold count %d", n)
+	}
+}
