@@ -5174,3 +5174,51 @@ func TestTagApostropheFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag quotation mark was treated as an apostrophe")
 	}
 }
+
+func TestSanitizeFailureStripsTagVerticalLine(t *testing.T) {
+	secret := "code|verifier12"
+	mark := "code\U000E007Cverifier12"
+	encoded := "code%F3%A0%81%BCverifier12"
+	inserted := "code|\U000E007Cverifier12"
+	mixedSecret := "rt'Zz9q|ab7f"
+	mixed := "rt\U000E0027Zz9q\U000E007Cab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code|verifier12code|verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E007Cverifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag vertical line leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E007C later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag vertical line prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagVerticalLineFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagVerticalLinePieces(rawPieces("code\U000E007Cverifier12"))
+	if !ok || renderPieces(folded) != "code|verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagVerticalLinePieces(rawPieces("code|verifier12")); ok {
+		t.Fatalf("ascii vertical line was folded")
+	}
+	if foldTagVerticalLineString("code\U000E0027verifier12") != "code\U000E0027verifier12" {
+		t.Fatalf("tag apostrophe was treated as a vertical line")
+	}
+}
