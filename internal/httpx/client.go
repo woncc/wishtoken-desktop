@@ -384,9 +384,11 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 }
 
 // dropMarkPieces removes characters that do not add a base letter: variation
-// selectors and other nonspacing or enclosing marks, plus format characters
-// such as zero-width spaces, joiners, and byte-order marks. The original byte
-// range of a match still covers one that was sitting inside the secret.
+// selectors and other nonspacing or enclosing marks, format characters such
+// as zero-width spaces, and controls other than ordinary spacing. Tab,
+// newline, and carriage return still separate operator text. The original
+// byte range of a match still covers a dropped character that was sitting
+// inside the secret.
 func dropMarkPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -398,7 +400,7 @@ func dropMarkPieces(in []secretPiece) []secretPiece {
 		if size <= 0 {
 			break
 		}
-		if r != utf8.RuneError && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Cf, r)) {
+		if ignorableCredentialRune(r) {
 			i += size
 			continue
 		}
@@ -406,6 +408,19 @@ func dropMarkPieces(in []secretPiece) []secretPiece {
 		i += size
 	}
 	return out
+}
+
+func ignorableCredentialRune(r rune) bool {
+	if r == utf8.RuneError {
+		return false
+	}
+	if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Cf, r) {
+		return true
+	}
+	if unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
+		return true
+	}
+	return unicode.Is(unicode.Cc, r) && !unicode.IsSpace(r)
 }
 
 func applySecretSpans(s string, spans [][2]int, repl string) string {
