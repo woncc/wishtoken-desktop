@@ -5990,3 +5990,51 @@ func TestTagExclamationFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag number sign was treated as an exclamation mark")
 	}
 }
+
+func TestSanitizeFailureStripsTagLeftParenthesis(t *testing.T) {
+	secret := "code(verifier12"
+	mark := "code\U000E0028verifier12"
+	encoded := "code%F3%A0%80%A8verifier12"
+	inserted := "code(\U000E0028verifier12"
+	mixedSecret := "rt!Zz9q(ab7f"
+	mixed := "rt\U000E0021Zz9q\U000E0028ab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code(verifier12code(verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E0028verifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag left parenthesis leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0028 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag left parenthesis prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagLeftParenthesisFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagLeftParenthesisPieces(rawPieces("code\U000E0028verifier12"))
+	if !ok || renderPieces(folded) != "code(verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagLeftParenthesisPieces(rawPieces("code(verifier12")); ok {
+		t.Fatalf("ascii left parenthesis was folded")
+	}
+	if foldTagLeftParenthesisString("code\U000E0021verifier12") != "code\U000E0021verifier12" {
+		t.Fatalf("tag exclamation mark was treated as a left parenthesis")
+	}
+}

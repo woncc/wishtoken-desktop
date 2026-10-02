@@ -813,6 +813,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleExclaim != needleNumber {
 		spans = append(spans, exactSecretSpans(exclaimBase, needleExclaim)...)
 	}
+	// Tag left parenthesis copies '(' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored left parenthesis. Folding it is a separate reading. It
+	// runs on the tag-exclamation-mark reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag left parenthesis cannot hide
+	// a token that has no left parenthesis.
+	leftParenBase := exclaimBase
+	if exclaimed, ok := foldTagExclamationPieces(exclaimBase); ok {
+		leftParenBase = exclaimed
+	}
+	needleLeftParen := foldTagLeftParenthesisString(needleExclaim)
+	if opened, ok := foldTagLeftParenthesisPieces(leftParenBase); ok {
+		spans = append(spans, exactSecretSpans(opened, needleLeftParen)...)
+	} else if needleLeftParen != needleExclaim {
+		spans = append(spans, exactSecretSpans(leftParenBase, needleLeftParen)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -2104,6 +2120,46 @@ func foldTagExclamationString(s string) string {
 		return s
 	}
 	folded, _ := foldTagExclamationPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagLeftParenthesisPieces maps the Unicode tag left parenthesis to ASCII
+// '('. It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored left parenthesis written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagLeftParenthesisPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0028 {
+			out = append(out, secretPiece{b: '(', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLeftParenthesisString(s string) string {
+	if !strings.ContainsRune(s, 0xE0028) {
+		return s
+	}
+	folded, _ := foldTagLeftParenthesisPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
