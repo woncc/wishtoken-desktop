@@ -2043,3 +2043,509 @@ func TestManagementHidesSecretsSplitByTagCommercialAt(t *testing.T) {
 		t.Fatalf("display context lost: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesSecretsSplitByTagQuotation(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt@\"Zz9qab7f3a"
+	half := strings.NewReplacer("\"", "\U000E0022").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("\"", "%F3%A0%80%A2").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("\"", "\U000E0022", "@", "\U000E0040").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagApostrophe(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt'\"Zz9qab7f3a"
+	half := strings.NewReplacer("'", "\U000E0027").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("'", "%F3%A0%80%A7").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("'", "\U000E0027", "\"", "\U000E0022").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagVerticalLine(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt|'Zz9qab7f3a"
+	half := strings.NewReplacer("|", "\U000E007C").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("|", "%F3%A0%81%BC").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("|", "\U000E007C", "'", "\U000E0027").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagCircumflex(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt^|Zz9qab7f3a"
+	half := strings.NewReplacer("^", "\U000E005E").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("^", "%F3%A0%81%9E").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("^", "\U000E005E", "|", "\U000E007C").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagGrave(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt`^Zz9qab7f3a"
+	half := strings.NewReplacer("`", "\U000E0060").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("`", "%F3%A0%81%A0").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("`", "\U000E0060", "^", "\U000E005E").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagLessThan(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt<`Zz9qab7f3a"
+	half := strings.NewReplacer("<", "\U000E003C").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("<", "%F3%A0%80%BC").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("<", "\U000E003C", "`", "\U000E0060").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagGreaterThan(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt><Zz9qab7f3a"
+	half := strings.NewReplacer(">", "\U000E003E").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer(">", "%F3%A0%80%BE").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer(">", "\U000E003E", "<", "\U000E003C").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagLeftSquareBracket(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt[>Zz9qab7f3a"
+	half := strings.NewReplacer("[", "\U000E005B").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("[", "%F3%A0%81%9B").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("[", "\U000E005B", ">", "\U000E003E").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagRightSquareBracket(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt][Zz9qab7f3a"
+	half := strings.NewReplacer("]", "\U000E005D").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("]", "%F3%A0%81%9D").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("]", "\U000E005D", "[", "\U000E005B").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagLeftCurlyBracket(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt{]Zz9qab7f3a"
+	half := strings.NewReplacer("{", "\U000E007B").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("{", "%F3%A0%81%BB").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("{", "\U000E007B", "]", "\U000E005D").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagRightCurlyBracket(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt}{Zz9qab7f3a"
+	half := strings.NewReplacer("}", "\U000E007D").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("}", "%F3%A0%81%BD").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("}", "\U000E007D", "{", "\U000E007B").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagComma(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt,}Zz9qab7f3a"
+	half := strings.NewReplacer(",", "\U000E002C").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer(",", "%F3%A0%80%AC").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer(",", "\U000E002C", "}", "\U000E007D").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagSemicolon(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt;,Zz9qab7f3a"
+	half := strings.NewReplacer(";", "\U000E003B").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer(";", "%F3%A0%80%BB").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer(";", "\U000E003B", ",", "\U000E002C").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagQuestionMark(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt?;Zz9qab7f3a"
+	half := strings.NewReplacer("?", "\U000E003F").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("?", "%F3%A0%80%BF").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("?", "\U000E003F", ";", "\U000E003B").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagAsterisk(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt*?Zz9qab7f3a"
+	half := strings.NewReplacer("*", "\U000E002A").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("*", "%F3%A0%80%AA").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("*", "\U000E002A", "?", "\U000E003F").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagAmpersand(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt&*Zz9qab7f3a"
+	half := strings.NewReplacer("&", "\U000E0026").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("&", "%F3%A0%80%A6").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("&", "\U000E0026", "*", "\U000E002A").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagDollar(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt$&Zz9qab7f3a"
+	half := strings.NewReplacer("$", "\U000E0024").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("$", "%F3%A0%80%A4").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("$", "\U000E0024", "&", "\U000E0026").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagNumberSign(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt#$Zz9qab7f3a"
+	half := strings.NewReplacer("#", "\U000E0023").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("#", "%F3%A0%80%A3").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("#", "\U000E0023", "$", "\U000E0024").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagExclamation(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt!#Zz9qab7f3a"
+	half := strings.NewReplacer("!", "\U000E0021").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("!", "%F3%A0%80%A1").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("!", "\U000E0021", "#", "\U000E0023").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagLeftParenthesis(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt(!Zz9qab7f3a"
+	half := strings.NewReplacer("(", "\U000E0028").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("(", "%F3%A0%80%A8").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("(", "\U000E0028", "!", "\U000E0021").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagRightParenthesis(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt)(Zz9qab7f3a"
+	half := strings.NewReplacer(")", "\U000E0029").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer(")", "%F3%A0%80%A9").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer(")", "\U000E0029", "(", "\U000E0028").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagTilde(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt~)Zz9qab7f3a"
+	half := strings.NewReplacer("~", "\U000E007E").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("~", "%F3%A0%81%BE").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("~", "\U000E007E", ")", "\U000E0029").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}

@@ -509,6 +509,358 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleAt != needlePercent {
 		spans = append(spans, exactSecretSpans(atBase, needleAt)...)
 	}
+	// Tag quotation mark copies '"' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a quoted
+	// token and misses the stored quotation mark. Folding it is a separate
+	// reading. It runs on the tag-commercial-at reading so one secret can
+	// use both. The drop reading still runs, so an inserted tag quotation
+	// mark cannot hide a token that has no quotation mark.
+	quoteBase := atBase
+	if ated, ok := foldTagCommercialAtPieces(atBase); ok {
+		quoteBase = ated
+	}
+	needleQuote := foldTagQuotationString(needleAt)
+	if quoted, ok := foldTagQuotationPieces(quoteBase); ok {
+		spans = append(spans, exactSecretSpans(quoted, needleQuote)...)
+	} else if needleQuote != needleAt {
+		spans = append(spans, exactSecretSpans(quoteBase, needleQuote)...)
+	}
+	// Tag apostrophe copies '\'' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored apostrophe. Folding it is a separate reading. It
+	// runs on the tag-quotation reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag apostrophe cannot hide a
+	// token that has no apostrophe.
+	aposBase := quoteBase
+	if quoted, ok := foldTagQuotationPieces(quoteBase); ok {
+		aposBase = quoted
+	}
+	needleApos := foldTagApostropheString(needleQuote)
+	if apostrophed, ok := foldTagApostrophePieces(aposBase); ok {
+		spans = append(spans, exactSecretSpans(apostrophed, needleApos)...)
+	} else if needleApos != needleQuote {
+		spans = append(spans, exactSecretSpans(aposBase, needleApos)...)
+	}
+	// Tag vertical line copies '|' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored vertical line. Folding it is a separate reading. It
+	// runs on the tag-apostrophe reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag vertical line cannot hide
+	// a token that has no vertical line.
+	barBase := aposBase
+	if apostrophed, ok := foldTagApostrophePieces(aposBase); ok {
+		barBase = apostrophed
+	}
+	needleBar := foldTagVerticalLineString(needleApos)
+	if barred, ok := foldTagVerticalLinePieces(barBase); ok {
+		spans = append(spans, exactSecretSpans(barred, needleBar)...)
+	} else if needleBar != needleApos {
+		spans = append(spans, exactSecretSpans(barBase, needleBar)...)
+	}
+	// Tag circumflex accent copies '^' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored circumflex. Folding it is a separate
+	// reading. It runs on the tag-vertical-line reading so one secret can
+	// use both. The drop reading still runs, so an inserted tag circumflex
+	// cannot hide a token that has no circumflex.
+	caretBase := barBase
+	if barred, ok := foldTagVerticalLinePieces(barBase); ok {
+		caretBase = barred
+	}
+	needleCaret := foldTagCircumflexString(needleBar)
+	if careted, ok := foldTagCircumflexPieces(caretBase); ok {
+		spans = append(spans, exactSecretSpans(careted, needleCaret)...)
+	} else if needleCaret != needleBar {
+		spans = append(spans, exactSecretSpans(caretBase, needleCaret)...)
+	}
+	// Tag grave accent copies '`' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored grave accent. Folding it is a separate reading. It
+	// runs on the tag-circumflex reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag grave accent cannot hide
+	// a token that has no grave accent.
+	graveBase := caretBase
+	if careted, ok := foldTagCircumflexPieces(caretBase); ok {
+		graveBase = careted
+	}
+	needleGrave := foldTagGraveString(needleCaret)
+	if graved, ok := foldTagGravePieces(graveBase); ok {
+		spans = append(spans, exactSecretSpans(graved, needleGrave)...)
+	} else if needleGrave != needleCaret {
+		spans = append(spans, exactSecretSpans(graveBase, needleGrave)...)
+	}
+	// Tag less-than sign copies '<' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored less-than sign. Folding it is a separate reading. It
+	// runs on the tag-grave reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag less-than sign cannot hide a
+	// token that has no less-than sign.
+	lessBase := graveBase
+	if graved, ok := foldTagGravePieces(graveBase); ok {
+		lessBase = graved
+	}
+	needleLess := foldTagLessThanString(needleGrave)
+	if lessed, ok := foldTagLessThanPieces(lessBase); ok {
+		spans = append(spans, exactSecretSpans(lessed, needleLess)...)
+	} else if needleLess != needleGrave {
+		spans = append(spans, exactSecretSpans(lessBase, needleLess)...)
+	}
+	// Tag greater-than sign copies '>' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored greater-than sign. Folding it is a separate reading.
+	// It runs on the tag-less-than reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag greater-than sign cannot
+	// hide a token that has no greater-than sign.
+	greaterBase := lessBase
+	if lessed, ok := foldTagLessThanPieces(lessBase); ok {
+		greaterBase = lessed
+	}
+	needleGreater := foldTagGreaterThanString(needleLess)
+	if greatered, ok := foldTagGreaterThanPieces(greaterBase); ok {
+		spans = append(spans, exactSecretSpans(greatered, needleGreater)...)
+	} else if needleGreater != needleLess {
+		spans = append(spans, exactSecretSpans(greaterBase, needleGreater)...)
+	}
+	// Tag left square bracket copies '[' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored left square bracket. Folding it is a
+	// separate reading. It runs on the tag-greater-than reading so one secret
+	// can use both. The drop reading still runs, so an inserted tag left
+	// square bracket cannot hide a token that has no left square bracket.
+	leftBracketBase := greaterBase
+	if greatered, ok := foldTagGreaterThanPieces(greaterBase); ok {
+		leftBracketBase = greatered
+	}
+	needleLeftBracket := foldTagLeftSquareBracketString(needleGreater)
+	if bracketed, ok := foldTagLeftSquareBracketPieces(leftBracketBase); ok {
+		spans = append(spans, exactSecretSpans(bracketed, needleLeftBracket)...)
+	} else if needleLeftBracket != needleGreater {
+		spans = append(spans, exactSecretSpans(leftBracketBase, needleLeftBracket)...)
+	}
+	// Tag right square bracket copies ']' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored right square bracket. Folding it is a
+	// separate reading. It runs on the tag-left-square-bracket reading so one
+	// secret can use both. The drop reading still runs, so an inserted tag
+	// right square bracket cannot hide a token that has no right square bracket.
+	rightBracketBase := leftBracketBase
+	if bracketed, ok := foldTagLeftSquareBracketPieces(leftBracketBase); ok {
+		rightBracketBase = bracketed
+	}
+	needleRightBracket := foldTagRightSquareBracketString(needleLeftBracket)
+	if closed, ok := foldTagRightSquareBracketPieces(rightBracketBase); ok {
+		spans = append(spans, exactSecretSpans(closed, needleRightBracket)...)
+	} else if needleRightBracket != needleLeftBracket {
+		spans = append(spans, exactSecretSpans(rightBracketBase, needleRightBracket)...)
+	}
+	// Tag left curly bracket copies '{' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored left curly bracket. Folding it is a
+	// separate reading. It runs on the tag-right-square-bracket reading so
+	// one secret can use both. The drop reading still runs, so an inserted
+	// tag left curly bracket cannot hide a token that has no left curly bracket.
+	leftCurlyBase := rightBracketBase
+	if closed, ok := foldTagRightSquareBracketPieces(rightBracketBase); ok {
+		leftCurlyBase = closed
+	}
+	needleLeftCurly := foldTagLeftCurlyBracketString(needleRightBracket)
+	if curled, ok := foldTagLeftCurlyBracketPieces(leftCurlyBase); ok {
+		spans = append(spans, exactSecretSpans(curled, needleLeftCurly)...)
+	} else if needleLeftCurly != needleRightBracket {
+		spans = append(spans, exactSecretSpans(leftCurlyBase, needleLeftCurly)...)
+	}
+	// Tag right curly bracket copies '}' and does not NFKC-fold. It is a
+	// format character, so the drop pass below removes it. That splits a
+	// token and misses the stored right curly bracket. Folding it is a
+	// separate reading. It runs on the tag-left-curly-bracket reading so one
+	// secret can use both. The drop reading still runs, so an inserted tag
+	// right curly bracket cannot hide a token that has no right curly bracket.
+	rightCurlyBase := leftCurlyBase
+	if curled, ok := foldTagLeftCurlyBracketPieces(leftCurlyBase); ok {
+		rightCurlyBase = curled
+	}
+	needleRightCurly := foldTagRightCurlyBracketString(needleLeftCurly)
+	if closed, ok := foldTagRightCurlyBracketPieces(rightCurlyBase); ok {
+		spans = append(spans, exactSecretSpans(closed, needleRightCurly)...)
+	} else if needleRightCurly != needleLeftCurly {
+		spans = append(spans, exactSecretSpans(rightCurlyBase, needleRightCurly)...)
+	}
+	// Tag comma copies ',' and does not NFKC-fold. It is a format character,
+	// so the drop pass below removes it. That splits a token and misses the
+	// stored comma. Folding it is a separate reading. It runs on the
+	// tag-right-curly-bracket reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag comma cannot hide a token that
+	// has no comma.
+	commaBase := rightCurlyBase
+	if closed, ok := foldTagRightCurlyBracketPieces(rightCurlyBase); ok {
+		commaBase = closed
+	}
+	needleComma := foldTagCommaString(needleRightCurly)
+	if commaed, ok := foldTagCommaPieces(commaBase); ok {
+		spans = append(spans, exactSecretSpans(commaed, needleComma)...)
+	} else if needleComma != needleRightCurly {
+		spans = append(spans, exactSecretSpans(commaBase, needleComma)...)
+	}
+	// Tag semicolon copies ';' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored semicolon. Folding it is a separate reading. It runs
+	// on the tag-comma reading so one secret can use both. The drop reading
+	// still runs, so an inserted tag semicolon cannot hide a token that has
+	// no semicolon.
+	semiBase := commaBase
+	if commaed, ok := foldTagCommaPieces(commaBase); ok {
+		semiBase = commaed
+	}
+	needleSemi := foldTagSemicolonString(needleComma)
+	if semied, ok := foldTagSemicolonPieces(semiBase); ok {
+		spans = append(spans, exactSecretSpans(semied, needleSemi)...)
+	} else if needleSemi != needleComma {
+		spans = append(spans, exactSecretSpans(semiBase, needleSemi)...)
+	}
+	// Tag question mark copies '?' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored question mark. Folding it is a separate reading. It
+	// runs on the tag-semicolon reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag question mark cannot hide a token
+	// that has no question mark.
+	questionBase := semiBase
+	if semied, ok := foldTagSemicolonPieces(semiBase); ok {
+		questionBase = semied
+	}
+	needleQuestion := foldTagQuestionMarkString(needleSemi)
+	if questioned, ok := foldTagQuestionMarkPieces(questionBase); ok {
+		spans = append(spans, exactSecretSpans(questioned, needleQuestion)...)
+	} else if needleQuestion != needleSemi {
+		spans = append(spans, exactSecretSpans(questionBase, needleQuestion)...)
+	}
+	// Tag asterisk copies '*' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored asterisk. Folding it is a separate reading. It runs
+	// on the tag-question-mark reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag asterisk cannot hide a token that
+	// has no asterisk.
+	asteriskBase := questionBase
+	if questioned, ok := foldTagQuestionMarkPieces(questionBase); ok {
+		asteriskBase = questioned
+	}
+	needleAsterisk := foldTagAsteriskString(needleQuestion)
+	if asterisked, ok := foldTagAsteriskPieces(asteriskBase); ok {
+		spans = append(spans, exactSecretSpans(asterisked, needleAsterisk)...)
+	} else if needleAsterisk != needleQuestion {
+		spans = append(spans, exactSecretSpans(asteriskBase, needleAsterisk)...)
+	}
+	// Tag ampersand copies '&' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored ampersand. Folding it is a separate reading. It runs
+	// on the tag-asterisk reading so one secret can use both. The drop reading
+	// still runs, so an inserted tag ampersand cannot hide a token that has no
+	// ampersand.
+	ampersandBase := asteriskBase
+	if asterisked, ok := foldTagAsteriskPieces(asteriskBase); ok {
+		ampersandBase = asterisked
+	}
+	needleAmpersand := foldTagAmpersandString(needleAsterisk)
+	if amped, ok := foldTagAmpersandPieces(ampersandBase); ok {
+		spans = append(spans, exactSecretSpans(amped, needleAmpersand)...)
+	} else if needleAmpersand != needleAsterisk {
+		spans = append(spans, exactSecretSpans(ampersandBase, needleAmpersand)...)
+	}
+	// Tag dollar sign copies '$' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored dollar sign. Folding it is a separate reading. It runs
+	// on the tag-ampersand reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag dollar sign cannot hide a token
+	// that has no dollar sign.
+	dollarBase := ampersandBase
+	if amped, ok := foldTagAmpersandPieces(ampersandBase); ok {
+		dollarBase = amped
+	}
+	needleDollar := foldTagDollarString(needleAmpersand)
+	if dollared, ok := foldTagDollarPieces(dollarBase); ok {
+		spans = append(spans, exactSecretSpans(dollared, needleDollar)...)
+	} else if needleDollar != needleAmpersand {
+		spans = append(spans, exactSecretSpans(dollarBase, needleDollar)...)
+	}
+	// Tag number sign copies '#' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored number sign. Folding it is a separate reading. It runs
+	// on the tag-dollar-sign reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag number sign cannot hide a token
+	// that has no number sign.
+	numberBase := dollarBase
+	if dollared, ok := foldTagDollarPieces(dollarBase); ok {
+		numberBase = dollared
+	}
+	needleNumber := foldTagNumberSignString(needleDollar)
+	if numbered, ok := foldTagNumberSignPieces(numberBase); ok {
+		spans = append(spans, exactSecretSpans(numbered, needleNumber)...)
+	} else if needleNumber != needleDollar {
+		spans = append(spans, exactSecretSpans(numberBase, needleNumber)...)
+	}
+	// Tag exclamation mark copies '!' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored exclamation mark. Folding it is a separate reading. It
+	// runs on the tag-number-sign reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag exclamation mark cannot hide a
+	// token that has no exclamation mark.
+	exclaimBase := numberBase
+	if numbered, ok := foldTagNumberSignPieces(numberBase); ok {
+		exclaimBase = numbered
+	}
+	needleExclaim := foldTagExclamationString(needleNumber)
+	if exclaimed, ok := foldTagExclamationPieces(exclaimBase); ok {
+		spans = append(spans, exactSecretSpans(exclaimed, needleExclaim)...)
+	} else if needleExclaim != needleNumber {
+		spans = append(spans, exactSecretSpans(exclaimBase, needleExclaim)...)
+	}
+	// Tag left parenthesis copies '(' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored left parenthesis. Folding it is a separate reading. It
+	// runs on the tag-exclamation-mark reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag left parenthesis cannot hide
+	// a token that has no left parenthesis.
+	leftParenBase := exclaimBase
+	if exclaimed, ok := foldTagExclamationPieces(exclaimBase); ok {
+		leftParenBase = exclaimed
+	}
+	needleLeftParen := foldTagLeftParenthesisString(needleExclaim)
+	if opened, ok := foldTagLeftParenthesisPieces(leftParenBase); ok {
+		spans = append(spans, exactSecretSpans(opened, needleLeftParen)...)
+	} else if needleLeftParen != needleExclaim {
+		spans = append(spans, exactSecretSpans(leftParenBase, needleLeftParen)...)
+	}
+	// Tag right parenthesis copies ')' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored right parenthesis. Folding it is a separate reading.
+	// It runs on the tag-left-parenthesis reading so one secret can use both.
+	// The drop reading still runs, so an inserted tag right parenthesis cannot
+	// hide a token that has no right parenthesis.
+	rightParenBase := leftParenBase
+	if opened, ok := foldTagLeftParenthesisPieces(leftParenBase); ok {
+		rightParenBase = opened
+	}
+	needleRightParen := foldTagRightParenthesisString(needleLeftParen)
+	if closed, ok := foldTagRightParenthesisPieces(rightParenBase); ok {
+		spans = append(spans, exactSecretSpans(closed, needleRightParen)...)
+	} else if needleRightParen != needleLeftParen {
+		spans = append(spans, exactSecretSpans(rightParenBase, needleRightParen)...)
+	}
+	// Tag tilde copies '~' and does not NFKC-fold. It is a format character,
+	// so the drop pass below removes it. That splits a token and misses the
+	// stored tilde. Folding it is a separate reading. It runs on the
+	// tag-right-parenthesis reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag tilde cannot hide a token that
+	// has no tilde.
+	tildeBase := rightParenBase
+	if closed, ok := foldTagRightParenthesisPieces(rightParenBase); ok {
+		tildeBase = closed
+	}
+	needleTilde := foldTagTildeString(needleRightParen)
+	if tilded, ok := foldTagTildePieces(tildeBase); ok {
+		spans = append(spans, exactSecretSpans(tilded, needleTilde)...)
+	} else if needleTilde != needleRightParen {
+		spans = append(spans, exactSecretSpans(tildeBase, needleTilde)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1036,6 +1388,891 @@ func foldTagCommercialAtString(s string) string {
 		return s
 	}
 	folded, _ := foldTagCommercialAtPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagQuotationPieces maps the Unicode tag quotation mark to ASCII '"'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored quotation mark written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagQuotationPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0022 {
+			out = append(out, secretPiece{b: '"', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagQuotationString(s string) string {
+	if !strings.ContainsRune(s, 0xE0022) {
+		return s
+	}
+	folded, _ := foldTagQuotationPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagApostrophePieces maps the Unicode tag apostrophe to ASCII '\”.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored apostrophe written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagApostrophePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0027 {
+			out = append(out, secretPiece{b: '\'', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagApostropheString(s string) string {
+	if !strings.ContainsRune(s, 0xE0027) {
+		return s
+	}
+	folded, _ := foldTagApostrophePieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagVerticalLinePieces maps the Unicode tag vertical line to ASCII '|'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored vertical line written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagVerticalLinePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE007C {
+			out = append(out, secretPiece{b: '|', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagVerticalLineString(s string) string {
+	if !strings.ContainsRune(s, 0xE007C) {
+		return s
+	}
+	folded, _ := foldTagVerticalLinePieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagCircumflexPieces maps the Unicode tag circumflex accent to ASCII '^'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored circumflex written with a tag would
+// stay visible. One output piece covers the original rune. The drop reading
+// still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagCircumflexPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE005E {
+			out = append(out, secretPiece{b: '^', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagCircumflexString(s string) string {
+	if !strings.ContainsRune(s, 0xE005E) {
+		return s
+	}
+	folded, _ := foldTagCircumflexPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagGravePieces maps the Unicode tag grave accent to ASCII '`'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored grave accent written with a tag would
+// stay visible. One output piece covers the original rune. The drop reading
+// still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagGravePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0060 {
+			out = append(out, secretPiece{b: '`', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagGraveString(s string) string {
+	if !strings.ContainsRune(s, 0xE0060) {
+		return s
+	}
+	folded, _ := foldTagGravePieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagLessThanPieces maps the Unicode tag less-than sign to ASCII '<'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored less-than sign written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagLessThanPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003C {
+			out = append(out, secretPiece{b: '<', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLessThanString(s string) string {
+	if !strings.ContainsRune(s, 0xE003C) {
+		return s
+	}
+	folded, _ := foldTagLessThanPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagGreaterThanPieces maps the Unicode tag greater-than sign to ASCII '>'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored greater-than sign written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagGreaterThanPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003E {
+			out = append(out, secretPiece{b: '>', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagGreaterThanString(s string) string {
+	if !strings.ContainsRune(s, 0xE003E) {
+		return s
+	}
+	folded, _ := foldTagGreaterThanPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagLeftSquareBracketPieces maps the Unicode tag left square bracket to
+// ASCII '['. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored left square bracket
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagLeftSquareBracketPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE005B {
+			out = append(out, secretPiece{b: '[', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLeftSquareBracketString(s string) string {
+	if !strings.ContainsRune(s, 0xE005B) {
+		return s
+	}
+	folded, _ := foldTagLeftSquareBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagRightSquareBracketPieces maps the Unicode tag right square bracket
+// to ASCII ']'. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored right square bracket
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagRightSquareBracketPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE005D {
+			out = append(out, secretPiece{b: ']', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagRightSquareBracketString(s string) string {
+	if !strings.ContainsRune(s, 0xE005D) {
+		return s
+	}
+	folded, _ := foldTagRightSquareBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagLeftCurlyBracketPieces maps the Unicode tag left curly bracket to
+// ASCII '{'. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored left curly bracket
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagLeftCurlyBracketPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE007B {
+			out = append(out, secretPiece{b: '{', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLeftCurlyBracketString(s string) string {
+	if !strings.ContainsRune(s, 0xE007B) {
+		return s
+	}
+	folded, _ := foldTagLeftCurlyBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagRightCurlyBracketPieces maps the Unicode tag right curly bracket to
+// ASCII '}'. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored right curly bracket
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagRightCurlyBracketPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE007D {
+			out = append(out, secretPiece{b: '}', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagRightCurlyBracketString(s string) string {
+	if !strings.ContainsRune(s, 0xE007D) {
+		return s
+	}
+	folded, _ := foldTagRightCurlyBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagCommaPieces maps the Unicode tag comma to ASCII ','. It does not
+// NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes format
+// characters, so a stored comma written with a tag would stay visible. One
+// output piece covers the original rune. The drop reading still runs on the
+// unfolded pieces. Other tag characters stay out.
+func foldTagCommaPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE002C {
+			out = append(out, secretPiece{b: ',', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagCommaString(s string) string {
+	if !strings.ContainsRune(s, 0xE002C) {
+		return s
+	}
+	folded, _ := foldTagCommaPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagSemicolonPieces maps the Unicode tag semicolon to ASCII ';'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored semicolon written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagSemicolonPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003B {
+			out = append(out, secretPiece{b: ';', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagSemicolonString(s string) string {
+	if !strings.ContainsRune(s, 0xE003B) {
+		return s
+	}
+	folded, _ := foldTagSemicolonPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagQuestionMarkPieces maps the Unicode tag question mark to ASCII '?'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored question mark written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagQuestionMarkPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003F {
+			out = append(out, secretPiece{b: '?', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagQuestionMarkString(s string) string {
+	if !strings.ContainsRune(s, 0xE003F) {
+		return s
+	}
+	folded, _ := foldTagQuestionMarkPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagAsteriskPieces maps the Unicode tag asterisk to ASCII '*'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored asterisk written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagAsteriskPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE002A {
+			out = append(out, secretPiece{b: '*', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagAsteriskString(s string) string {
+	if !strings.ContainsRune(s, 0xE002A) {
+		return s
+	}
+	folded, _ := foldTagAsteriskPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagAmpersandPieces maps the Unicode tag ampersand to ASCII '&'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored ampersand written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagAmpersandPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0026 {
+			out = append(out, secretPiece{b: '&', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagAmpersandString(s string) string {
+	if !strings.ContainsRune(s, 0xE0026) {
+		return s
+	}
+	folded, _ := foldTagAmpersandPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagDollarPieces maps the Unicode tag dollar sign to ASCII '$'. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored dollar sign written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagDollarPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0024 {
+			out = append(out, secretPiece{b: '$', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagDollarString(s string) string {
+	if !strings.ContainsRune(s, 0xE0024) {
+		return s
+	}
+	folded, _ := foldTagDollarPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagNumberSignPieces maps the Unicode tag number sign to ASCII '#'. It
+// does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored number sign written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagNumberSignPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0023 {
+			out = append(out, secretPiece{b: '#', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagNumberSignString(s string) string {
+	if !strings.ContainsRune(s, 0xE0023) {
+		return s
+	}
+	folded, _ := foldTagNumberSignPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagExclamationPieces maps the Unicode tag exclamation mark to ASCII '!'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored exclamation mark written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagExclamationPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0021 {
+			out = append(out, secretPiece{b: '!', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagExclamationString(s string) string {
+	if !strings.ContainsRune(s, 0xE0021) {
+		return s
+	}
+	folded, _ := foldTagExclamationPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagLeftParenthesisPieces maps the Unicode tag left parenthesis to ASCII
+// '('. It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored left parenthesis written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagLeftParenthesisPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0028 {
+			out = append(out, secretPiece{b: '(', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLeftParenthesisString(s string) string {
+	if !strings.ContainsRune(s, 0xE0028) {
+		return s
+	}
+	folded, _ := foldTagLeftParenthesisPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagRightParenthesisPieces maps the Unicode tag right parenthesis to
+// ASCII ')'. It does not NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored right parenthesis
+// written with a tag would stay visible. One output piece covers the original
+// rune. The drop reading still runs on the unfolded pieces. Other tag
+// characters stay out.
+func foldTagRightParenthesisPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0029 {
+			out = append(out, secretPiece{b: ')', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagRightParenthesisString(s string) string {
+	if !strings.ContainsRune(s, 0xE0029) {
+		return s
+	}
+	folded, _ := foldTagRightParenthesisPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagTildePieces maps the Unicode tag tilde to ASCII '~'. It does not
+// NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes format
+// characters, so a stored tilde written with a tag would stay visible. One
+// output piece covers the original rune. The drop reading still runs on the
+// unfolded pieces. Other tag characters stay out.
+func foldTagTildePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE007E {
+			out = append(out, secretPiece{b: '~', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagTildeString(s string) string {
+	if !strings.ContainsRune(s, 0xE007E) {
+		return s
+	}
+	folded, _ := foldTagTildePieces(rawPieces(s))
 	return renderPieces(folded)
 }
 

@@ -569,6 +569,22 @@ TAG_DIGIT = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_DIGITS})
 # the file. A second reading folds the other tag copies too.
 TAG_LOW_LINE = '\U000E005F'
 TAG_LOW_LINE_FOLD = str.maketrans({0xE005F: '_'})
+# Tag tilde copies '~' and does not NFKC-fold. It is a format character, so
+# the component reading strips it. That turns auth.json~1 into auth.json1 and
+# the editor-number alias never runs. The tilde reading is tried after the
+# low line. Folding only the tilde still strips any other tag, so an extra
+# tag letter cannot rename the file. A second reading folds the other tag
+# copies too.
+TAG_TILDE = '\U000E007E'
+TAG_TILDE_FOLD = str.maketrans({0xE007E: '~'})
+# Tag parentheses copy '(' and ')' and do not NFKC-fold. They are format
+# characters, so the component reading strips them. That turns
+# auth (1).json into auth 1.json and the copy-index alias never runs.
+# The parenthesis reading is tried after the tilde. Folding only the
+# parentheses still strips any other tag, so an extra tag letter cannot
+# rename the file. A second reading folds the other tag copies too.
+TAG_PAREN_CHARS = frozenset('\U000E0028\U000E0029')
+TAG_PAREN_FOLD = str.maketrans({0xE0028: '(', 0xE0029: ')'})
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -609,6 +625,18 @@ def path_reason(rel):
         folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD)
         if reason := component_path_reason(folded):
             return reason
+    if TAG_TILDE in rel:
+        if reason := component_path_reason(rel.translate(TAG_TILDE_FOLD)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD).translate(TAG_TILDE_FOLD)
+        if reason := component_path_reason(folded):
+            return reason
+    if any(ch in TAG_PAREN_CHARS for ch in rel):
+        if reason := component_path_reason(rel.translate(TAG_PAREN_FOLD)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD).translate(TAG_TILDE_FOLD).translate(TAG_PAREN_FOLD)
+        if reason := component_path_reason(folded):
+            return reason
     return ''
 
 def component_path_reason(rel):
@@ -628,10 +656,286 @@ def private_filename(name):
     stem = path.stem.replace('_', '-')
     return stem == 'handoff' or stem == 'auth-snapshot' or stem.startswith('auth-snapshot-')
 
+
+def math_ascii(cp):
+    # Same ranges the credential redactor folds. Greek mathematical letters
+    # and the holes reserved for letterlike forms are not ASCII copies.
+    if 0x1D400 <= cp <= 0x1D419:
+        return chr(cp - 0x1D400 + ord('A'))
+    if 0x1D41A <= cp <= 0x1D433:
+        return chr(cp - 0x1D41A + ord('a'))
+    if 0x1D434 <= cp <= 0x1D44D:
+        return chr(cp - 0x1D434 + ord('A'))
+    if 0x1D44E <= cp <= 0x1D454:
+        return chr(cp - 0x1D44E + ord('a'))
+    if 0x1D456 <= cp <= 0x1D467:
+        return chr(cp - 0x1D456 + ord('i'))
+    if 0x1D468 <= cp <= 0x1D481:
+        return chr(cp - 0x1D468 + ord('A'))
+    if 0x1D482 <= cp <= 0x1D49B:
+        return chr(cp - 0x1D482 + ord('a'))
+    if cp == 0x1D49C:
+        return 'A'
+    if 0x1D49E <= cp <= 0x1D49F:
+        return chr(cp - 0x1D49E + ord('C'))
+    if cp == 0x1D4A2:
+        return 'G'
+    if 0x1D4A5 <= cp <= 0x1D4A6:
+        return chr(cp - 0x1D4A5 + ord('J'))
+    if 0x1D4A9 <= cp <= 0x1D4AC:
+        return chr(cp - 0x1D4A9 + ord('N'))
+    if 0x1D4AE <= cp <= 0x1D4B5:
+        return chr(cp - 0x1D4AE + ord('S'))
+    if 0x1D4B6 <= cp <= 0x1D4B9:
+        return chr(cp - 0x1D4B6 + ord('a'))
+    if cp == 0x1D4BB:
+        return 'f'
+    if 0x1D4BD <= cp <= 0x1D4C3:
+        return chr(cp - 0x1D4BD + ord('h'))
+    if 0x1D4C5 <= cp <= 0x1D4CF:
+        return chr(cp - 0x1D4C5 + ord('p'))
+    if 0x1D4D0 <= cp <= 0x1D4E9:
+        return chr(cp - 0x1D4D0 + ord('A'))
+    if 0x1D4EA <= cp <= 0x1D503:
+        return chr(cp - 0x1D4EA + ord('a'))
+    if 0x1D504 <= cp <= 0x1D505:
+        return chr(cp - 0x1D504 + ord('A'))
+    if 0x1D507 <= cp <= 0x1D50A:
+        return chr(cp - 0x1D507 + ord('D'))
+    if 0x1D50D <= cp <= 0x1D514:
+        return chr(cp - 0x1D50D + ord('J'))
+    if 0x1D516 <= cp <= 0x1D51C:
+        return chr(cp - 0x1D516 + ord('S'))
+    if 0x1D51E <= cp <= 0x1D537:
+        return chr(cp - 0x1D51E + ord('a'))
+    if 0x1D538 <= cp <= 0x1D539:
+        return chr(cp - 0x1D538 + ord('A'))
+    if 0x1D53B <= cp <= 0x1D53E:
+        return chr(cp - 0x1D53B + ord('D'))
+    if 0x1D540 <= cp <= 0x1D544:
+        return chr(cp - 0x1D540 + ord('I'))
+    if cp == 0x1D546:
+        return 'O'
+    if 0x1D54A <= cp <= 0x1D550:
+        return chr(cp - 0x1D54A + ord('S'))
+    if 0x1D552 <= cp <= 0x1D56B:
+        return chr(cp - 0x1D552 + ord('a'))
+    if 0x1D56C <= cp <= 0x1D585:
+        return chr(cp - 0x1D56C + ord('A'))
+    if 0x1D586 <= cp <= 0x1D59F:
+        return chr(cp - 0x1D586 + ord('a'))
+    if 0x1D5A0 <= cp <= 0x1D5B9:
+        return chr(cp - 0x1D5A0 + ord('A'))
+    if 0x1D5BA <= cp <= 0x1D5D3:
+        return chr(cp - 0x1D5BA + ord('a'))
+    if 0x1D5D4 <= cp <= 0x1D5ED:
+        return chr(cp - 0x1D5D4 + ord('A'))
+    if 0x1D5EE <= cp <= 0x1D607:
+        return chr(cp - 0x1D5EE + ord('a'))
+    if 0x1D608 <= cp <= 0x1D621:
+        return chr(cp - 0x1D608 + ord('A'))
+    if 0x1D622 <= cp <= 0x1D63B:
+        return chr(cp - 0x1D622 + ord('a'))
+    if 0x1D63C <= cp <= 0x1D655:
+        return chr(cp - 0x1D63C + ord('A'))
+    if 0x1D656 <= cp <= 0x1D66F:
+        return chr(cp - 0x1D656 + ord('a'))
+    if 0x1D670 <= cp <= 0x1D689:
+        return chr(cp - 0x1D670 + ord('A'))
+    if 0x1D68A <= cp <= 0x1D6A3:
+        return chr(cp - 0x1D68A + ord('a'))
+    if 0x1D7CE <= cp <= 0x1D7D7:
+        return chr(cp - 0x1D7CE + ord('0'))
+    if 0x1D7D8 <= cp <= 0x1D7E1:
+        return chr(cp - 0x1D7D8 + ord('0'))
+    if 0x1D7E2 <= cp <= 0x1D7EB:
+        return chr(cp - 0x1D7E2 + ord('0'))
+    if 0x1D7EC <= cp <= 0x1D7F5:
+        return chr(cp - 0x1D7EC + ord('0'))
+    if 0x1D7F6 <= cp <= 0x1D7FF:
+        return chr(cp - 0x1D7F6 + ord('0'))
+    return {
+        0x2102: 'C', 0x210A: 'g', 0x210B: 'H', 0x210C: 'H', 0x210D: 'H',
+        0x210E: 'h', 0x2110: 'I', 0x2111: 'I', 0x2112: 'L', 0x2113: 'l',
+        0x2115: 'N', 0x2119: 'P', 0x211A: 'Q', 0x211B: 'R', 0x211C: 'R',
+        0x211D: 'R', 0x2124: 'Z', 0x2128: 'Z', 0x212C: 'B', 0x212D: 'C',
+        0x212F: 'e', 0x2130: 'E', 0x2131: 'F', 0x2133: 'M', 0x2134: 'o',
+        0x2145: 'D', 0x2146: 'd', 0x2147: 'e', 0x2148: 'i', 0x2149: 'j',
+    }.get(cp)
+
+
+def enclosed_ascii(cp):
+    # Circled digits one through nine, circled zero, and circled or squared
+    # letters fold to one ASCII character. Numbers above nine expand to two
+    # digits in circled_number.
+    if 0x2460 <= cp <= 0x2468:
+        return chr(cp - 0x2460 + ord('1'))
+    if 0x24B6 <= cp <= 0x24CF:
+        return chr(cp - 0x24B6 + ord('A'))
+    if 0x24D0 <= cp <= 0x24E9:
+        return chr(cp - 0x24D0 + ord('a'))
+    if cp == 0x24EA:
+        return '0'
+    if cp == 0x1F12B:
+        return 'C'
+    if cp == 0x1F12C:
+        return 'R'
+    if 0x1F130 <= cp <= 0x1F149:
+        return chr(cp - 0x1F130 + ord('A'))
+    return None
+
+
+def circled_number(cp):
+    # NFKC expands these to two ASCII digits. Negative circled numbers and
+    # numbers on black squares do not, so they stay out.
+    if 0x2469 <= cp <= 0x2473:
+        return str((cp - 0x2469) + 10)
+    if 0x3251 <= cp <= 0x325F:
+        return str((cp - 0x3251) + 21)
+    if 0x32B1 <= cp <= 0x32BF:
+        return str((cp - 0x32B1) + 36)
+    return None
+
+
+def super_sub_ascii(cp):
+    # Superscript and subscript letters and digits NFKC-fold to one ASCII
+    # character. The holes in those blocks are not letters and stay out.
+    singles = {
+        0x00AA: 'a', 0x00BA: 'o', 0x00B2: '2', 0x00B3: '3', 0x00B9: '1',
+        0x2070: '0', 0x2071: 'i', 0x207F: 'n',
+    }
+    if cp in singles:
+        return singles[cp]
+    if 0x2074 <= cp <= 0x2079:
+        return chr(cp - 0x2074 + ord('4'))
+    if 0x2080 <= cp <= 0x2089:
+        return chr(cp - 0x2080 + ord('0'))
+    if 0x2090 <= cp <= 0x2093:
+        return 'aeox'[cp - 0x2090]
+    if 0x2095 <= cp <= 0x209C:
+        return 'hklmnpst'[cp - 0x2095]
+    return None
+
+def modifier_ascii(cp):
+    # Modifier letters that NFKC-fold to one ASCII letter. The credential
+    # redactor uses the same set. Latin subscript letters in the phonetic
+    # blocks do the same, so they are listed too. Kelvin sign and the
+    # information source are the letterlike symbols with that one-letter
+    # fold. Hooked, turned, and non-Latin modifiers are not ASCII copies.
+    # Long s, roman numerals, and segmented digits stay out.
+    return {
+        0x02B0: 'h', 0x02B2: 'j', 0x02B3: 'r', 0x02B7: 'w', 0x02B8: 'y',
+        0x02E1: 'l', 0x02E2: 's', 0x02E3: 'x',
+        0x1D2C: 'A', 0x1D2E: 'B', 0x1D30: 'D', 0x1D31: 'E',
+        0x1D33: 'G', 0x1D34: 'H', 0x1D35: 'I', 0x1D36: 'J', 0x1D37: 'K',
+        0x1D38: 'L', 0x1D39: 'M', 0x1D3A: 'N', 0x1D3C: 'O', 0x1D3E: 'P',
+        0x1D3F: 'R', 0x1D40: 'T', 0x1D41: 'U', 0x1D42: 'W',
+        0x1D43: 'a', 0x1D47: 'b', 0x1D48: 'd', 0x1D49: 'e', 0x1D4D: 'g',
+        0x1D4F: 'k', 0x1D50: 'm', 0x1D52: 'o', 0x1D56: 'p', 0x1D57: 't',
+        0x1D58: 'u', 0x1D5B: 'v',
+        0x1D62: 'i', 0x1D63: 'r', 0x1D64: 'u', 0x1D65: 'v',
+        0x1D9C: 'c', 0x1DA0: 'f', 0x1DBB: 'z',
+        0x2C7C: 'j', 0x2C7D: 'V',
+        0xA7F2: 'C', 0xA7F3: 'F', 0xA7F4: 'Q',
+        0x107A5: 'q',
+        0x212A: 'K', 0x2139: 'i',
+    }.get(cp)
+
+
+def segmented_digit(cp):
+    # Segmented digits NFKC-fold to one ASCII digit. This pass does not run
+    # NFKC. Circled numbers, parenthesized numbers, and digit full stops are
+    # other folds, so they stay out of this one.
+    if 0x1FBF0 <= cp <= 0x1FBF9:
+        return chr(cp - 0x1FBF0 + ord('0'))
+    return None
+
+def fold_content(data):
+    # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
+    # characters, including the language tag and cancel tag, only split a
+    # token. Combining marks do the same. Fullwidth ASCII is a compatibility
+    # copy of the same byte: this pass does not run NFKC, so leaving it in
+    # place split a token, JWT, private key, or personal path. Fold the
+    # copies, then drop format characters and marks. Line breaks stay put so
+    # a wrapped sk- line is not glued to the next line.
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data
+    out = []
+    changed = False
+    for ch in text:
+        cp = ord(ch)
+        if 0xE0020 <= cp <= 0xE007E:
+            out.append(chr(cp - 0xE0000))
+            changed = True
+            continue
+        # U+FF01..U+FF5E is fullwidth ASCII punctuation, digits, and letters.
+        # The offset is the NFKC compatibility mapping. Ideographic space is
+        # not in this block and stays out, so it cannot join two lines.
+        if 0xFF01 <= cp <= 0xFF5E:
+            out.append(chr(cp - 0xFEE0))
+            changed = True
+            continue
+        # Mathematical letters and digits NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split. Greek
+        # mathematical letters are not in math_ascii and stay out.
+        mapped = math_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Circled and squared alphanumerics NFKC-fold to one ASCII letter or
+        # digit. This pass does not run NFKC. Numbers above nine expand to
+        # two digits; a list marker still cannot spell a token by itself.
+        mapped = enclosed_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        expanded = circled_number(cp)
+        if expanded is not None:
+            out.append(expanded)
+            changed = True
+            continue
+        # Superscript and subscript forms NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split.
+        mapped = super_sub_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Modifier letters NFKC-fold to one ASCII letter. This pass does not
+        # run NFKC, so a token written with them stayed split. Phonetic
+        # modifiers that are not ASCII copies stay out.
+        mapped = modifier_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Segmented digits NFKC-fold to ASCII digits. This pass does not run
+        # NFKC, so a token or JWT written with them stayed split.
+        mapped = segmented_digit(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Mn/Me/Mc add no base letter. Dropping them keeps a split token
+        # visible to the byte patterns. Cc and line separators stay, so a
+        # wrapped line is not joined.
+        if unicodedata.category(ch) in {'Cf', 'Mn', 'Me', 'Mc'}:
+            changed = True
+            continue
+        out.append(ch)
+    if not changed:
+        return data
+    return ''.join(out).encode('utf-8')
+
 def content_reasons(data):
+    views = (data, fold_content(data))
     found = []
     for label, pattern in RULES.items():
-        if pattern.search(data):
+        if any(pattern.search(view) for view in views):
             found.append(label)
     return found
 
@@ -845,6 +1149,15 @@ def self_test():
         'codex\U000E005Finstances.json', 'id\U000E005Frsa\U000E0061',
         'i\U000E0064\U000E005Frsa', 'nested/id\U000E005Frsa/extra.txt',
         'id\U000E005Fed\U000E00325519',
+        'auth.json\U000E007E1', 'tokens.json\U000E007E2',
+        'nested/credentials.json\U000E007E1', 'ID_RSA\U000E007E3',
+        'au\U000E0074h.json\U000E007E1', 'id\U000E005Frsa\U000E007E1',
+        'Copy of auth.json\U000E007E1',
+        'auth \U000E00281\U000E0029.json', 'accounts \U000E00282\U000E0029.json',
+        'auth (1\U000E0029.json', 'auth \U000E00281).json',
+        'nested/tokens \U000E00281\U000E0029.json', 'ID_RSA \U000E00281\U000E0029',
+        'a\U000E0075th \U000E00281\U000E0029.json', 'id\U000E005Frsa \U000E00281\U000E0029',
+        'Copy\U000E0020of auth \U000E00281\U000E0029.json',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -953,6 +1266,10 @@ def self_test():
         'notes\U000E0031.txt', 'script\U000E0030.go', 'id_ed\U000E00325519.pub',
         'readme\U000E0039md',
         'id\U000E005Frsa.pub', 'script\U000E005F.go', 'notes\U000E005F.txt',
+        'notes\U000E007E.txt', 'readme\U000E007Emd', 'notes\U000E007E1.txt',
+        'script.go\U000E007E1', 'id_rsa.pub\U000E007E1',
+        'notes \U000E00281\U000E0029.txt', 'script \U000E00281\U000E0029.go',
+        'readme\U000E0028md', 'models\U000E0029.json',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
@@ -998,6 +1315,121 @@ def self_test():
         raise SystemExit('self-test failed: personal path was not detected')
     if content_reasons(unrelated):
         raise SystemExit('self-test failed: unrelated Windows path was blocked')
+    hidden_token = b'sk-' + b'a' * 10 + '\U000E0001'.encode() + b'a' * 20
+    tag_hyphen = 'sk\U000E002D'.encode() + b'a' * 30
+    tag_body = ('sk-' + '\U000E0061' * 30).encode()
+    hidden_key = '-----BEGIN \U000E004FPENSSH PRIVATE KEY-----'.encode()
+    hidden_jwt = b'eyJ' + b'a' * 25 + b'.' + b'b' * 10 + '\U000E007F'.encode() + b'b' * 20 + b'.' + b'c' * 15
+    if content_reasons(hidden_token) != ['secret token literal'] or content_reasons(tag_hyphen) != ['secret token literal'] or content_reasons(tag_body) != ['secret token literal']:
+        raise SystemExit('self-test failed: a tag-hidden token was not detected')
+    if content_reasons(hidden_key) != ['private key'] or content_reasons(hidden_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a tag-hidden key or JWT was not detected')
+    if content_reasons(b'sk-\n' + b'a' * 30) or content_reasons(b'rt_' + b'short' + '\U000E0001'.encode()):
+        raise SystemExit('self-test failed: ordinary wrapped text was blocked')
+    if content_reasons('-----BEGIN PU\U000E0042LIC KEY-----'.encode()):
+        raise SystemExit('self-test failed: a tagged public key was blocked')
+    marked_token = ('sk-' + 'a' * 10 + '\u0301' + 'a' * 20).encode()
+    marked_key = '-----BEGIN OPE\u0301NSSH PRIVATE KEY-----'.encode()
+    marked_jwt = b'eyJ' + b'a' * 25 + b'.' + ('b' * 10 + '\u0301' + 'b' * 20).encode() + b'.' + b'c' * 15
+    if content_reasons(marked_token) != ['secret token literal'] or content_reasons(marked_key) != ['private key'] or content_reasons(marked_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a mark-hidden secret was not detected')
+    if content_reasons('caf\u0301e'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0301' + 'short').encode()):
+        raise SystemExit('self-test failed: an ordinary mark was blocked')
+    wide_token = ('\uff53\uff4b-' + '\uff41' * 30).encode()
+    wide_hyphen = ('sk' + '\uff0d' + 'a' * 30).encode()
+    wide_key = ('\uff0d' * 5 + '\uff22\uff25\uff27\uff29\uff2e OPENSSH PRIVATE KEY' + '\uff0d' * 5).encode()
+    wide_jwt = ('\uff45\uff59\uff2a' + '\uff41' * 25 + '\uff0e' + '\uff42' * 30 + '.' + '\uff43' * 15).encode()
+    wide_path = '\uff23\uff1a/Users/Mayn/project'.encode()
+    if content_reasons(wide_token) != ['secret token literal'] or content_reasons(wide_hyphen) != ['secret token literal']:
+        raise SystemExit('self-test failed: a fullwidth token was not detected')
+    if content_reasons(wide_key) != ['private key'] or content_reasons(wide_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a fullwidth key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(wide_path):
+        raise SystemExit('self-test failed: a fullwidth personal path was not detected')
+    ordinary = '\u8bf4\u660e\uff1a\u4e0d\u8981\u63d0\u4ea4\uff08\u5bc6\u94a5\uff09\uff1b'
+    if content_reasons(ordinary.encode()) or content_reasons(('\uff53\uff4b-' + '\uff41' * 10).encode()) or content_reasons('-----\uff22\uff25\uff27\uff29\uff2e PUBLIC KEY-----'.encode()) or content_reasons(('sk-\n' + '\uff41' * 30).encode()):
+        raise SystemExit('self-test failed: ordinary fullwidth text was blocked')
+    if math_ascii(0x1D400) != 'A' or math_ascii(0x1D41A) != 'a' or math_ascii(0x1D455) is not None or math_ascii(0x1D6FC) is not None or math_ascii(0x210E) != 'h' or math_ascii(0x1D7CE) != '0' or math_ascii(0x212A) is not None:
+        raise SystemExit('self-test failed: mathematical ASCII fold is wrong')
+    math_token = ('sk-' + '\U0001D41A' * 30).encode()
+    math_digit = ('rt_' + '\U0001D7CE' * 30).encode()
+    math_key = ('-----' + '\U0001D401\U0001D404\U0001D406\U0001D408\U0001D40D' + ' OPENSSH PRIVATE KEY-----').encode()
+    math_jwt = ('\U0001D41E\U0001D432\U0001D409' + '\U0001D41A' * 25 + '.' + '\U0001D41B' * 30 + '.' + '\U0001D41C' * 15).encode()
+    math_path = '\U0001D402:/Users/Mayn/project'.encode()
+    hole = ('sk-' + 'a' * 10 + '\U0001D455' + 'a' * 20).encode()
+    greek = ('sk-' + 'a' * 10 + '\U0001D6FC' + 'a' * 20).encode()
+    if content_reasons(math_token) != ['secret token literal'] or content_reasons(math_digit) != ['secret token literal']:
+        raise SystemExit('self-test failed: a mathematical token was not detected')
+    if content_reasons(math_key) != ['private key'] or content_reasons(math_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a mathematical key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(math_path):
+        raise SystemExit('self-test failed: a mathematical personal path was not detected')
+    if content_reasons(hole) or content_reasons(greek) or content_reasons('\U0001D465 = 1'.encode()) or content_reasons(('-----' + '\U0001D401\U0001D404\U0001D406\U0001D408\U0001D40D' + ' PUBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary mathematical text was blocked')
+    if enclosed_ascii(0x2460) != '1' or enclosed_ascii(0x2468) != '9' or enclosed_ascii(0x24EA) != '0' or enclosed_ascii(0x24B6) != 'A' or enclosed_ascii(0x24D0) != 'a' or enclosed_ascii(0x24E9) != 'z' or enclosed_ascii(0x2469) is not None or enclosed_ascii(0x1F130) != 'A' or enclosed_ascii(0x1F12B) != 'C':
+        raise SystemExit('self-test failed: enclosed ASCII fold is wrong')
+    enc_token = ('sk-' + '\u24d0' * 30).encode()
+    enc_digit = ('rt_' + '\u2460' * 30).encode()
+    enc_key = ('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' OPENSSH PRIVATE KEY-----').encode()
+    enc_jwt = ('\u24d4\u24e8\u24bf' + '\u24d0' * 25 + '.' + '\u24d1' * 30 + '.' + '\u24d2' * 15).encode()
+    enc_path = '\u24b8:/Users/Mayn/project'.encode()
+    enc_square = ('ghp_' + '\U0001F130' * 30).encode()
+    enc_ten = ('sk-' + 'a' * 10 + '\u2469' + 'a' * 20).encode()
+    if content_reasons(enc_token) != ['secret token literal'] or content_reasons(enc_digit) != ['secret token literal'] or content_reasons(enc_square) != ['secret token literal']:
+        raise SystemExit('self-test failed: an enclosed token was not detected')
+    if content_reasons(enc_key) != ['private key'] or content_reasons(enc_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: an enclosed key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(enc_path):
+        raise SystemExit('self-test failed: an enclosed personal path was not detected')
+    if content_reasons('step \u2460'.encode()) or content_reasons(('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' PUBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary enclosed text was blocked')
+    if circled_number(0x2469) != '10' or circled_number(0x2473) != '20' or circled_number(0x3251) != '21' or circled_number(0x325F) != '35' or circled_number(0x32B1) != '36' or circled_number(0x32BF) != '50' or circled_number(0x24EB) is not None or circled_number(0x2460) is not None:
+        raise SystemExit('self-test failed: circled number fold is wrong')
+    enc_twenty = ('rt_' + '\u3251' * 13).encode()
+    if content_reasons(enc_ten) != ['secret token literal'] or content_reasons(enc_twenty) != ['secret token literal']:
+        raise SystemExit('self-test failed: a multi-digit circled number was not detected')
+    if content_reasons('step \u2469'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2469').encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: an ordinary circled number was blocked')
+    if super_sub_ascii(0x00B9) != '1' or super_sub_ascii(0x2070) != '0' or super_sub_ascii(0x2079) != '9' or super_sub_ascii(0x2071) != 'i' or super_sub_ascii(0x207F) != 'n' or super_sub_ascii(0x2080) != '0' or super_sub_ascii(0x2089) != '9' or super_sub_ascii(0x2090) != 'a' or super_sub_ascii(0x209C) != 't' or super_sub_ascii(0x00AA) != 'a' or super_sub_ascii(0x207A) is not None or super_sub_ascii(0x2094) is not None:
+        raise SystemExit('self-test failed: superscript fold is wrong')
+    sup_token = ('sk-' + '\u2071' * 30).encode()
+    sub_digit = ('rt_' + '\u2080' * 30).encode()
+    ordinal = ('ghp_' + '\u00aa' * 30).encode()
+    if content_reasons(sup_token) != ['secret token literal'] or content_reasons(sub_digit) != ['secret token literal'] or content_reasons(ordinal) != ['secret token literal']:
+        raise SystemExit('self-test failed: a superscript token was not detected')
+    if content_reasons('m\u00b2'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u207a' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2071' * 10).encode()):
+        raise SystemExit('self-test failed: ordinary superscript text was blocked')
+    if modifier_ascii(0x02B0) != 'h' or modifier_ascii(0x02B1) is not None or modifier_ascii(0x02E2) != 's' or modifier_ascii(0x1D2C) != 'A' or modifier_ascii(0x1D2D) is not None or modifier_ascii(0x1D4A) is not None or modifier_ascii(0x1D62) != 'i' or modifier_ascii(0x2C7C) != 'j' or modifier_ascii(0x2C7D) != 'V' or modifier_ascii(0xA7F2) != 'C' or modifier_ascii(0x107A5) != 'q' or modifier_ascii(0x212A) != 'K' or modifier_ascii(0x2139) != 'i' or modifier_ascii(0x017F) is not None or modifier_ascii(0x2160) is not None or modifier_ascii(0x1FBF0) is not None:
+        raise SystemExit('self-test failed: modifier ASCII fold is wrong')
+    mod_token = ('sk-' + '\u02e2' * 30).encode()
+    mod_sub = ('rt_' + '\u1d62' * 30).encode()
+    mod_q = ('ghp_' + '\U000107a5' * 30).encode()
+    mod_kelvin = ('gho_' + '\u212a' * 30).encode()
+    mod_key = ('-----BEGIN ' + '\U00001D3C\U00001D3E\U00001D31' + 'NSSH PRIVATE KEY-----').encode()
+    mod_jwt = ('\u1d49\u02b8\U00001D36' + '\u1d43' * 25 + '.' + '\u1d47' * 30 + '.' + '\u1d9c' * 15).encode()
+    mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
+    mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
+    mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
+    mod_roman = ('sk-' + 'a' * 10 + '\u2160' + 'a' * 20).encode()
+    if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
+        raise SystemExit('self-test failed: a modifier token was not detected')
+    if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a modifier key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(mod_path):
+        raise SystemExit('self-test failed: a modifier personal path was not detected')
+    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary modifier text was blocked')
+    if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
+        raise SystemExit('self-test failed: segmented digit fold is wrong')
+    if sum(segmented_digit(cp) is not None for cp in range(0x1FBE0, 0x1FC10)) != 10:
+        raise SystemExit('self-test failed: segmented digit fold count is wrong')
+    seg_token = ('rt_' + '\U0001fbf0' * 30).encode()
+    seg_mix = ('sk-' + 'a' * 10 + '\U0001fbf5' + 'a' * 20).encode()
+    seg_jwt = ('eyJ' + 'a' * 20 + '\U0001fbf1' * 5 + '.' + 'b' * 25 + '\U0001fbf2' * 5 + '.' + 'c' * 10 + '\U0001fbf9' * 5).encode()
+    if content_reasons(seg_token) != ['secret token literal'] or content_reasons(seg_mix) != ['secret token literal'] or content_reasons(seg_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a segmented digit secret was not detected')
+    if content_reasons('see \U0001fbf0 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2474' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2488' + 'a' * 20).encode()) or content_reasons(('rt_' + '\U0001fbf0' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary segmented text was blocked')
 
 def main():
     self_test()
