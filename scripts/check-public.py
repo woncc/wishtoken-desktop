@@ -427,12 +427,14 @@ SEPARATOR_LIKE = {
     # Katakana no, Old Coptic esh, and the slash radical skeleton to a solidus
     # and do not NFKC-fold to one. The radical's ideograph is that same
     # prototype. Halfwidth katakana no folds to katakana no, so the post-NFKC
-    # translate covers it. The dot radical and its ideograph skeleton to a
-    # reverse solidus instead.
+    # translate covers it. The small Old Coptic esh does not NFKC-fold to the
+    # capital, so the capital entry does not cover it. The dot radical and its
+    # ideograph skeleton to a reverse solidus instead.
     ord('\u30ce'): '/',
     ord('\u4e3f'): '/',
     ord('\u2f03'): '/',
     ord('\u2cc6'): '/',
+    ord('\u2cc7'): '/',
     ord('\u4e36'): '/',
     ord('\u2f02'): '/',
 }
@@ -682,6 +684,9 @@ def self_test():
         'nested/id_rsa\u2e4ax', 'Diagnostics\u2e4acapture.png', 'tokens.json\u2e4aextra.txt',
         'auth.json\u30cesecret.txt', 'credentials\u4e3ftoken.txt', 'notes\u2f03id_rsa',
         'nested/id_rsa\u2cc6x', 'tokens.json\u4e36extra.txt', 'auth.json\u2f02secret.txt',
+        'auth.json\u2cc7secret.txt', 'credentials\u2cc7token.txt', 'notes\u2cc7id_rsa',
+        'nested/id_rsa\u2cc7x', 'Diagnostics\u2cc7capture.png', 'tokens.json\u2cc7extra.txt',
+        'readme\u2cc7auth.json', 'file\u2cc7.netrc', 'ID_RSA\u2cc7x',
         'notes\uff89id_rsa', 'accounts.json\u4e3fnotes.txt', 'readme\u30ceauth.json',
         'file\u2cc6.netrc', 'ID_RSA\u4e36x', 'credentials\uff89token.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
@@ -766,6 +771,8 @@ def self_test():
         'models.json\u2e4areadme.txt',
         'notes\u30cereadme.txt', 'script.go\u4e3fZone.Identifier', 'id_rsa.pub\u2f03foo.txt',
         'models.json\u2cc6readme.txt', 'notes\u4e36readme.txt', 'script.go\u2f02Zone.Identifier',
+        'notes\u2cc7readme.txt', 'script.go\u2cc7Zone.Identifier', 'id_rsa.pub\u2cc7foo.txt',
+        'models.json\u2cc7readme.txt', 'readme\u2cc7md',
         'id_rsa.pub\uff89foo.txt', 'readme\u30cemd',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',

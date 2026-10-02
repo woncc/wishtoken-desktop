@@ -359,17 +359,25 @@ func decodePieces(in []secretPiece) []secretPiece {
 }
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
-	// A hyphen or compatibility full stop is not ignorable: dropping it would
-	// glue the token together and miss the stored ASCII byte. Fold first,
-	// then drop marks.
-	needle := foldDotString(foldHyphenString(secret))
-	folded := foldDotPieces(foldHyphenPieces(pieces))
+	// A hyphen or full stop is not ignorable: dropping it would glue the
+	// token together and miss the stored ASCII byte. Fullwidth letters and
+	// digits are folded first. Then drop marks. Spacing marks shaped like
+	// full stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(secret)))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(pieces)))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
 	// '-' is a separate reading; the drop reading still runs.
 	if soft, ok := foldSoftHyphenPieces(folded); ok {
 		spans = append(spans, exactSecretSpans(soft, foldSoftHyphenString(needle))...)
+	}
+	if spacing, ok := foldSpacingStopPieces(folded); ok {
+		needleStop := foldSpacingStopString(needle)
+		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
+		if droppedStops := dropMarkPieces(spacing); len(droppedStops) != len(spacing) {
+			spans = append(spans, exactSecretSpans(droppedStops, needleStop)...)
+		}
 	}
 	dropped := dropMarkPieces(folded)
 	if len(dropped) != len(folded) {
@@ -507,12 +515,68 @@ func hyphenLike(r rune) bool {
 	}
 }
 
-// foldDotPieces maps compatibility full stops to ASCII '.'. One dot leader,
-// small full stop, and fullwidth full stop NFKC-fold to '.'. Vertical
-// ideographic full stop and halfwidth ideographic full stop fold to U+3002.
-// This pass does not run NFKC, so a JWT split by one of those marks would
-// miss both the stored token and the JWT pattern. One output piece covers
-// the original rune.
+// foldFullwidthPieces maps fullwidth letters and digits to ASCII.
+// NFKC folds them, and this pass does not run NFKC, so a stored token or a
+// JWT written with those forms would stay visible. Fullwidth punctuation is
+// left to the separator folds. One output piece covers the original rune.
+func foldFullwidthPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := fullwidthASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldFullwidthString(s string) string {
+	if !fullwidthFolded(s) {
+		return s
+	}
+	return renderPieces(foldFullwidthPieces(rawPieces(s)))
+}
+
+func fullwidthFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := fullwidthASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func fullwidthASCII(r rune) (byte, bool) {
+	switch {
+	case r >= '\uff10' && r <= '\uff19', r >= '\uff21' && r <= '\uff3a', r >= '\uff41' && r <= '\uff5a':
+		return byte(r - 0xfee0), true
+	default:
+		return 0, false
+	}
+}
+
+// foldDotPieces maps full stops to ASCII '.'. Compatibility forms NFKC-fold
+// to '.' or to U+3002, and the other full stops do not NFKC-fold at all.
+// This pass does not run NFKC, so a JWT split by any of them would miss both
+// the stored token and the JWT pattern. Mongolian full stop and Manchu full
+// stop are colon lookalikes in proxy userinfo; a dotted token still reads
+// them as dots. One output piece covers the original rune.
 func foldDotPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -558,11 +622,70 @@ func dotFolded(s string) bool {
 
 func dotLike(r rune) bool {
 	switch r {
-	case '\u2024', '\ufe52', '\uff0e', '\ufe12', '\uff61':
+	case '\u2024', '\ufe52', '\uff0e', '\ufe12', '\uff61',
+		'\u3002', '\u06d4', '\u0701', '\u0702', '\u1362', '\u166e',
+		'\u1803', '\u1809', '\u2cf9', '\u2cfe', '\u2e3c', '\ua4ff', '\ua60e', '\ua6f3',
+		'\U00016af5', '\U00016e98', '\U0001bc9f', '\U0001da88',
+		'\ua4f8', '\U00010a50', '\ua4fa',
+		'\u0660', '\u06f0', '\U0001ecae':
 		return true
 	default:
 		return false
 	}
+}
+
+// foldSpacingStopPieces maps spacing marks that are full stops to ASCII '.'.
+// Meetei Mayek lum iyek and the musical augmentation dot do not NFKC-fold to
+// '.'. Folding them is a separate reading: dropMarkPieces still has to remove
+// an inserted mark, or a dotless token would no longer match. A following
+// drop on this reading removes any other mark that was sitting beside the
+// stop. One output piece covers the original rune.
+func foldSpacingStopPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if spacingStop(r) {
+			out = append(out, secretPiece{b: '.', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldSpacingStopString(s string) string {
+	if !spacingStopFolded(s) {
+		return s
+	}
+	folded, _ := foldSpacingStopPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func spacingStopFolded(s string) bool {
+	for _, r := range s {
+		if spacingStop(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func spacingStop(r rune) bool {
+	return r == '\uabec' || r == '\U0001d16d'
 }
 
 // dropMarkPieces removes characters that do not add a base letter: variation
