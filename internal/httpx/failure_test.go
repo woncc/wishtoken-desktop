@@ -1565,7 +1565,11 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x00A5, 0, false},
 		{0x30CE, '/', true},
 		{0xFF89, '/', true},
+		{0x32E8, '/', true},
+		{0x3328, '/', true},
+		{0x3329, '/', true},
 		{0x306E, 0, false},
+		{0x3382, 0, false},
 		{0x3033, '/', true},
 		{0x3034, '/', true},
 		{0x3031, 0, false},
@@ -1593,7 +1597,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 25 {
+	if n != 28 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -1790,6 +1794,28 @@ func TestSanitizeFailureStripsKatakanaNoAndCopticEsh(t *testing.T) {
 	for _, prose := range []string{"see \u30ce later", "see \uff89 later", "see \u2cc6 later", "see \u306e later", "see \u2cf9 later"} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("kana prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsCircledKatakanaNo(t *testing.T) {
+	secret := "code/ver/1"
+	circled := strings.ReplaceAll(secret, "/", "\u32e8")
+	nano := strings.ReplaceAll(secret, "/", "\u3328")
+	notto := strings.ReplaceAll(secret, "/", "\u3329")
+	encoded := strings.ReplaceAll(secret, "/", "%E3%8B%A8")
+	got := SanitizeFailure("rejected "+circled+" "+encoded+" "+nano+" "+notto+" later", secret)
+	for _, item := range []string{secret, circled, nano, notto, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \u32e8 later", "see \u3328 later", "see \u3329 later", "see \u3382 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("circled prose changed: %q -> %q", prose, got)
 		}
 	}
 }

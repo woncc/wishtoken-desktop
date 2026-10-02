@@ -4669,9 +4669,11 @@ func parenASCII(r rune) (byte, bool) {
 // diagonal, CJK strokes P and SP, the slash radical, the double and
 // triple solidus operators, the kana repeat upper halves, the slash
 // radical's ideograph, katakana no, and both Old Coptic esh letters.
-// Halfwidth katakana no NFKC-folds to katakana no rather than '/', so it
-// is listed too. Each of those stays one slash, so an expanded form
-// cannot glue the token back together.
+// Halfwidth katakana no and circled katakana no NFKC-fold to katakana no
+// rather than '/', so both are listed. Square nano and square notto
+// expand to kana around that letter and do not NFKC-fold to a slash
+// either. Each of those stays one slash, so an expanded form cannot
+// glue the token back together. Other non-ASCII squares stay out.
 // This pass does not run NFKC.
 // A reverse solidus folds to a backslash on its own pass, including the
 // Greek notation slashes and the kana repeat lower half. The full vertical
@@ -4726,7 +4728,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
