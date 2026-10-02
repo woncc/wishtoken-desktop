@@ -298,6 +298,11 @@ SEPARATOR_LIKE = {
     # The caret insertion point does not NFKC-fold to a slash, but it is
     # confusable with one and still splits a private name from the next part.
     ord('\u2041'): '/',
+    # Double and triple solidus operators, and the OCR double backslash, do
+    # not NFKC-fold to a slash. Each one still splits the following component.
+    ord('\u2afd'): '/',
+    ord('\u2afb'): '/',
+    ord('\u244a'): '/',
 }
 
 def normalized_rel(rel):
@@ -491,6 +496,8 @@ def self_test():
         'nested/tokens\U0001ecaejson/extra.txt', 'ID_ED25519\u0660TXT',
         'auth.json\u2041secret.txt', 'credentials\u2041token.txt', 'notes\u2041id_rsa',
         'nested/id_rsa\u2041x', 'Diagnostics\u2041capture.png', 'tokens.json\u2041extra.txt',
+        'auth.json\u2afdsecret.txt', 'credentials\u2afbtoken.txt', 'notes\u244aid_rsa',
+        'nested/id_rsa\u2afdx', 'Diagnostics\u2afbcapture.png', 'tokens.json\u244aextra.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -541,6 +548,8 @@ def self_test():
         'models.json\u0589readme',
         'notes\u0660txt', 'script\u06f0go', 'models\U0001ecaejson', 'id_rsa\u0660pub', 'readme\U0001d16dmd',
         'notes\u2041readme.txt', 'script.go\u2041Zone.Identifier', 'id_rsa.pub\u2041foo.txt',
+        'notes\u2afdreadme.txt', 'script.go\u2afbextra.txt', 'id_rsa.pub\u244afoo.txt',
+        'models.json\u2afdreadme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
