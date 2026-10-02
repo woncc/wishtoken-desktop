@@ -989,3 +989,28 @@ func TestRedactHidesCommaInProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesCurlyBracketInProxyPassword(t *testing.T) {
+	const password = "s3cret{proxy}"
+	marked := strings.NewReplacer("{", "\uFF5B", "}", "\uFF5D").Replace(password)
+	small := strings.NewReplacer("{", "\uFE5B", "}", "\uFE5C").Replace(password)
+	vertical := strings.NewReplacer("{", "\uFE37", "}", "\uFE38").Replace(password)
+	encoded := strings.NewReplacer("{", "%EF%BD%9B", "}", "%EF%BD%9D").Replace(password)
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + vertical,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, vertical, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") {
+			t.Fatalf("host lost: %q", got)
+		}
+	}
+}

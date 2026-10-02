@@ -2346,3 +2346,80 @@ func TestCommaASCIIFoldsOnlyCommas(t *testing.T) {
 		t.Fatalf("comma fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCurlyBrackets(t *testing.T) {
+	secret := "code{ver}1"
+	marked := strings.NewReplacer("{", "\uFE5B", "}", "\uFE5C").Replace(secret)
+	encoded := strings.NewReplacer("{", "%EF%BD%9B", "}", "%EF%BD%9D").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.NewReplacer("{", "\uFE37", "}", "\uFE38").Replace(secret)
+	full := strings.NewReplacer("{", "\uFF5B", "}", "\uFF5D").Replace(secret)
+	got = SanitizeFailure("rejected "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, vertical, full, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2774 later",
+		"see \u2775 later",
+		"see \u2983 later",
+		"see \u2984 later",
+		"see \ufe5d later",
+		"see \ufe39 later",
+		"path \uff5b file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("brace prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestBraceASCIIFoldsOnlyCurlyBrackets(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE37, '{', true},
+		{0xFE5B, '{', true},
+		{0xFF5B, '{', true},
+		{0xFE38, '}', true},
+		{0xFE5C, '}', true},
+		{0xFF5D, '}', true},
+		{'{', 0, false},
+		{'}', 0, false},
+		{0x2774, 0, false},
+		{0x2775, 0, false},
+		{0x2983, 0, false},
+		{0x2984, 0, false},
+		{0xFE5D, 0, false},
+		{0xFE39, 0, false},
+		{0x3014, 0, false},
+		{0x23A7, 0, false},
+		{0xFF08, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := braceASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := braceASCII(r); ok {
+			n++
+		}
+	}
+	if n != 6 {
+		t.Fatalf("brace fold count %d", n)
+	}
+}
