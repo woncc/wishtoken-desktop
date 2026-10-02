@@ -360,12 +360,12 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Enclosed letters and
-	// digits, mathematical alphanumeric symbols, and fullwidth letters and
-	// digits are folded first. Then drop marks. Spacing marks shaped like
-	// full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(secret)))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(pieces)))))
+	// token together and miss the stored ASCII byte. Superscripts and
+	// subscripts, enclosed letters and digits, mathematical alphanumeric
+	// symbols, and fullwidth letters and digits are folded first. Then drop
+	// marks. Spacing marks shaped like full stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(secret))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(pieces))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -782,6 +782,89 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldSuperSubPieces maps superscript and subscript letters and digits
+// to ASCII. NFKC folds them, and this pass does not run NFKC, so a stored
+// token or a JWT written with those forms would stay visible. The feminine
+// and masculine ordinals are superscript a and o. Superscript and subscript
+// minus are already hyphen folds. Plus, equals, parentheses, and subscript
+// schwa do not become an ASCII letter or digit, so they stay out. One
+// output piece covers the original rune.
+func foldSuperSubPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := superSubASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldSuperSubString(s string) string {
+	if !superSubFolded(s) {
+		return s
+	}
+	return renderPieces(foldSuperSubPieces(rawPieces(s)))
+}
+
+func superSubFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := superSubASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func superSubASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x00AA:
+		return 'a', true
+	case 0x00BA:
+		return 'o', true
+	case 0x00B2:
+		return '2', true
+	case 0x00B3:
+		return '3', true
+	case 0x00B9:
+		return '1', true
+	case 0x2070:
+		return '0', true
+	case 0x2071:
+		return 'i', true
+	case 0x207F:
+		return 'n', true
+	}
+	switch {
+	case r >= 0x2074 && r <= 0x2079:
+		return byte(r - 0x2074 + '4'), true
+	case r >= 0x2080 && r <= 0x2089:
+		return byte(r - 0x2080 + '0'), true
+	case r >= 0x2090 && r <= 0x2093:
+		return "aeox"[r-0x2090], true
+	case r >= 0x2095 && r <= 0x209C:
+		return "hklmnpst"[r-0x2095], true
 	default:
 		return 0, false
 	}
