@@ -2276,3 +2276,73 @@ func TestSemicolonASCIIFoldsOnlySemicolons(t *testing.T) {
 		t.Fatalf("semicolon fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCommas(t *testing.T) {
+	secret := "code,ver1"
+	marked := strings.ReplaceAll(secret, ",", "\uFE50")
+	encoded := strings.ReplaceAll(secret, ",", "%EF%BC%8C")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.ReplaceAll(secret, ",", "\uFE10")
+	full := strings.ReplaceAll(secret, ",", "\uFF0C")
+	got = SanitizeFailure("rejected "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, vertical, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u060c later",
+		"see \u3001 later",
+		"see \ufe51 later",
+		"see \u2e41 later",
+		"see \u2e4c later",
+		"path \uff0c file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("comma prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestCommaASCIIFoldsOnlyCommas(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE10, ',', true},
+		{0xFE50, ',', true},
+		{0xFF0C, ',', true},
+		{',', 0, false},
+		{0x060C, 0, false},
+		{0x3001, 0, false},
+		{0xFE11, 0, false},
+		{0xFE51, 0, false},
+		{0x2E41, 0, false},
+		{0x2E4C, 0, false},
+		{0xFF1B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := commaASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := commaASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("comma fold count %d", n)
+	}
+}
