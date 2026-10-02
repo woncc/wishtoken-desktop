@@ -822,7 +822,8 @@ def modifier_ascii(cp):
     # blocks do the same, so they are listed too. Kelvin sign and the
     # information source are the letterlike symbols with that one-letter
     # fold. Hooked, turned, and non-Latin modifiers are not ASCII copies.
-    # Long s, roman numerals, and segmented digits stay out.
+    # Roman numerals and segmented digits stay out. Long s is folded
+    # separately.
     return {
         0x02B0: 'h', 0x02B2: 'j', 0x02B3: 'r', 0x02B7: 'w', 0x02B8: 'y',
         0x02E1: 'l', 0x02E2: 's', 0x02E3: 'x',
@@ -875,6 +876,15 @@ def additive_roman(cp):
         0x2176: 'vii', 0x2177: 'viii', 0x2178: 'ix',
         0x217A: 'xi', 0x217B: 'xii',
     }.get(cp)
+
+
+def long_s_ascii(cp):
+    # Latin small letter long s NFKC-folds to ASCII s. Long s with a dot
+    # or a stroke stays phonetic. The long s t ligature expands to "st"
+    # and stays on the ligature fold. Subscript s is a superscript fold.
+    if cp == 0x017F:
+        return 's'
+    return None
 
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
@@ -960,6 +970,15 @@ def fold_content(data):
         expanded = additive_roman(cp)
         if expanded is not None:
             out.append(expanded)
+            changed = True
+            continue
+        # Latin small letter long s NFKC-folds to ASCII s. This pass does
+        # not run NFKC, so a token, JWT, or personal path written with it
+        # stayed split. Long s with a dot or a stroke stays phonetic, and
+        # the long s t ligature expands to two letters on its own fold.
+        mapped = long_s_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1451,14 +1470,13 @@ def self_test():
     mod_jwt = ('\u1d49\u02b8\U00001D36' + '\u1d43' * 25 + '.' + '\u1d47' * 30 + '.' + '\u1d9c' * 15).encode()
     mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
     mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
-    mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
     if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
         raise SystemExit('self-test failed: a modifier token was not detected')
     if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a modifier key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(mod_path):
         raise SystemExit('self-test failed: a modifier personal path was not detected')
-    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+    if content_reasons(mod_hole) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary modifier text was blocked')
     if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
         raise SystemExit('self-test failed: segmented digit fold is wrong')
@@ -1499,6 +1517,23 @@ def self_test():
         raise SystemExit('self-test failed: an additive roman secret was not detected')
     if content_reasons('see \u2161 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2185' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2166' * 2).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2153' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary additive roman text was blocked')
+    if long_s_ascii(0x017F) != 's' or long_s_ascii(ord('s')) is not None or long_s_ascii(0xFB05) is not None or long_s_ascii(0x1E9B) is not None or long_s_ascii(0x1E9C) is not None or long_s_ascii(0x1E9D) is not None or long_s_ascii(0x209B) is not None:
+        raise SystemExit('self-test failed: long s fold is wrong')
+    if sum(long_s_ascii(cp) is not None for cp in range(0x30000)) != 1:
+        raise SystemExit('self-test failed: long s fold count is wrong')
+    long_token = ('sk-' + '\u017f' * 30).encode()
+    long_prefix = ('\u017fk-' + 'a' * 30).encode()
+    long_mix = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
+    long_jwt = ('eyJ' + '\u017f' * 25 + '.' + '\u017f' * 30 + '.' + '\u017f' * 15).encode()
+    long_path = 'C:/U\u017fers/Mayn'.encode()
+    if content_reasons(long_token) != ['secret token literal'] or content_reasons(long_prefix) != ['secret token literal'] or content_reasons(long_mix) != ['secret token literal']:
+        raise SystemExit('self-test failed: a long s token was not detected')
+    if content_reasons(long_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a long s JWT was not detected')
+    if 'personal Windows path' not in content_reasons(long_path):
+        raise SystemExit('self-test failed: a long s personal path was not detected')
+    if content_reasons('long \u017f word'.encode()) or content_reasons('see \ufb05 later'.encode()) or content_reasons('see \u1e9b later'.encode()) or content_reasons('see \u1e9c later'.encode()) or content_reasons(('sk-' + '\u017f' * 10).encode()) or content_reasons('C:/U\u1e9bsers/Mayn'.encode()):
+        raise SystemExit('self-test failed: ordinary long s text was blocked')
 
 def main():
     self_test()
