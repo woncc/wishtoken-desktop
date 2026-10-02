@@ -4353,8 +4353,9 @@ func numberSignASCII(r rune) (byte, bool) {
 // short box drawings from upper centre to middle right and from middle left
 // to lower centre, the mathematical falling diagonal, the squared falling
 // diagonal, CJK stroke D,
-// the dot radical, the very heavy reverse solidus, the Greek notation
-// slashes, and the kana repeat lower half. This pass does not run NFKC.
+// the dot radical, the very heavy reverse solidus, the upper right
+// block diagonal, the Greek notation slashes, and the kana repeat
+// lower half. This pass does not run NFKC.
 // Forward solidus lookalikes fold to '/'. The dot radical's ideograph
 // folds here too. Reverse solidus preceding subset expands to a backslash
 // plus a syllabic letter and does not NFKC-fold to a backslash. It stays
@@ -4371,7 +4372,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // circle cannot glue the token back together. The circled division sign
 // and the combining enclosing circle backslash stay out. The diagonal
 // cross, the chevron diagonals, and the negative diamond stay out. The
-// negative short diagonal folds to a slash.
+// negative short diagonal folds to a slash. The upper right block
+// diagonal from upper centre to lower right is that falling stroke as a
+// narrow block and does not NFKC-fold to a backslash. It stays one
+// backslash. The wider upper-right block diagonals stay out.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4419,7 +4423,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2:
+	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FB66:
 		return '\\', true
 	default:
 		return 0, false
