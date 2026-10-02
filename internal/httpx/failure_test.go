@@ -3922,3 +3922,89 @@ func TestParenNumberASCIIFoldsOnlyNumbers(t *testing.T) {
 		t.Fatalf("paren number fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsParenLetters(t *testing.T) {
+	pairs := []struct {
+		secret  string
+		letters string
+		mark    string
+	}{
+		{"rt_Zz9q(a)7f3a", "(a)", "\u249C"},
+		{"rt_Aa8k(z)7f3a", "(z)", "\u24B5"},
+		{"rt_Bb7m(A)7f3a", "(A)", "\U0001F110"},
+		{"rt_Cc6n(Z)7f", "(Z)", "\U0001F129"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.letters, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.letters)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "(a)", "%E2%92%9C")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[3].secret, "(Z)", "\U0001F129")
+	got = SanitizeFailure("rejected "+pairs[3].secret+" later", stored)
+	for _, item := range []string{pairs[3].secret, stored, "Cc6n", "(Z)", "7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u249C later",
+		"see \u24B5 later",
+		"see \U0001F110 later",
+		"see \U0001F129 later",
+		"see \u2474 later",
+		"see \u3200 later",
+		"see \u24B6 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("paren letter prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestParenLetterASCIIFoldsOnlyLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x249C, "(a)"},
+		{0x24B5, "(z)"},
+		{0x1F110, "(A)"},
+		{0x1F129, "(Z)"},
+	}
+	for _, check := range checks {
+		got, ok := parenLetterASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'(', ')', 'a', 'A', 0x249B, 0x24B6, 0x2474, 0x1F10F, 0x1F12A, 0x3200, 0xFF08} {
+		if _, ok := parenLetterASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := parenLetterASCII(r); ok {
+			n++
+		}
+	}
+	if n != 52 {
+		t.Fatalf("paren letter fold count %d", n)
+	}
+}
