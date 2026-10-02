@@ -1027,10 +1027,18 @@ def fold_content(data):
         # does not run NFKC, so a token, JWT, or PEM header written with one
         # stayed split. Fold them before marks are dropped: a spacing hyphen
         # would otherwise disappear, and the header would no longer match.
-        # Soft hyphen is format, not in this table, and stays on its own fold.
+        # Soft hyphen is format, not in this table, and is folded next.
         mapped = HYPHEN_LIKE.get(cp)
         if mapped is not None:
             out.append(mapped)
+            changed = True
+            continue
+        # Soft hyphen is a format character. Dropping it with the other
+        # format characters removes a hyphen a PEM header or sk- prefix
+        # needs, so the secret stayed hidden. Fold it to ASCII '-' first.
+        # Other format characters still only split a token.
+        if cp == 0x00AD:
+            out.append('-')
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1632,8 +1640,20 @@ def self_test():
         raise SystemExit('self-test failed: a hyphen-lookalike JWT was not detected')
     if content_reasons(hy_pem) != ['private key']:
         raise SystemExit('self-test failed: a hyphen-lookalike private key was not detected')
-    if content_reasons('re\u2013try later'.encode()) or content_reasons('re\u2014try later'.encode()) or content_reasons('re\u05betry later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2016' + 'a' * 20).encode()) or content_reasons(('----' + '\u00ad' + 'BEGIN OPENSSH PRIVATE KEY-----').encode()):
+    if content_reasons('re\u2013try later'.encode()) or content_reasons('re\u2014try later'.encode()) or content_reasons('re\u05betry later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2016' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary hyphen text was blocked')
+    shy_pem = ('----' + '\u00ad' + 'BEGIN OPENSSH PRIVATE KEY-----').encode()
+    shy_prefix = ('sk' + '\u00ad' + 'a' * 30).encode()
+    shy_token = ('sk-' + 'a' * 12 + '\u00ad' + 'a' * 12).encode()
+    shy_jwt = ('eyJ' + 'a' * 24 + '\u00ad' + '.' + 'b' * 29 + '\u00ad' + '.' + 'c' * 14 + '\u00ad').encode()
+    if content_reasons(shy_pem) != ['private key']:
+        raise SystemExit('self-test failed: a soft-hyphen private key was not detected')
+    if content_reasons(shy_prefix) != ['secret token literal'] or content_reasons(shy_token) != ['secret token literal']:
+        raise SystemExit('self-test failed: a soft-hyphen token was not detected')
+    if content_reasons(shy_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a soft-hyphen JWT was not detected')
+    if content_reasons('slow\u00addown'.encode()) or content_reasons(('----BEGIN OPENSSH PRIVATE KEY-----').encode()) or content_reasons(('sk-' + 'a' * 12 + '\u200b' + 'a' * 12).encode()) or content_reasons(('sk' + '\u00ad' + 'a' * 10).encode()):
+        raise SystemExit('self-test failed: ordinary soft hyphen text was blocked')
 
 def main():
     self_test()
