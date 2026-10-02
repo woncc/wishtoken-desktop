@@ -1063,6 +1063,18 @@ def fold_content(data):
             out.append(mapped)
             changed = True
             continue
+        # Slash lookalikes are the same set the path check uses. This pass
+        # does not run NFKC, so a personal Windows path written with a yen
+        # sign, division slash, or small reverse solidus stayed split.
+        # Fullwidth solidus is already folded above. Expanding forms such as
+        # vulgar fractions stay one slash, matching the path check, so the
+        # extra digits cannot glue the name back together. A slash is not a
+        # token character, so it still splits sk- text.
+        mapped = SEPARATOR_LIKE.get(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
         # visible to the byte patterns. Cc and line separators stay, so a
         # wrapped line is not joined.
@@ -1697,6 +1709,19 @@ def self_test():
         raise SystemExit('self-test failed: a colon-lookalike personal path was not detected')
     if content_reasons('see \u2236 later'.encode()) or content_reasons('see \u0903 later'.encode()) or content_reasons('C\u2236/Users/other'.encode()) or content_reasons('C\u2025/Users/Mayn'.encode()) or content_reasons(('sk-' + '\u2236' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0903' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary colon text was blocked')
+    if len(SEPARATOR_LIKE) != 77 or SEPARATOR_LIKE[0x00A5] != '/' or SEPARATOR_LIKE[0x20A9] != '/' or SEPARATOR_LIKE[0x2215] != '/' or SEPARATOR_LIKE[0x2216] != '/' or SEPARATOR_LIKE[0x2044] != '/' or SEPARATOR_LIKE[0xFE68] != '/' or SEPARATOR_LIKE[0x00BC] != '/' or SEPARATOR_LIKE[0xFF0F] != '/' or SEPARATOR_LIKE[0xFF3C] != '/' or SEPARATOR_LIKE.get(ord('/')) is not None or SEPARATOR_LIKE.get(0x2025) is not None:
+        raise SystemExit('self-test failed: slash lookalike table is wrong')
+    slash_yen = 'C:\u00a5Users\u00a5Mayn'.encode()
+    slash_won = 'D:\u20a9Git_Project\u20a9kawang'.encode()
+    slash_div = 'C:\u2215Users\u2215gptbridge'.encode()
+    slash_set = 'C:\u2216Users\u2216rain'.encode()
+    slash_small = 'C:\ufe68Users\ufe68WishToApp'.encode()
+    slash_frac = 'C:\u00bcUsers\u00bcMayn'.encode()
+    slash_wide = 'C:\uff0fUsers\uff0fMayn'.encode()
+    if any('personal Windows path' not in content_reasons(item) for item in (slash_yen, slash_won, slash_div, slash_set, slash_small, slash_frac, slash_wide)):
+        raise SystemExit('self-test failed: a slash-lookalike personal path was not detected')
+    if content_reasons('see \u00a5 later'.encode()) or content_reasons('see \u30ce later'.encode()) or content_reasons('about \u00bc later'.encode()) or content_reasons('C:\u2215Users\u2215other'.encode()) or content_reasons('C:\u2215tmp\u2215Mayn'.encode()) or content_reasons(('sk-' + '\u2215' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u00a5' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary slash text was blocked')
 
 def main():
     self_test()
