@@ -2760,3 +2760,63 @@ func TestVerticalLineASCIIFoldsOnlyVerticalLines(t *testing.T) {
 		t.Fatalf("vertical line fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsApostrophes(t *testing.T) {
+	secret := "code'ver'1"
+	marked := strings.NewReplacer("'", "\uFF07").Replace(secret)
+	encoded := strings.NewReplacer("'", "%EF%BC%87").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u2018 later",
+		"see \u2019 later",
+		"see \u02BC later",
+		"see \u2032 later",
+		"see \u055A later",
+		"path \uFF07 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("apostrophe prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestApostropheASCIIFoldsOnlyApostrophes(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF07, '\'', true},
+		{'\'', 0, false},
+		{0x2018, 0, false},
+		{0x2019, 0, false},
+		{0x02BC, 0, false},
+		{0x02B9, 0, false},
+		{0x2032, 0, false},
+		{0x055A, 0, false},
+		{0xFF02, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := apostropheASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := apostropheASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("apostrophe fold count %d", n)
+	}
+}
