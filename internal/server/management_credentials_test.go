@@ -2851,3 +2851,37 @@ func TestManagementHidesSecretsSplitByRadicalIdeographs(t *testing.T) {
 		t.Fatalf("backslash context lost: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesSecretsSplitByKatakanaNoAndCopticEsh(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9q/Refresh/7f3a"
+	kana := strings.ReplaceAll(acc.RefreshToken, "/", "\u30ce")
+	half := strings.ReplaceAll(acc.RefreshToken, "/", "\uff89")
+	acc.Name = "note " + kana
+	acc.LastError = "rejected " + half
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, kana, half, payload, "eyJ", "Zz9q", "Refresh", "7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	capital := strings.ReplaceAll(acc.RefreshToken, "/", "%E2%B3%86")
+	small := strings.ReplaceAll(acc.RefreshToken, "/", "%E2%B3%87")
+	raw := `{"note":"see ` + capital + ` ` + small + `","access_token":"` + acc.AccessToken + `"}`
+	out := string(f.srv.redactManagementBody([]byte(raw)))
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, capital, small, payload, "eyJ", "Zz9q", "Refresh"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}

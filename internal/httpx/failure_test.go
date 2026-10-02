@@ -1563,13 +1563,17 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1F67C, '/', true},
 		{0x2216, 0, false},
 		{0x00A5, 0, false},
-		{0x30CE, 0, false},
+		{0x30CE, '/', true},
+		{0xFF89, '/', true},
+		{0x306E, 0, false},
 		{0x3033, '/', true},
 		{0x3034, '/', true},
 		{0x3031, 0, false},
 		{0x1D20F, 0, false},
 		{0x4E3F, '/', true},
-		{0x2CC6, 0, false},
+		{0x2CC6, '/', true},
+		{0x2CC7, '/', true},
+		{0x2CF9, 0, false},
 		{0xFF3C, 0, false},
 		{0xFE68, 0, false},
 		{0x223C, 0, false},
@@ -1589,7 +1593,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 21 {
+	if n != 25 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -1762,6 +1766,30 @@ func TestSanitizeFailureStripsRadicalIdeographs(t *testing.T) {
 	for _, prose := range []string{"see \u4e3f later", "see \u4e36 later", "see \u30ce later", "see \u2cc6 later"} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("ideograph prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsKatakanaNoAndCopticEsh(t *testing.T) {
+	secret := "code/ver/1"
+	kana := strings.ReplaceAll(secret, "/", "\u30ce")
+	half := strings.ReplaceAll(secret, "/", "\uff89")
+	capital := strings.ReplaceAll(secret, "/", "\u2cc6")
+	small := strings.ReplaceAll(secret, "/", "\u2cc7")
+	encoded := strings.ReplaceAll(secret, "/", "%E3%83%8E")
+	encodedHalf := strings.ReplaceAll(secret, "/", "%EF%BE%89")
+	got := SanitizeFailure("rejected "+kana+" "+encoded+" "+half+" "+encodedHalf+" "+capital+" "+small+" later", secret)
+	for _, item := range []string{secret, kana, half, capital, small, encoded, encodedHalf, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \u30ce later", "see \uff89 later", "see \u2cc6 later", "see \u306e later", "see \u2cf9 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("kana prose changed: %q -> %q", prose, got)
 		}
 	}
 }
