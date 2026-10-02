@@ -2006,3 +2006,66 @@ func TestDollarASCIIFoldsOnlyDollarSigns(t *testing.T) {
 		t.Fatalf("dollar fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsAmpersands(t *testing.T) {
+	secret := "code&ver1"
+	marked := strings.ReplaceAll(secret, "&", "\uFE60")
+	encoded := strings.ReplaceAll(secret, "&", "%EF%BC%86")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "&", "\uFF06")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u214b later",
+		"see \U0001f674 later",
+		"see \U0001f675 later",
+		"path \uff06 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("ampersand prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestAmpersandASCIIFoldsOnlyAmpersands(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE60, '&', true},
+		{0xFF06, '&', true},
+		{'&', 0, false},
+		{0x214B, 0, false},
+		{0x1F674, 0, false},
+		{0x1F675, 0, false},
+		{0xFF05, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := ampersandASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := ampersandASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("ampersand fold count %d", n)
+	}
+}

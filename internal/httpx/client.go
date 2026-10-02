@@ -932,16 +932,73 @@ func escapeASCII(r rune) (byte, bool) {
 
 // foldCredentialPieces maps compatibility letters, digits, and token
 // punctuation, including the percent sign, exclamation mark, reverse
-// solidus, number sign, and dollar sign, to ASCII. Credential redaction
-// does not run NFKC. The percent fold is part of this result because the
-// decode loop consumes it: a compatibility percent or hex digit still starts
-// the next escape layer. Marks are not dropped here.
+// solidus, number sign, dollar sign, and ampersand, to ASCII. Credential
+// redaction does not run NFKC. The percent fold is part of this result
+// because the decode loop consumes it: a compatibility percent or hex digit
+// still starts the next escape layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))
+	return foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))
+	return foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))
+}
+
+// foldAmpersandPieces maps small and fullwidth ampersands to ASCII '&'.
+// NFKC folds them, and this pass does not run NFKC, so a stored secret
+// written with those forms would stay visible. A turned ampersand and
+// heavy or swash ampersand ornaments do not fold to '&', so they stay out.
+// One output piece covers the original rune.
+func foldAmpersandPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := ampersandASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldAmpersandString(s string) string {
+	if !ampersandFolded(s) {
+		return s
+	}
+	return renderPieces(foldAmpersandPieces(rawPieces(s)))
+}
+
+func ampersandFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := ampersandASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func ampersandASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE60, 0xFF06:
+		return '&', true
+	default:
+		return 0, false
+	}
 }
 
 // foldDollarPieces maps small and fullwidth dollar signs to ASCII '$'.
