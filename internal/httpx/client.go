@@ -360,13 +360,14 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Long s, roman numerals,
-	// segmented digits, modifier letters, superscripts and subscripts,
-	// enclosed letters and digits, mathematical alphanumeric symbols, and
-	// fullwidth letters and digits are folded first. Then drop marks.
-	// Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(secret))))))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(pieces))))))))))
+	// token together and miss the stored ASCII byte. Plus and equals signs,
+	// long s, roman numerals, segmented digits, modifier letters,
+	// superscripts and subscripts, enclosed letters and digits, mathematical
+	// alphanumeric symbols, and fullwidth letters and digits are folded
+	// first. Then drop marks. Spacing marks shaped like full stops keep
+	// both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(secret)))))))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(pieces)))))))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -783,6 +784,65 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldPlusEqualsPieces maps plus and equals signs to ASCII.
+// NFKC folds them, and this pass does not run NFKC, so an opaque token
+// written with those forms would stay visible. Plus-minus, superscript
+// minus, and not-equal do not become one ASCII plus or equals, so they
+// stay out. One output piece covers the original rune.
+func foldPlusEqualsPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := plusEqualsASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldPlusEqualsString(s string) string {
+	if !plusEqualsFolded(s) {
+		return s
+	}
+	return renderPieces(foldPlusEqualsPieces(rawPieces(s)))
+}
+
+func plusEqualsFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := plusEqualsASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func plusEqualsASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x207A, 0x208A, 0xFB29, 0xFE62, 0xFF0B:
+		return '+', true
+	case 0x207C, 0x208C, 0xFE66, 0xFF1D:
+		return '=', true
 	default:
 		return 0, false
 	}
