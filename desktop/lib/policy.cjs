@@ -465,6 +465,9 @@ const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_
 // "%26%23x%33%41%3B" is "&#x3A;", and "%26%63%6F%6C%6F%6E%3B" is "&colon;".
 // A nested %25 layer on each of those bytes hides the same reference.
 // Decode one accepted reference per pass, body included.
+// A numeric reference can also be an invisible mark. "&#8203;" and "&#x200B;"
+// are U+200B. A supplementary reference such as "&#xE0100;" folds to U+200B.
+// Otherwise "user:secret@my&#8203;proxy:7890" keeps the password.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -527,7 +530,8 @@ const PROXY_HTML_CHARS = proxyHtmlChars();
 function htmlProxyChar(cp) {
   if (!Number.isInteger(cp) || cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return '';
   const char = String.fromCodePoint(cp);
-  return PROXY_HTML_CHARS.has(char) ? char : '';
+  if (PROXY_HTML_CHARS.has(char) || PROXY_MARK_CODES.has(cp) || isSupplementaryInvisible(cp)) return char;
+  return '';
 }
 const PROXY_MARK_CODES = new Set(Array.from(PROXY_MARK, char => char.codePointAt(0)));
 const SUPP_INVISIBLE = /[\u{110BD}\u{110CD}\u{13430}-\u{1343F}\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0001}\u{E0020}-\u{E007F}\u{E0100}-\u{E01EF}]/gu;
@@ -708,7 +712,7 @@ function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
 function redactProxyCredentials(text) {
-  const decoded = decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(String(text))));
+  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(String(text)))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
