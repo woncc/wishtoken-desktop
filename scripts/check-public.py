@@ -185,14 +185,30 @@ def forbidden_suffix(name):
     folded = strip_alias(name)
     return Path(name).suffix in FORBIDDEN_SUFFIXES or Path(folded).suffix in FORBIDDEN_SUFFIXES
 
+def piece_private(name):
+    name = strip_edges(name)
+    if not name:
+        return False
+    if name in FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
+        return True
+    return forbidden_suffix(name)
+
 def component_private(part):
     name = visible_name(part)
     whole = strip_edges(normalize_component(part))
     if not name and not whole:
         return False
-    if name and (name in FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name)):
+    if name and piece_private(name):
         return True
-    return forbidden_suffix(name) or (whole != name and forbidden_suffix(whole))
+    if whole != name and forbidden_suffix(whole):
+        return True
+    # filename:auth.json and filename:id_rsa keep the forbidden name in the
+    # NTFS stream. The base name is ordinary, so the stream has to be judged too.
+    if ':' in whole:
+        for piece in whole.split(':'):
+            if piece_private(piece):
+                return True
+    return False
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -296,6 +312,10 @@ def self_test():
         'credentials\u05c3token', 'nested/auth.json\u0709/payload.txt', 'ID_RSA\u0706x', 'auth.json\u2236secret.txt',
         'Copy of auth.json\u1361notes', 'auth\u3002json\u0708secret', 'notes.bak\u0589readme',
         'notes\u0705trace.log', 'readme\u0705trace.log.txt', 'notes:trace.log',
+        'readme:auth.json', 'notes:id_rsa', 'docs:credentials.json', 'readme:.env',
+        'nested/file:accounts.json', 'readme:Copy of auth.json', 'notes:auth.json:$DATA',
+        'file:id_rsa.txt', 'readme:accounts.json.bak', 'script:tokens.json.gz', 'readme\u0705auth.json',
+        'notes:ID_RSA', 'file:.netrc', 'readme:auth.json.txt',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -306,6 +326,7 @@ def self_test():
         'notes.txt', 'docs/readme.txt', 'script.go.txt',
         'models.json.txt', 'notes.txt.', 'readme.gz', 'script.go.xz', 'models.json.gz',
         'script.go:Zone.Identifier', 'notes\u00a0.txt', 'readme\u3002txt', 'script.go\u200b',
+        'models.json:Zone.Identifier', 'notes:readme.txt', 'file:notes.tmp',
         'notes .txt', 'models .json.gz', 'id_rsa.pub\u200e', 'id_rsa .pub',
         'notes.bak3/readme.md', 'script.go.swp/foo.txt', 'models.json.gz/foo.txt',
         'id_rsa.pub/foo.txt', 'Copy of README.md/img.png', 'docs/handover-not-private/readme.md',
