@@ -158,14 +158,19 @@ def secret_alias(name):
 
 # NFKC already folds fullwidth solidus and reverse solidus. These remaining
 # slash lookalikes, plus the yen and won signs Windows still treats as
-# separators, must split a path before any component is judged.
+# separators, must split a path before any component is judged. Set minus,
+# the reverse solidus operator, and big reverse solidus do not NFKC-fold
+# to a backslash, so they must be listed beside their forward twins.
 SEPARATOR_LIKE = {
     ord('\\'): '/',
     ord('\u00a5'): '/',
     ord('\u20a9'): '/',
     ord('\u2044'): '/',
     ord('\u2215'): '/',
+    ord('\u2216'): '/',
+    ord('\u29f5'): '/',
     ord('\u29f8'): '/',
+    ord('\u29f9'): '/',
     ord('\ufe68'): '/',
     ord('\uff0f'): '/',
     ord('\uff3c'): '/',
@@ -305,6 +310,8 @@ def self_test():
         '.#tokens.json/x', '._auth.json/x', 'config.toml.bak-20261001/x',
         'auth.json:secret/file.txt', 'auth.json\\notes.txt', 'credentials\\token.txt',
         'auth.json\u2044secret.txt', 'auth.json\u2215secret.txt', 'accounts.json\u29f8extra.txt',
+        'auth.json\u2216secret.txt', 'accounts.json\u29f5extra.txt', 'tokens.json\u29f9notes.txt',
+        'Diagnostics\u2216capture.png', 'credentials\u29f9token.txt', 'nested/id_rsa\u29f5x',
         'auth.json\u00a5secret.txt', 'tokens.json\u20a9extra.txt', 'auth.json\uff0fsecret.txt',
         'accounts.json\uff3cnotes.txt', 'Diagnostics\u2044capture.png', 'auth.json\u200b/payload.txt',
         'auth.json.crdownload', 'auth.json.part', 'credentials.json.partial', 'accounts.json.download',
@@ -332,6 +339,7 @@ def self_test():
         'id_rsa.pub/foo.txt', 'Copy of README.md/img.png', 'docs/handover-not-private/readme.md',
         'notes\\readme.txt', 'readme\u2044notes.txt', 'script.go\u00a5extra.txt',
         'models.json\uff0freadme.txt',
+        'readme\u2216notes.txt', 'script.go\u29f5extra.txt', 'models.json\u29f9readme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
         'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
         'models.json\u0589readme',
