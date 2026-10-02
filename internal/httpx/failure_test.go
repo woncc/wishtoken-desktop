@@ -1940,3 +1940,69 @@ func TestNumberSignASCIIFoldsOnlyNumberSigns(t *testing.T) {
 		t.Fatalf("number sign fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsDollarSigns(t *testing.T) {
+	secret := "code$ver1"
+	marked := strings.ReplaceAll(secret, "$", "\uFE69")
+	encoded := strings.ReplaceAll(secret, "$", "%EF%BC%84")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "$", "\uFF04")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u1f4b2 later",
+		"see \u00a2 later",
+		"see \u00a3 later",
+		"see \u20ac later",
+		"path \uff04 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("dollar prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDollarASCIIFoldsOnlyDollarSigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE69, '$', true},
+		{0xFF04, '$', true},
+		{'$', 0, false},
+		{0x1F4B2, 0, false},
+		{0x00A2, 0, false},
+		{0x00A3, 0, false},
+		{0x00A4, 0, false},
+		{0x20AC, 0, false},
+		{0xFF03, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := dollarASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := dollarASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("dollar fold count %d", n)
+	}
+}
