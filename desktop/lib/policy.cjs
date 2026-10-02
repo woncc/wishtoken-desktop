@@ -441,6 +441,11 @@ const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${enc
 // may omit the semicolon, including directly before the next name.
 // encodeURIComponent("&#58;") is "%26%2358%3B". A nested "%2526" layer hides
 // the same reference. Decode those spans on the copy before the scrubber.
+// encodeURIComponent leaves digits and letters alone. Encoding those body
+// characters too still hides the mark: "%26%23%35%38%3B" is "&#58;",
+// "%26%23x%33%41%3B" is "&#x3A;", and "%26%63%6F%6C%6F%6E%3B" is "&colon;".
+// A nested %25 layer on each of those bytes hides the same reference.
+// Decode one accepted reference per pass, body included.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -505,6 +510,80 @@ function htmlProxyChar(cp) {
   const char = String.fromCodePoint(cp);
   return PROXY_HTML_CHARS.has(char) ? char : '';
 }
+function readHtmlAtom(text, index) {
+  if (index >= text.length) return null;
+  const encoded = /^%(?:25){0,3}([0-9A-Fa-f]{2})/.exec(text.slice(index));
+  if (encoded) {
+    const cp = Number.parseInt(encoded[1], 16);
+    if (cp >= 0x21 && cp <= 0x7E) return { char: String.fromCharCode(cp), next: index + encoded[0].length };
+  }
+  return { char: text[index], next: index + 1 };
+}
+function acceptedProxyRef(literal, nextChar) {
+  let match = /^&#(0*[0-9]{1,7});?$/.exec(literal);
+  if (match) {
+    if (!literal.endsWith(';') && nextChar && /[0-9]/.test(nextChar)) return '';
+    return htmlProxyChar(Number(match[1]));
+  }
+  match = /^&#[xX](0*[0-9a-fA-F]{1,6});?$/.exec(literal);
+  if (match) {
+    if (!literal.endsWith(';') && nextChar && /[0-9a-fA-F]/.test(nextChar)) return '';
+    return htmlProxyChar(Number.parseInt(match[1], 16));
+  }
+  match = /^&([A-Za-z0-9]+);$/.exec(literal);
+  if (match && HTML_NAMED.has(match[1])) return HTML_NAMED.get(match[1]);
+  match = /^&([A-Za-z0-9]+)$/.exec(literal);
+  if (match && HTML_LEGACY.includes(match[1])) return HTML_NAMED.get(match[1]) || '';
+  return '';
+}
+const HTML_ATOM = /[A-Za-z0-9#xX;]/;
+function parseProxyHtmlRef(text, index) {
+  const atoms = [];
+  let cursor = index;
+  let lookahead = '';
+  while (atoms.length < 48 && cursor < text.length) {
+    const atom = readHtmlAtom(text, cursor);
+    if (!atom) break;
+    if (!atoms.length) {
+      if (atom.char !== '&') return null;
+    } else if (atom.char === ';') {
+      atoms.push(atom);
+      cursor = atom.next;
+      break;
+    } else if (!HTML_ATOM.test(atom.char)) {
+      lookahead = atom.char;
+      break;
+    }
+    atoms.push(atom);
+    cursor = atom.next;
+  }
+  if (atoms.length < 2) return null;
+  if (!lookahead && cursor < text.length) {
+    const peek = readHtmlAtom(text, cursor);
+    if (peek) lookahead = peek.char;
+  }
+  for (let count = atoms.length; count >= 2; count -= 1) {
+    const literal = atoms.slice(0, count).map(item => item.char).join('');
+    const nextChar = literal.endsWith(';') ? '' : (count < atoms.length ? atoms[count].char : lookahead);
+    const char = acceptedProxyRef(literal, nextChar);
+    if (char) return { char, next: atoms[count - 1].next };
+  }
+  return null;
+}
+function unwrapHtmlInteriors(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const ref = text[index] === '&' || text[index] === '%' ? parseProxyHtmlRef(text, index) : null;
+    if (ref && ref.next > index) {
+      out += ref.char;
+      index = ref.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
 function decodeEncodedHtml(text) {
   return text
     .replace(ENC_NUMERIC, (match, dec, hex) => {
@@ -518,7 +597,7 @@ function decodeEncodedHtml(text) {
 function decodeProxyHtml(text) {
   let out = text;
   for (let pass = 0; pass < 4; pass += 1) {
-    const next = decodeEncodedHtml(out).replace(HTML_REF, (match, dec, hex, legacy, strict) => {
+    const next = decodeEncodedHtml(unwrapHtmlInteriors(out)).replace(HTML_REF, (match, dec, hex, legacy, strict) => {
       const named = legacy || strict;
       if (named) return HTML_NAMED.get(named) || match;
       const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);
