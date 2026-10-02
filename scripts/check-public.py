@@ -54,9 +54,11 @@ DOT_LIKE = {
     ord('\U0001da88'): '.',
     # These do not NFKC-fold to '.'. Lisu mya ti, the Kharoshthi punctuation
     # dot, and Meetei Mayek lum iyek still hide auth.json and .netrc.
+    # Lisu tone mya cya is confusable with two full stops and does not fold.
     ord('\ua4f8'): '.',
     ord('\U00010a50'): '.',
     ord('\uabec'): '.',
+    ord('\ua4fa'): '.',
     # Unicode confusables map these to FULL STOP, and none of them NFKC-fold
     # to '.'. Arabic-indic zero and the extended zero are the digit forms.
     # The siyaq half maps through that zero, and the musical augmentation
@@ -495,6 +497,8 @@ def self_test():
         'auth\ua4f8json', 'accounts\U00010a50json', 'credentials\uabecjson',
         '\U00010a50netrc', 'id_rsa\ua4f8txt', 'Copy of auth\uabecjson',
         'nested/tokens\ua4f8json/extra.txt', 'auth\ua4f8\ua4f8json',
+        'auth\ua4fajson', '\ua4fanetrc', 'id_rsa\ua4fatxt', 'Copy of auth\ua4fajson',
+        'nested/tokens\ua4fajson/extra.txt', 'auth\ua4fa\ua4fajson', 'accounts\ua4fajson.txt',
         'auth\u0660json', 'accounts\u06f0json', 'credentials\U0001ecaejson',
         '\u0660netrc', '\u06f0env', 'id_rsa\U0001d16dtxt', 'secrets\u06f0env',
         'auth\u0660json.txt', 'Copy of auth\u06f0json', 'auth\u0660\u0660json',
@@ -552,6 +556,7 @@ def self_test():
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
+        'notes\ua4fatxt', 'script\ua4fago', 'models\ua4fajson', 'id_rsa\ua4fapub', 'readme\ua4famd',
         'models.json\u0589readme',
         'notes\u0660txt', 'script\u06f0go', 'models\U0001ecaejson', 'id_rsa\u0660pub', 'readme\U0001d16dmd',
         'notes\u2041readme.txt', 'script.go\u2041Zone.Identifier', 'id_rsa.pub\u2041foo.txt',
