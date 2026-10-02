@@ -39,6 +39,10 @@ const SECRET_TEXT = [
 // %3A is a port colon too. A literal-colon host check leaves the password in
 // "user:secret@127.0.0.1%3A7890". Four numeric labels can omit the port, the
 // same way a dotted IPv4 address already can.
+// %2E is a host dot, including a nested %252E. U+FF0E U+FE52 U+2024 fold to
+// "." under NFKC, and so do their percent-encoded forms. A literal-dot check
+// leaves the password in "user:secret@127%2E0%2E0%2E1:7890". Fullwidth digits
+// are numeric labels as well.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
 // A query, path, or fragment marker is a boundary too. Otherwise
@@ -91,10 +95,28 @@ function atSeparator() {
   return `(?:${parts.join('|')})`;
 }
 const AT_SEP = atSeparator();
+// U+FF0E U+FE52 U+2024 fold to "." under NFKC. A nested %252E hides the same dot.
+const DOT_CHARS = ['\uFF0E', '\uFE52', '\u2024'];
+function dotSeparator() {
+  const parts = ['\\.', '%2[Ee]', '%25(?:25){0,2}2[Ee]'];
+  for (const char of DOT_CHARS) {
+    parts.push(char);
+    const encoded = percentBytes(char);
+    for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
+  }
+  return `(?:${parts.join('|')})`;
+}
+const DOT_SEP = dotSeparator();
 const SCHEME_USER = '[^\\s/?#:@' + COLON_CHARS.join('') + ']+';
 const proxyPort = COLON_SEP;
-const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
-const PROXY_HOST = '(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|' + numericLabel + '(?:\\.' + numericLabel + '){3})(?:' + proxyPort + '\\d+)?|(?:' + numericLabel + '(?:\\.' + numericLabel + '){0,2}|\\d{4,10}|[A-Za-z][A-Za-z0-9_-]*)' + proxyPort + '\\d{2,5})(?=$|' + PROXY_TAIL + ')';
+const DIGIT = '(?:\\d|[\\uFF10-\\uFF19])';
+const numericLabel = `(?:${DIGIT}{1,4}|0[xX][0-9A-Fa-f]{1,8})`;
+const domainLabel = '[A-Za-z0-9-]+';
+const literalDomain = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
+const encodedDomain = `${domainLabel}(?:${DOT_SEP}${domainLabel})*${DOT_SEP}[A-Za-z]{2,}`;
+const fourNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){3}`;
+const shortNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){0,2}`;
+const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}\\d+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}\\d{2,5})(?=$|${PROXY_TAIL})`;
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
