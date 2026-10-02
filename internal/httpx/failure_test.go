@@ -2229,6 +2229,26 @@ func TestSanitizeFailureStripsOuterBlockDiagonal(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsTopLowerLeftBlockDiagonal(t *testing.T) {
+	secret := "code\\ver\\1"
+	block := strings.ReplaceAll(secret, "\\", "\U0001FB4D")
+	encoded := strings.ReplaceAll(secret, "\\", "%F0%9F%AD%8D")
+	got := SanitizeFailure("rejected "+block+" "+encoded+" later", secret)
+	for _, item := range []string{secret, block, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001FB4D later", "see \U0001FB4C later", "see \U0001FB68 later", "see \U0001FB4E later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("top lower left block diagonal prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
 func TestSanitizeFailureStripsInnerLowerLeftBlockDiagonal(t *testing.T) {
 	secret := "code\\ver\\1"
 	block := strings.ReplaceAll(secret, "\\", "\U0001FB4E")
@@ -2805,7 +2825,8 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x1FBA4, 0, false},
 		{0x1FBBE, 0, false},
 		{0x1FB65, '\\', true},
-		{0x1FB4D, 0, false},
+		{0x1FB4C, 0, false},
+		{0x1FB4D, '\\', true},
 		{0x1FB4E, '\\', true},
 		{0x1FB4F, '\\', true},
 		{0x1FB50, '\\', true},
@@ -2836,7 +2857,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 42 {
+	if n != 43 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
