@@ -419,3 +419,38 @@ func TestManagementHidesSecretsSplitByLongAndWaveDashes(t *testing.T) {
 		t.Fatalf("note was rewritten: %s", out)
 	}
 }
+
+func TestManagementHidesSecretsSplitByCompatibilityHyphens(t *testing.T) {
+	refresh := "rt_display-123456789"
+	super := "rt_display" + "\u207b" + "123456789"
+	sub := "rt_display" + "\u208b" + "123456789"
+	vertical := "rt_display" + "\ufe32" + "123456789"
+	small := "rt_display" + "\ufe63" + "123456789"
+	full := "rt_display" + "\uff0d" + "123456789"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = refresh
+	acc.Name = "note " + super
+	acc.LastError = "rejected " + sub
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	for _, leaked := range []string{refresh, super, sub, "display-123456789", "123456789"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	bodyBytes := []byte(`{"note":"see ` + vertical + ` ` + small + ` ` + full + `","access_token":"` + acc.AccessToken + `"}`)
+	out := string(f.srv.redactManagementBody(bodyBytes))
+	for _, leaked := range []string{refresh, vertical, small, full, acc.AccessToken, "123456789"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}

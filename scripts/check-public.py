@@ -211,6 +211,16 @@ HYPHEN_LIKE = {
     ord('\u2E3B'): '-',
     ord('\u301C'): '-',
     ord('\u3030'): '-',
+    # These NFKC-fold to '-' or to a dash already listed. Superscript and
+    # subscript minus fold to U+2212, vertical en dash folds to an en dash,
+    # and small hyphen-minus and fullwidth hyphen-minus fold to '-'. The
+    # raw forms are listed so a reordered normalization cannot hide
+    # launch-history.json. Credential redaction does not run NFKC.
+    ord('\u207B'): '-',
+    ord('\u208B'): '-',
+    ord('\uFE32'): '-',
+    ord('\uFE63'): '-',
+    ord('\uFF0D'): '-',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -555,6 +565,10 @@ def self_test():
         'launch\U00010eadhistory.json', 'Copy of cache.sqlite\u058awal',
         'launch\u2e3ahistory.json', 'cache.sqlite\u2e3bwal', 'vault.db\u301cjournal',
         'nested/cockpit\u3030integration.json', 'Copy of cache.sqlite\u2e3awal',
+        'launch\u207bhistory.json', 'cache.sqlite\u208bwal', 'vault.db\ufe32journal',
+        'launch\ufe63history.json', 'cache.sqlite\uff0dwal',
+        'nested/cockpit\ufe63integration.json', 'bridge\ufe32identity.json',
+        'state.sqlite3\u207bshm', 'Copy of cache.sqlite\uff0dwal',
         'nested/cockpit\u2014integration.json', 'bridge\ufe31identity.json',
         'state.sqlite3\u2015shm', 'Copy of cache.sqlite\ufe31wal',
         'launch\u00adhistory.json', 'cache.sqlite\u00adwal', 'vault.db\u00adjournal',
@@ -757,6 +771,8 @@ def self_test():
         'script.go\u30a0extra', 'au\U00010eadth.json',
         'au\u2e3ath.json', 'au\u2e3bth.json', 'script.go\u301cextra', 'notes\u3030.txt',
         'auth\u174djson',
+        'au\u207bth.json', 'au\u208bth.json', 'au\ufe32th.json', 'au\ufe63th.json', 'au\uff0dth.json',
+        'notes\ufe63.txt', 'script.go\uff0dextra', 'auth\uff0djson',
         'notes\u00ad.txt', 'script.go\u00adextra',
     )
     for rel in blocked:
