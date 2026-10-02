@@ -3480,3 +3480,94 @@ func TestEqualsRunASCIIFoldsOnlyConsecutiveEquals(t *testing.T) {
 		t.Fatalf("equals run fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCircledNumbers(t *testing.T) {
+	pairs := []struct {
+		secret string
+		digits string
+		mark   string
+	}{
+		{"rt_Zz9q10ab7f", "10", "\u2469"},
+		{"rt_Zz9q20ab7f", "20", "\u2473"},
+		{"rt_Zz9q21ab7f", "21", "\u3251"},
+		{"rt_Zz9q35ab7f", "35", "\u325F"},
+		{"rt_Zz9q36ab7f", "36", "\u32B1"},
+		{"rt_Zz9q50ab7f", "50", "\u32BF"},
+	}
+	var parts []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.digits, pair.mark)
+		parts = append(parts, marked)
+		leaked = append(leaked, pair.secret, marked, pair.digits)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "10", "%E2%91%A9")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "ab7f")
+	got := SanitizeFailure("rejected " + strings.Join(parts, " ") + " later")
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[0].secret, "10", "\u2469")
+	got = SanitizeFailure("rejected "+pairs[0].secret+" later", stored)
+	for _, item := range []string{pairs[0].secret, stored, "Zz9q", "10", "ab7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2469 later",
+		"see \u2473 later",
+		"see \u3251 later",
+		"see \u32BF later",
+		"see \u2460 later",
+		"see \u24EB later",
+		"see \u2474 later",
+		"see \u2488 later",
+		"see \u3248 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("circled prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestCircledNumberASCIIFoldsOnlyTensThroughFifty(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2469, "10"},
+		{0x246A, "11"},
+		{0x2473, "20"},
+		{0x3251, "21"},
+		{0x325F, "35"},
+		{0x32B1, "36"},
+		{0x32BF, "50"},
+	}
+	for _, check := range checks {
+		got, ok := circledNumberASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{0x2460, 0x2468, 0x2474, 0x2488, 0x249C, 0x24EA, 0x24EB, 0x24FE, 0x277F, 0x3248, 0x3250, 0x32B0, 0x32C0} {
+		if _, ok := circledNumberASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := circledNumberASCII(r); ok {
+			n++
+		}
+	}
+	if n != 41 {
+		t.Fatalf("circled number fold count %d", n)
+	}
+}
