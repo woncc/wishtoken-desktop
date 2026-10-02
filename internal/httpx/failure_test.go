@@ -2069,3 +2069,68 @@ func TestAmpersandASCIIFoldsOnlyAmpersands(t *testing.T) {
 		t.Fatalf("ampersand fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsAsterisks(t *testing.T) {
+	secret := "code*ver1"
+	marked := strings.ReplaceAll(secret, "*", "\uFE61")
+	encoded := strings.ReplaceAll(secret, "*", "%EF%BC%8A")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "*", "\uFF0A")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2217 later",
+		"see \u204e later",
+		"see \u2731 later",
+		"see \u066d later",
+		"path \uff0a file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("asterisk prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestAsteriskASCIIFoldsOnlyAsterisks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE61, '*', true},
+		{0xFF0A, '*', true},
+		{'*', 0, false},
+		{0x066D, 0, false},
+		{0x204E, 0, false},
+		{0x2217, 0, false},
+		{0x2731, 0, false},
+		{0xFF0B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := asteriskASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := asteriskASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("asterisk fold count %d", n)
+	}
+}
