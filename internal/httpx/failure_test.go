@@ -3017,3 +3017,87 @@ func TestCommercialAtASCIIFoldsOnlyCommercialAt(t *testing.T) {
 		t.Fatalf("commercial at fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCompatibilitySpaces(t *testing.T) {
+	secret := "rt_Zz9q Refresh 7f3a"
+	spaces := []rune{
+		0x00A0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+		0x2007, 0x2008, 0x2009, 0x200A, 0x202F, 0x205F, 0x3000,
+	}
+	var parts []string
+	var leaked []string
+	for _, r := range spaces {
+		marked := strings.ReplaceAll(secret, " ", string(r))
+		parts = append(parts, marked)
+		leaked = append(leaked, marked)
+	}
+	encoded := strings.ReplaceAll(secret, " ", "%C2%A0")
+	ideoEncoded := strings.ReplaceAll(secret, " ", "%E3%80%80")
+	parts = append(parts, encoded, ideoEncoded)
+	leaked = append(leaked, secret, encoded, ideoEncoded, "Zz9q", "Refresh", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secret)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(secret, " ", "\u3000")
+	shown := strings.ReplaceAll(secret, " ", "\u00A0")
+	got = SanitizeFailure("rejected "+secret+" "+shown+" later", stored)
+	for _, item := range []string{secret, stored, shown, "Zz9q", "Refresh", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored space leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"slow\u00a0down",
+		"slow\u2003down",
+		"slow\u3000down",
+		"slow\u1680down",
+	} {
+		if got := SanitizeFailure(prose); got != "slow down" || strings.Contains(got, "[redacted]") {
+			t.Fatalf("space prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSpaceASCIIFoldsOnlyCompatibilitySpaces(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x00A0, ' ', true},
+		{0x2000, ' ', true},
+		{0x2003, ' ', true},
+		{0x2009, ' ', true},
+		{0x202F, ' ', true},
+		{0x205F, ' ', true},
+		{0x3000, ' ', true},
+		{' ', 0, false},
+		{'\t', 0, false},
+		{'\n', 0, false},
+		{0x1680, 0, false},
+		{0x200B, 0, false},
+		{0x2028, 0, false},
+		{0xFEFF, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := spaceASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := spaceASCII(r); ok {
+			n++
+		}
+	}
+	if n != 15 {
+		t.Fatalf("space fold count %d", n)
+	}
+}

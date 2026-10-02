@@ -388,6 +388,13 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 			spans = append(spans, exactSecretSpans(droppedStops, needleStop)...)
 		}
 	}
+	// Compatibility spaces NFKC-fold to ASCII space, and this pass does not
+	// run NFKC. Dropping one joins a spaced token and misses the stored ' '.
+	// Folding it to ' ' is a separate reading; the drop below still runs so
+	// an inserted space cannot hide a token that has no space.
+	if spaced, ok := foldSpacePieces(folded); ok {
+		spans = append(spans, exactSecretSpans(spaced, foldSpaceString(needle))...)
+	}
 	dropped := dropMarkPieces(folded)
 	if len(dropped) != len(folded) {
 		spans = append(spans, exactSecretSpans(dropped, needle)...)
@@ -1000,6 +1007,67 @@ func commercialAtASCII(r rune) (byte, bool) {
 	switch r {
 	case 0xFE6B, 0xFF20:
 		return '@', true
+	default:
+		return 0, false
+	}
+}
+
+// foldSpacePieces maps compatibility spaces to ASCII ' '. NFKC folds them,
+// and this pass does not run NFKC, so a stored secret written with those
+// spaces would stay visible. This is a separate reading from dropMarkPieces:
+// dropping the space would join the token and miss the stored ' '. Ogham
+// space does not NFKC-fold to ' ', and neither do tab, line separators, or
+// zero-width spaces, so they stay out. This pass does not decide where a
+// proxy password ends. One output piece covers the original rune.
+func foldSpacePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := spaceASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldSpaceString(s string) string {
+	if !spaceFolded(s) {
+		return s
+	}
+	folded, _ := foldSpacePieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func spaceFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := spaceASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func spaceASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x00A0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+		0x2007, 0x2008, 0x2009, 0x200A, 0x202F, 0x205F, 0x3000:
+		return ' ', true
 	default:
 		return 0, false
 	}
@@ -2956,7 +3024,9 @@ func ignorableCredentialRune(r rune) bool {
 	}
 	// ASCII space still separates words. The other space separators, including
 	// Ogham space which does not NFKC-fold, have to come out before a token is
-	// matched or they hide the secret.
+	// matched or they hide the secret. Compatibility spaces that do NFKC-fold
+	// to ASCII space also have a fold reading in findSecretSpans; this drop
+	// still removes them so an inserted space cannot split a token.
 	if r != ' ' && unicode.Is(unicode.Zs, r) {
 		return true
 	}

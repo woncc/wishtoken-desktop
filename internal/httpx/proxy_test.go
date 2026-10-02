@@ -1215,3 +1215,33 @@ func TestRedactHidesCommercialAtInProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesCompatibilitySpaceInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9q Refresh 7f3a"
+	nbsp := strings.NewReplacer(" ", "\u00A0").Replace(password)
+	ideo := strings.NewReplacer(" ", "\u3000").Replace(password)
+	narrow := strings.NewReplacer(" ", "\u202F").Replace(password)
+	encoded := strings.NewReplacer(" ", "%C2%A0").Replace(password)
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + nbsp,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + ideo,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + narrow,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, nbsp, ideo, narrow, encoded, "Zz9q", "Refresh", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	plain := "member\u3000example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
