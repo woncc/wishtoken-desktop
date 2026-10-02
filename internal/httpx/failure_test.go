@@ -1111,3 +1111,81 @@ func TestModifierASCIIFoldsOnlySingleLetters(t *testing.T) {
 		t.Fatalf("modifier fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSegmentedDigits(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"0", "\U0001fbf0",
+		"1", "\U0001fbf1",
+		"2", "\U0001fbf2",
+		"5", "\U0001fbf5",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "2", "%F0%9F%AF%B2", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"1", "\U0001fbf1",
+		"2", "\U0001fbf2",
+	).Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U0001fbf0 later",
+		"room \u2469 later",
+		"item \u2474 later",
+		"rev \u2488 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("segmented prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSegmentedASCIIFoldsOnlyDigits(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x1FBEF, 0, false},
+		{0x1FBF0, '0', true},
+		{0x1FBF1, '1', true},
+		{0x1FBF5, '5', true},
+		{0x1FBF9, '9', true},
+		{0x1FBFA, 0, false},
+		{0x2469, 0, false},
+		{0x2474, 0, false},
+		{0x2488, 0, false},
+		{0x24EA, 0, false},
+		{0x24FF, 0, false},
+		{0xFF10, 0, false},
+		{'5', 0, false},
+	}
+	for _, check := range checks {
+		got, ok := segmentedASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := segmentedASCII(r); ok {
+			n++
+		}
+	}
+	if n != 10 {
+		t.Fatalf("segmented fold count %d", n)
+	}
+}
