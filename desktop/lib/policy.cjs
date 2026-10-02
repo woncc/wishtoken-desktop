@@ -592,12 +592,15 @@ function htmlProxyChar(cp) {
   // Arabic-Indic digits, NKo digits, Devanagari digits, Bengali digits,
   // Gurmukhi digits, Gujarati digits, Oriya digits, Tamil digits,
   // Telugu digits, Kannada digits, Malayalam digits, Sinhala digits,
-  // Thai digits, Lao digits, Tibetan digits, and Myanmar digits do too.
+  // Thai digits, Lao digits, Tibetan digits, Myanmar digits, Myanmar Shan
+  // digits, Khmer digits, Mongolian digits, Limbu digits, New Tai Lue
+  // digits, Tai Tham Hora digits, Tai Tham Tham digits, Balinese digits,
+  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, and Brahmi digits do too.
   // A numeric reference has to yield the same character so the label fold
   // can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp) || isMyanmarShanDigit(cp) || isKhmerDigit(cp) || isMongolianDigit(cp) || isLimbuDigit(cp) || isNewTaiLueDigit(cp) || isTaiThamHoraDigit(cp) || isTaiThamThamDigit(cp) || isBalineseDigit(cp) || isSundaneseDigit(cp) || isLepchaDigit(cp) || isOlChikiDigit(cp) || isVaiDigit(cp) || isSaurashtraDigit(cp) || isKayahLiDigit(cp) || isJavaneseDigit(cp) || isMyanmarTaiLaingDigit(cp) || isChamDigit(cp) || isMeeteiMayekDigit(cp) || isOsmanyaDigit(cp) || isHanifiRohingyaDigit(cp) || isGarayDigit(cp) || isBrahmiDigit(cp)) return char;
   if (cp === 0x02D7 || cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x207B || cp === 0x208B || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -2646,8 +2649,1260 @@ function foldMyanmarDigits(text) {
   return out;
 }
 
+// Myanmar Shan digits U+1090..U+1099 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1091proxy:7890" and
+// "user:secret@\u1091\u1092\u1097.\u1090.\u1090.\u1091:7890" keep the
+// password. The redacted host uses an ASCII digit. U+108F, U+109A, and other
+// non-digit Myanmar marks stay as written.
+function myanmarShanDigitAscii(cp) {
+  if (cp >= 0x1090 && cp <= 0x1099) return String.fromCharCode(0x30 + (cp - 0x1090));
+  return '';
+}
+function isMyanmarShanDigit(cp) {
+  return myanmarShanDigitAscii(cp) !== '';
+}
+function readEncodedMyanmarShanDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isMyanmarShanDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedMyanmarShanDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedMyanmarShanDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldMyanmarShanDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += myanmarShanDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+// Khmer digits U+17E0..U+17E9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u17E1proxy:7890" and
+// "user:secret@\u17E1\u17E2\u17E7.\u17E0.\u17E0.\u17E1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+17DF, U+17EA, and other
+// non-digit Khmer marks stay as written.
+function khmerDigitAscii(cp) {
+  if (cp >= 0x17E0 && cp <= 0x17E9) return String.fromCharCode(0x30 + (cp - 0x17E0));
+  return '';
+}
+function isKhmerDigit(cp) {
+  return khmerDigitAscii(cp) !== '';
+}
+function readEncodedKhmerDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isKhmerDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedKhmerDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedKhmerDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldKhmerDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += khmerDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+// Mongolian digits U+1810..U+1819 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1811proxy:7890" and
+// "user:secret@\u1811\u1812\u1817.\u1810.\u1810.\u1811:7890" keep the
+// password. The redacted host uses an ASCII digit. U+180F, U+181A, and other
+// non-digit Mongolian marks stay as written.
+function mongolianDigitAscii(cp) {
+  if (cp >= 0x1810 && cp <= 0x1819) return String.fromCharCode(0x30 + (cp - 0x1810));
+  return '';
+}
+function isMongolianDigit(cp) {
+  return mongolianDigitAscii(cp) !== '';
+}
+function readEncodedMongolianDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isMongolianDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedMongolianDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedMongolianDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldMongolianDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += mongolianDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Limbu digits U+1946..U+194F do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1947proxy:7890" and
+// "user:secret@\u1947\u1948\u194D.\u1946.\u1946.\u1947:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1945, U+1950, and other
+// non-digit Limbu marks stay as written.
+function limbuDigitAscii(cp) {
+  if (cp >= 0x1946 && cp <= 0x194F) return String.fromCharCode(0x30 + (cp - 0x1946));
+  return '';
+}
+function isLimbuDigit(cp) {
+  return limbuDigitAscii(cp) !== '';
+}
+function readEncodedLimbuDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isLimbuDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedLimbuDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedLimbuDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldLimbuDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += limbuDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// New Tai Lue digits U+19D0..U+19D9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u19D1proxy:7890" and
+// "user:secret@\u19D1\u19D2\u19D7.\u19D0.\u19D0.\u19D1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+19CF, U+19DA, and other
+// non-digit New Tai Lue marks stay as written.
+function newTaiLueDigitAscii(cp) {
+  if (cp >= 0x19D0 && cp <= 0x19D9) return String.fromCharCode(0x30 + (cp - 0x19D0));
+  return '';
+}
+function isNewTaiLueDigit(cp) {
+  return newTaiLueDigitAscii(cp) !== '';
+}
+function readEncodedNewTaiLueDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isNewTaiLueDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedNewTaiLueDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedNewTaiLueDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldNewTaiLueDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += newTaiLueDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Tai Tham Hora digits U+1A80..U+1A89 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1A81proxy:7890" and
+// "user:secret@\u1A81\u1A82\u1A87.\u1A80.\u1A80.\u1A81:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1A7F, U+1A8A, and other
+// non-digit Tai Tham marks stay as written.
+function taiThamHoraDigitAscii(cp) {
+  if (cp >= 0x1A80 && cp <= 0x1A89) return String.fromCharCode(0x30 + (cp - 0x1A80));
+  return '';
+}
+function isTaiThamHoraDigit(cp) {
+  return taiThamHoraDigitAscii(cp) !== '';
+}
+function readEncodedTaiThamHoraDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isTaiThamHoraDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedTaiThamHoraDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedTaiThamHoraDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldTaiThamHoraDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += taiThamHoraDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Tai Tham Tham digits U+1A90..U+1A99 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1A91proxy:7890" and
+// "user:secret@\u1A91\u1A92\u1A97.\u1A90.\u1A90.\u1A91:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1A8F, U+1A9A, and other
+// non-digit Tai Tham marks stay as written.
+function taiThamThamDigitAscii(cp) {
+  if (cp >= 0x1A90 && cp <= 0x1A99) return String.fromCharCode(0x30 + (cp - 0x1A90));
+  return '';
+}
+function isTaiThamThamDigit(cp) {
+  return taiThamThamDigitAscii(cp) !== '';
+}
+function readEncodedTaiThamThamDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isTaiThamThamDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedTaiThamThamDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedTaiThamThamDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldTaiThamThamDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += taiThamThamDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Balinese digits U+1B50..U+1B59 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1B51proxy:7890" and
+// "user:secret@\u1B51\u1B52\u1B57.\u1B50.\u1B50.\u1B51:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1B4F, U+1B5A, and other
+// non-digit Balinese marks stay as written.
+function balineseDigitAscii(cp) {
+  if (cp >= 0x1B50 && cp <= 0x1B59) return String.fromCharCode(0x30 + (cp - 0x1B50));
+  return '';
+}
+function isBalineseDigit(cp) {
+  return balineseDigitAscii(cp) !== '';
+}
+function readEncodedBalineseDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isBalineseDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedBalineseDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedBalineseDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldBalineseDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += balineseDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Sundanese digits U+1BB0..U+1BB9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1BB1proxy:7890" and
+// "user:secret@\u1BB1\u1BB2\u1BB7.\u1BB0.\u1BB0.\u1BB1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1BAF, U+1BBA, and other
+// non-digit Sundanese marks stay as written.
+function sundaneseDigitAscii(cp) {
+  if (cp >= 0x1BB0 && cp <= 0x1BB9) return String.fromCharCode(0x30 + (cp - 0x1BB0));
+  return '';
+}
+function isSundaneseDigit(cp) {
+  return sundaneseDigitAscii(cp) !== '';
+}
+function readEncodedSundaneseDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isSundaneseDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedSundaneseDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedSundaneseDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldSundaneseDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += sundaneseDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Lepcha digits U+1C40..U+1C49 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1C41proxy:7890" and
+// "user:secret@\u1C41\u1C42\u1C47.\u1C40.\u1C40.\u1C41:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1C3F, U+1C4A, and other
+// non-digit Lepcha marks stay as written.
+function lepchaDigitAscii(cp) {
+  if (cp >= 0x1C40 && cp <= 0x1C49) return String.fromCharCode(0x30 + (cp - 0x1C40));
+  return '';
+}
+function isLepchaDigit(cp) {
+  return lepchaDigitAscii(cp) !== '';
+}
+function readEncodedLepchaDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isLepchaDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedLepchaDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedLepchaDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldLepchaDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += lepchaDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Ol Chiki digits U+1C50..U+1C59 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u1C51proxy:7890" and
+// "user:secret@\u1C51\u1C52\u1C57.\u1C50.\u1C50.\u1C51:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1C4F, U+1C5A, and other
+// non-digit Ol Chiki marks stay as written.
+function olChikiDigitAscii(cp) {
+  if (cp >= 0x1C50 && cp <= 0x1C59) return String.fromCharCode(0x30 + (cp - 0x1C50));
+  return '';
+}
+function isOlChikiDigit(cp) {
+  return olChikiDigitAscii(cp) !== '';
+}
+function readEncodedOlChikiDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isOlChikiDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedOlChikiDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedOlChikiDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldOlChikiDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += olChikiDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Vai digits U+A620..U+A629 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uA621proxy:7890" and
+// "user:secret@\uA621\uA622\uA627.\uA620.\uA620.\uA621:7890" keep the
+// password. The redacted host uses an ASCII digit. U+A61F, U+A62A, and other
+// non-digit Vai marks stay as written.
+function vaiDigitAscii(cp) {
+  if (cp >= 0xA620 && cp <= 0xA629) return String.fromCharCode(0x30 + (cp - 0xA620));
+  return '';
+}
+function isVaiDigit(cp) {
+  return vaiDigitAscii(cp) !== '';
+}
+function readEncodedVaiDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isVaiDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedVaiDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedVaiDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldVaiDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += vaiDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Saurashtra digits U+A8D0..U+A8D9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uA8D1proxy:7890" and
+// "user:secret@\uA8D1\uA8D2\uA8D7.\uA8D0.\uA8D0.\uA8D1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+A8CF, U+A8DA, and other
+// non-digit Saurashtra marks stay as written.
+function saurashtraDigitAscii(cp) {
+  if (cp >= 0xA8D0 && cp <= 0xA8D9) return String.fromCharCode(0x30 + (cp - 0xA8D0));
+  return '';
+}
+function isSaurashtraDigit(cp) {
+  return saurashtraDigitAscii(cp) !== '';
+}
+function readEncodedSaurashtraDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isSaurashtraDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedSaurashtraDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedSaurashtraDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldSaurashtraDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += saurashtraDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Kayah Li digits U+A900..U+A909 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uA901proxy:7890" and
+// "user:secret@\uA901\uA902\uA907.\uA900.\uA900.\uA901:7890" keep the
+// password. The redacted host uses an ASCII digit. U+A8FF, U+A90A, and other
+// non-digit Kayah Li marks stay as written.
+function kayahLiDigitAscii(cp) {
+  if (cp >= 0xA900 && cp <= 0xA909) return String.fromCharCode(0x30 + (cp - 0xA900));
+  return '';
+}
+function isKayahLiDigit(cp) {
+  return kayahLiDigitAscii(cp) !== '';
+}
+function readEncodedKayahLiDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isKayahLiDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedKayahLiDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedKayahLiDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldKayahLiDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += kayahLiDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Javanese digits U+A9D0..U+A9D9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uA9D1proxy:7890" and
+// "user:secret@\uA9D1\uA9D2\uA9D7.\uA9D0.\uA9D0.\uA9D1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+A9CF, U+A9DA, and other
+// non-digit Javanese marks stay as written.
+function javaneseDigitAscii(cp) {
+  if (cp >= 0xA9D0 && cp <= 0xA9D9) return String.fromCharCode(0x30 + (cp - 0xA9D0));
+  return '';
+}
+function isJavaneseDigit(cp) {
+  return javaneseDigitAscii(cp) !== '';
+}
+function readEncodedJavaneseDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isJavaneseDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedJavaneseDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedJavaneseDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldJavaneseDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += javaneseDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Myanmar Tai Laing digits U+A9F0..U+A9F9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uA9F1proxy:7890" and
+// "user:secret@\uA9F1\uA9F2\uA9F7.\uA9F0.\uA9F0.\uA9F1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+A9EF, U+A9FA, and other
+// non-digit Myanmar Tai Laing marks stay as written.
+function myanmarTaiLaingDigitAscii(cp) {
+  if (cp >= 0xA9F0 && cp <= 0xA9F9) return String.fromCharCode(0x30 + (cp - 0xA9F0));
+  return '';
+}
+function isMyanmarTaiLaingDigit(cp) {
+  return myanmarTaiLaingDigitAscii(cp) !== '';
+}
+function readEncodedMyanmarTaiLaingDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isMyanmarTaiLaingDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedMyanmarTaiLaingDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedMyanmarTaiLaingDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldMyanmarTaiLaingDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += myanmarTaiLaingDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Cham digits U+AA50..U+AA59 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uAA51proxy:7890" and
+// "user:secret@\uAA51\uAA52\uAA57.\uAA50.\uAA50.\uAA51:7890" keep the
+// password. The redacted host uses an ASCII digit. U+AA4F, U+AA5A, and other
+// non-digit Cham marks stay as written.
+function chamDigitAscii(cp) {
+  if (cp >= 0xAA50 && cp <= 0xAA59) return String.fromCharCode(0x30 + (cp - 0xAA50));
+  return '';
+}
+function isChamDigit(cp) {
+  return chamDigitAscii(cp) !== '';
+}
+function readEncodedChamDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isChamDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedChamDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedChamDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldChamDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += chamDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Meetei Mayek digits U+ABF0..U+ABF9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\uABF1proxy:7890" and
+// "user:secret@\uABF1\uABF2\uABF7.\uABF0.\uABF0.\uABF1:7890" keep the
+// password. The redacted host uses an ASCII digit. U+ABEF, U+ABFA, and other
+// non-digit Meetei Mayek marks stay as written.
+function meeteiMayekDigitAscii(cp) {
+  if (cp >= 0xABF0 && cp <= 0xABF9) return String.fromCharCode(0x30 + (cp - 0xABF0));
+  return '';
+}
+function isMeeteiMayekDigit(cp) {
+  return meeteiMayekDigitAscii(cp) !== '';
+}
+function readEncodedMeeteiMayekDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isMeeteiMayekDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedMeeteiMayekDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedMeeteiMayekDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldMeeteiMayekDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += meeteiMayekDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Osmanya digits U+104A0..U+104A9 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u{104A1}proxy:7890" and
+// "user:secret@\u{104A1}\u{104A2}\u{104A7}.\u{104A0}.\u{104A0}.\u{104A1}:7890" keep the
+// password. The redacted host uses an ASCII digit. U+1049F, U+104AA, and other
+// non-digit Osmanya marks stay as written.
+function osmanyaDigitAscii(cp) {
+  if (cp >= 0x104A0 && cp <= 0x104A9) return String.fromCharCode(0x30 + (cp - 0x104A0));
+  return '';
+}
+function isOsmanyaDigit(cp) {
+  return osmanyaDigitAscii(cp) !== '';
+}
+function readEncodedOsmanyaDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 4; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xF0 || lead > 0xF4) return null;
+  for (let count = 1; count < 4; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isOsmanyaDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedOsmanyaDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedOsmanyaDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldOsmanyaDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += osmanyaDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Hanifi Rohingya digits U+10D30..U+10D39 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u{10D31}proxy:7890" and
+// "user:secret@\u{10D31}\u{10D32}\u{10D37}.\u{10D30}.\u{10D30}.\u{10D31}:7890" keep the
+// password. The redacted host uses an ASCII digit. U+10D2F, U+10D3A, and other
+// non-digit Hanifi Rohingya marks stay as written.
+function hanifiRohingyaDigitAscii(cp) {
+  if (cp >= 0x10D30 && cp <= 0x10D39) return String.fromCharCode(0x30 + (cp - 0x10D30));
+  return '';
+}
+function isHanifiRohingyaDigit(cp) {
+  return hanifiRohingyaDigitAscii(cp) !== '';
+}
+function readEncodedHanifiRohingyaDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 4; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xF0 || lead > 0xF4) return null;
+  for (let count = 1; count < 4; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isHanifiRohingyaDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedHanifiRohingyaDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedHanifiRohingyaDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldHanifiRohingyaDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += hanifiRohingyaDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+
+// Garay digits U+10D40..U+10D49 do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u{10D41}proxy:7890" and
+// "user:secret@\u{10D41}\u{10D42}\u{10D47}.\u{10D40}.\u{10D40}.\u{10D41}:7890" keep the
+// password. The redacted host uses an ASCII digit. U+10D3F, U+10D4A, and other
+// non-digit Garay marks stay as written.
+function garayDigitAscii(cp) {
+  if (cp >= 0x10D40 && cp <= 0x10D49) return String.fromCharCode(0x30 + (cp - 0x10D40));
+  return '';
+}
+function isGarayDigit(cp) {
+  return garayDigitAscii(cp) !== '';
+}
+function readEncodedGarayDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 4; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xF0 || lead > 0xF4) return null;
+  for (let count = 1; count < 4; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isGarayDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedGarayDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedGarayDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+
+
+// Brahmi digits U+11066..U+1106F do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u{11067}proxy:7890" and
+// "user:secret@\u{11067}\u{11068}\u{1106D}.\u{11066}.\u{11066}.\u{11067}:7890" keep the
+// password. The redacted host uses an ASCII digit. U+11065, U+11070, and other
+// non-digit Brahmi marks stay as written.
+function brahmiDigitAscii(cp) {
+  if (cp >= 0x11066 && cp <= 0x1106F) return String.fromCharCode(0x30 + (cp - 0x11066));
+  return '';
+}
+function isBrahmiDigit(cp) {
+  return brahmiDigitAscii(cp) !== '';
+}
+function readEncodedBrahmiDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 4; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xF0 || lead > 0xF4) return null;
+  for (let count = 1; count < 4; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isBrahmiDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedBrahmiDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedBrahmiDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldBrahmiDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += brahmiDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
+function foldGarayDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += garayDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+
 function redactProxyCredentials(text) {
-  const decoded = foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  const decoded = foldBrahmiDigits(foldGarayDigits(foldHanifiRohingyaDigits(foldOsmanyaDigits(foldMeeteiMayekDigits(foldChamDigits(foldMyanmarTaiLaingDigits(foldJavaneseDigits(foldKayahLiDigits(foldSaurashtraDigits(foldVaiDigits(foldOlChikiDigits(foldLepchaDigits(foldSundaneseDigits(foldBalineseDigits(foldTaiThamThamDigits(foldTaiThamHoraDigits(foldNewTaiLueDigits(foldLimbuDigits(foldMongolianDigits(foldKhmerDigits(foldMyanmarShanDigits(foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedMyanmarShanDigits(decodeEncodedKhmerDigits(decodeEncodedMongolianDigits(decodeEncodedLimbuDigits(decodeEncodedNewTaiLueDigits(decodeEncodedTaiThamHoraDigits(decodeEncodedTaiThamThamDigits(decodeEncodedBalineseDigits(decodeEncodedSundaneseDigits(decodeEncodedLepchaDigits(decodeEncodedOlChikiDigits(decodeEncodedVaiDigits(decodeEncodedSaurashtraDigits(decodeEncodedKayahLiDigits(decodeEncodedJavaneseDigits(decodeEncodedMyanmarTaiLaingDigits(decodeEncodedChamDigits(decodeEncodedMeeteiMayekDigits(decodeEncodedOsmanyaDigits(decodeEncodedBrahmiDigits(decodeEncodedGarayDigits(decodeEncodedHanifiRohingyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
