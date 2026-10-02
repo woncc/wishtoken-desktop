@@ -938,7 +938,7 @@ func escapeASCII(r rune) (byte, bool) {
 }
 
 // foldCredentialPieces maps compatibility letters, digits, latin
-// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, and token punctuation, including the percent sign, exclamation
+// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, and token punctuation, including the percent sign, exclamation
 // mark, consecutive equals signs, dot leaders, reverse solidus, number sign, dollar sign,
 // ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
@@ -949,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -3448,16 +3448,101 @@ func parenLetterASCII(r rune) (string, bool) {
 	}
 }
 
+// foldEnclosedAbbrevPieces maps circled, squared, and raised Latin
+// abbreviations to the ASCII letters NFKC produces. This pass does not run
+// NFKC, so a stored secret written with those forms would stay visible.
+// Each output byte keeps the original rune's range. Single enclosed letters
+// are folded separately. CJK square units, letterlike signs, and negative
+// circled letters do not fold here.
+func foldEnclosedAbbrevPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := enclosedAbbrevASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldEnclosedAbbrevString(s string) string {
+	if !enclosedAbbrevFolded(s) {
+		return s
+	}
+	return renderPieces(foldEnclosedAbbrevPieces(rawPieces(s)))
+}
+
+func enclosedAbbrevFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := enclosedAbbrevASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func enclosedAbbrevASCII(r rune) (string, bool) {
+	switch r {
+	case 0x1F12D:
+		return "CD", true
+	case 0x1F12E:
+		return "WZ", true
+	case 0x1F14A:
+		return "HV", true
+	case 0x1F14B:
+		return "MV", true
+	case 0x1F14C:
+		return "SD", true
+	case 0x1F14D:
+		return "SS", true
+	case 0x1F14E:
+		return "PPV", true
+	case 0x1F14F:
+		return "WC", true
+	case 0x1F16A:
+		return "MC", true
+	case 0x1F16B:
+		return "MD", true
+	case 0x1F16C:
+		return "MR", true
+	case 0x1F190:
+		return "DJ", true
+	default:
+		return "", false
+	}
+}
+
 // foldEnclosedPieces maps circled and squared Latin letters and digits to
 // ASCII. NFKC folds them, and this pass does not run NFKC, so a stored
 // token or a JWT written with those forms would stay visible. Circled
 // italic C and R are the only circled italic letters. Circled numbers
 // from ten through fifty expand to two digits and are folded separately.
 // Parenthesized letters expand to parentheses plus a letter and are folded
-// separately. Negative circled letters and squared digraphs such as HV
-// expand to more than one character or do not fold, so they stay out. Digit
-// full stops expand to a number and a full stop and are folded separately.
-// One output piece covers the original rune.
+// separately. Squared and circled abbreviations such as HV expand to more
+// than one letter and are folded separately. Negative circled letters do
+// not fold to ASCII, so they stay out. Digit full stops expand to a number
+// and a full stop and are folded separately. One output piece covers the
+// original rune.
 func foldEnclosedPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

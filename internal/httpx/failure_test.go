@@ -4008,3 +4008,97 @@ func TestParenLetterASCIIFoldsOnlyLetters(t *testing.T) {
 		t.Fatalf("paren letter fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsEnclosedAbbrevs(t *testing.T) {
+	pairs := []struct {
+		secret string
+		plain  string
+		mark   string
+	}{
+		{"rt_Zz9qHV7f3a", "HV", "\U0001F14A"},
+		{"rt_Aa8kPPV7f", "PPV", "\U0001F14E"},
+		{"rt_Bb7mCD7f3a", "CD", "\U0001F12D"},
+		{"rt_Cc6nMR7f", "MR", "\U0001F16C"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.plain, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.plain)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "HV", "%F0%9F%85%8A")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[3].secret, "MR", "\U0001F16C")
+	got = SanitizeFailure("rejected "+pairs[3].secret+" later", stored)
+	for _, item := range []string{pairs[3].secret, stored, "Cc6n", "MR", "7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U0001F14A later",
+		"see \U0001F14E later",
+		"see \U0001F12D later",
+		"see \U0001F16C later",
+		"see \U0001F190 later",
+		"see \u338F later",
+		"see \u2105 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("enclosed abbrev prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestEnclosedAbbrevASCIIFoldsOnlyAbbreviations(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x1F12D, "CD"},
+		{0x1F12E, "WZ"},
+		{0x1F14A, "HV"},
+		{0x1F14B, "MV"},
+		{0x1F14C, "SD"},
+		{0x1F14D, "SS"},
+		{0x1F14E, "PPV"},
+		{0x1F14F, "WC"},
+		{0x1F16A, "MC"},
+		{0x1F16B, "MD"},
+		{0x1F16C, "MR"},
+		{0x1F190, "DJ"},
+	}
+	for _, check := range checks {
+		got, ok := enclosedAbbrevASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'H', 'V', 0x1F149, 0x1F150, 0x1F12C, 0x1F169, 0x1F18F, 0x338F, 0x2100, 0x3250, 0x32CF} {
+		if _, ok := enclosedAbbrevASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := enclosedAbbrevASCII(r); ok {
+			n++
+		}
+	}
+	if n != 12 {
+		t.Fatalf("enclosed abbrev fold count %d", n)
+	}
+}
