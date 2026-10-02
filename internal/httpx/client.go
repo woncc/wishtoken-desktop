@@ -179,11 +179,12 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // four-dot punctuation are confusable with "::" and do not fold to ':'.
 // Mongolian full stop and Manchu full stop are skeletoned as colons too;
 // the public-path check keeps them as dots so a private extension still matches.
-// url.Parse rejects every one of them as invalid userinfo, so an unlisted
-// character would otherwise be returned with its password intact. The Go
-// core has no Unicode normalization dependency, so each one is listed.
+// Tag colon is a format character and does not NFKC-fold. url.Parse rejects
+// every one of them as invalid userinfo, so an unlisted character would
+// otherwise be returned with its password intact. The Go core has no Unicode
+// normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd\u0903\u0a83\U00011002\U00011082\U00011182\U000115BE\U000116AC\U00011838\u0983\u0a03\u0c03\u0c83\u0d03\u0d83\u0f7f\u1038\u17c7\U00011303\U000114C1\U000119DF\U00011A39\U00011C3E\u1393\U0001D108\U00011DD9\u2237\u2e2c\u1803\u1809"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd\u0903\u0a83\U00011002\U00011082\U00011182\U000115BE\U000116AC\U00011838\u0983\u0a03\u0c03\u0c83\u0d03\u0d83\u0f7f\u1038\u17c7\U00011303\U000114C1\U000119DF\U00011A39\U00011C3E\u1393\U0001D108\U00011DD9\u2237\u2e2c\u1803\u1809\U000E003A"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -259,6 +260,7 @@ func foldUserinfoColons(s string) string {
 		"\u2e2c", ":",
 		"\u1803", ":",
 		"\u1809", ":",
+		"\U000E003A", ":",
 	).Replace(s)
 }
 
@@ -380,6 +382,18 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// '-' is a separate reading; the drop reading still runs.
 	if soft, ok := foldSoftHyphenPieces(folded); ok {
 		spans = append(spans, exactSecretSpans(soft, foldSoftHyphenString(needle))...)
+	}
+	// Tag hyphen, full stop, solidus, colon, and reverse solidus are format
+	// characters, so the drop pass below removes them. That joins a token and
+	// misses the stored byte. Folding those five is a separate reading; the
+	// drop reading still runs, so an inserted tag cannot hide a token that
+	// has no such mark. Language tag and cancel tag are not ASCII copies.
+	needleTag := foldTagPunctuationString(needle)
+	if tagged, ok := foldTagPunctuationPieces(folded); ok {
+		spans = append(spans, exactSecretSpans(tagged, needleTag)...)
+	} else if needleTag != needle {
+		// The stored secret uses a tag and the response already has ASCII.
+		spans = append(spans, exactSecretSpans(folded, needleTag)...)
 	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
@@ -513,6 +527,74 @@ func foldSoftHyphenString(s string) string {
 	}
 	folded, _ := foldSoftHyphenPieces(rawPieces(s))
 	return renderPieces(folded)
+}
+
+// foldTagPunctuationPieces maps the five Unicode tag punctuation characters
+// to the ASCII marks they copy. None of them NFKC-fold. This pass does not
+// run NFKC, and dropMarkPieces removes format characters, so a stored slash,
+// dot, hyphen, colon, or backslash written with a tag would stay visible.
+// One output piece covers the original rune. The drop reading still runs on
+// the unfolded pieces. Other tag characters, including letters and the
+// language and cancel tags, stay out.
+func foldTagPunctuationPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := tagPunctuationASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagPunctuationString(s string) string {
+	if !tagPunctuationFolded(s) {
+		return s
+	}
+	folded, _ := foldTagPunctuationPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func tagPunctuationFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := tagPunctuationASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func tagPunctuationASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xE002D:
+		return '-', true
+	case 0xE002E:
+		return '.', true
+	case 0xE002F:
+		return '/', true
+	case 0xE003A:
+		return ':', true
+	case 0xE005C:
+		return '\\', true
+	default:
+		return 0, false
+	}
 }
 
 func hyphenLike(r rune) bool {
