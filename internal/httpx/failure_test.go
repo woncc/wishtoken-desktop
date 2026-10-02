@@ -71,3 +71,16 @@ func TestSanitizeFailureStripsEncodedCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsProxyPasswords(t *testing.T) {
+	const password = "s3cret-proxy"
+	text := "dial http://user:" + password + "@127.0.0.1:7890 and http://user\u0705" + password + "@127.0.0.1:7890 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, "\u0705"+password) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("proxy failure: %q", got)
+	}
+	plain := "http://127.0.0.1:7890"
+	if SanitizeFailure("see "+plain) != "see "+plain {
+		t.Fatal("proxy without a password was rewritten")
+	}
+}
