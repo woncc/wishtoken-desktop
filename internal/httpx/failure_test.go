@@ -1569,6 +1569,14 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x29B8, 0, false},
 		{0x2349, 0, false},
 		{0x2A38, 0, false},
+		{0x1FBA0, '/', true},
+		{0x1FBA3, '/', true},
+		{0x1FBA1, 0, false},
+		{0x1FBA2, 0, false},
+		{0x2573, 0, false},
+		{0x1FBA4, 0, false},
+		{0x1FBBE, '/', true},
+		{0x1FBBF, 0, false},
 		{0x27CB, '/', true},
 		{0x2AFD, '/', true},
 		{0x1F67C, '/', true},
@@ -1608,7 +1616,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 32 {
+	if n != 35 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -1967,6 +1975,69 @@ func TestSanitizeFailureStripsAPLCircleBackslash(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsShortDiagonals(t *testing.T) {
+	secret := "code/ver/1"
+	rising := strings.ReplaceAll(secret, "/", "\U0001fba0")
+	encoded := strings.ReplaceAll(secret, "/", "%F0%9F%AE%A0")
+	got := SanitizeFailure("rejected "+rising+" "+encoded+" later", secret)
+	for _, item := range []string{secret, rising, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	lower := strings.ReplaceAll(secret, "/", "\U0001fba3")
+	got = SanitizeFailure("rejected "+lower+" later", secret)
+	for _, item := range []string{secret, lower, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("lower leaked %q in %q", item, got)
+		}
+	}
+	back := "code\\ver\\1"
+	falling := strings.ReplaceAll(back, "\\", "\U0001fba1")
+	encodedBack := strings.ReplaceAll(back, "\\", "%F0%9F%AE%A1")
+	got = SanitizeFailure("rejected "+falling+" "+encodedBack+" later", back)
+	for _, item := range []string{back, falling, encodedBack, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("backslash leaked %q in %q", item, got)
+		}
+	}
+	lowerBack := strings.ReplaceAll(back, "\\", "\U0001fba2")
+	got = SanitizeFailure("rejected "+lowerBack+" later", back)
+	for _, item := range []string{back, lowerBack, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("lower backslash leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{"see \U0001fba0 later", "see \U0001fba1 later", "see \U0001fba2 later", "see \U0001fba3 later", "see \u2573 later", "see \U0001fba4 later", "see \U0001fbbe later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("short diagonal prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsNegativeDiagonal(t *testing.T) {
+	secret := "code/ver/1"
+	neg := strings.ReplaceAll(secret, "/", "\U0001fbbe")
+	encoded := strings.ReplaceAll(secret, "/", "%F0%9F%AE%BE")
+	got := SanitizeFailure("rejected "+neg+" "+encoded+" later", secret)
+	for _, item := range []string{secret, neg, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001fbbe later", "see \U0001fbbd later", "see \U0001fbbf later", "see \u2573 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("negative diagonal prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
 func TestSanitizeFailureStripsParentheses(t *testing.T) {
 	secret := "code(ver)1"
 	marked := strings.NewReplacer("(", "\u207d", ")", "\u208e").Replace(secret)
@@ -2275,6 +2346,13 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x2298, 0, false},
 		{0x2A38, 0, false},
 		{0x20E0, 0, false},
+		{0x1FBA1, '\\', true},
+		{0x1FBA2, '\\', true},
+		{0x1FBA0, 0, false},
+		{0x1FBA3, 0, false},
+		{0x2573, 0, false},
+		{0x1FBA4, 0, false},
+		{0x1FBBE, 0, false},
 		{0x30CE, 0, false},
 		{0xFF0F, 0, false},
 	}
@@ -2290,7 +2368,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 25 {
+	if n != 27 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
