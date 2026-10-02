@@ -25,7 +25,10 @@ FORBIDDEN_SUFFIXES = {
     '.har', '.pcap', '.pcapng', '.p12', '.pfx', '.kdbx',
     '.ppk', '.p8', '.jks', '.keystore',
     '.sqlite', '.sqlite3', '.db', '.ovpn', '.psafe3',
+    '.gpg', '.pgp', '.age',
 }
+COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst'}
+INVISIBLE = dict.fromkeys(map(ord, '\u200b\u200c\u200d\ufeff\u2060'))
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
     '.swp', '.swo', '.swn', '.tmp',
@@ -50,6 +53,18 @@ def forbidden_name(folded):
     bare = folded[1:] if folded.startswith('.') else folded
     return bare in FOLD_NAMES
 
+def visible_name(name):
+    # Windows ignores trailing dots and spaces. Editors and NTFS streams can
+    # also hide a forbidden name behind invisible characters or a colon suffix.
+    folded = name.casefold().translate(INVISIBLE).strip(' \t')
+    while folded.endswith('.'):
+        folded = folded[:-1]
+    if ':' in folded:
+        folded = folded.split(':', 1)[0].strip(' \t')
+        while folded.endswith('.'):
+            folded = folded[:-1]
+    return folded
+
 def strip_alias(folded):
     if folded.startswith('.#'):
         folded = folded[2:]
@@ -71,7 +86,7 @@ def strip_alias(folded):
             folded = stem[:-5] + suffix
             changed = True
             continue
-        if suffix in BACKUP_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
+        if suffix in BACKUP_SUFFIXES or suffix in COMPRESSED_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
             if stem and stem != folded:
                 folded = stem
                 changed = True
@@ -84,7 +99,9 @@ def strip_alias(folded):
     return folded
 
 def secret_alias(name):
-    folded = name.casefold()
+    folded = visible_name(name)
+    if not folded:
+        return False
     if folded.startswith('._') and folded[2:] and secret_alias(folded[2:]):
         return True
     if folded.startswith('copy of ') and secret_alias(folded[8:]):
@@ -97,11 +114,13 @@ def secret_alias(name):
 
 def path_reason(rel):
     path = Path(rel)
-    parts = {part.casefold() for part in path.parts}
-    name = path.name.casefold()
+    parts = {visible_name(part) for part in path.parts}
+    parts.discard('')
+    name = visible_name(path.name)
     if parts & FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
         return 'private state or generated artifact path'
-    if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or path.suffix.casefold() in FORBIDDEN_SUFFIXES:
+    suffix = Path(name).suffix
+    if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or suffix in FORBIDDEN_SUFFIXES or path.suffix.casefold() in FORBIDDEN_SUFFIXES:
         return 'private state or generated artifact path'
     return ''
 
@@ -172,6 +191,9 @@ def self_test():
         'accounts copy.json', 'nested/auth.json.bak3', 'ID_ED25519.OLD2', '._.netrc',
         'id_rsa.txt', 'accounts.json.txt', 'nested/auth.json.txt', 'credentials.txt', 'ID_ED25519.TXT',
         'accounts.json.bak.txt', 'notes.bak.txt', 'auth.json.log.txt', 'trace.jsonl.txt', 'auth.json.bak.txt.1', 'Accounts.JSON.BAK.TXT',
+        'auth.json.', 'accounts.json ', ' auth.json', 'Copy of auth.json.',
+        'id_rsa.gpg', 'secrets.age', 'keys/backup.pgp', 'auth.json.gz', 'nested/credentials.json.bz2',
+        'auth.json\u200b', 'auth\u200b.json', 'accounts.json::$DATA', 'id_rsa:secret', 'tokens.json.xz',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -180,7 +202,8 @@ def self_test():
         'docs/assets/accounts.png', 'internal/localcodex/models.json', 'notes.tmp', 'script.go.swp',
         'id_rsa.pub', 'script (1).go', 'notes.bak3', 'Copy of README.md', '._script.go',
         'notes.txt', 'docs/readme.txt', 'script.go.txt',
-        'models.json.txt',
+        'models.json.txt', 'notes.txt.', 'readme.gz', 'script.go.xz', 'models.json.gz',
+        'script.go:Zone.Identifier',
     )
     for rel in blocked:
         if not path_reason(rel):
