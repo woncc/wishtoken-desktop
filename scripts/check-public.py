@@ -31,7 +31,28 @@ FORBIDDEN_SUFFIXES = {
 COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst', '.br', '.7z', '.tar', '.tgz', '.lz4', '.lzma', '.zstd', '.rar', '.cab'}
 PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
-DOT_LIKE = {ord('\u3002'): '.'}
+# These other full stops do not NFKC-fold to '.' either. Armenian full stop is a
+# colon lookalike and is folded with the colons instead.
+DOT_LIKE = {
+    ord('\u3002'): '.',
+    ord('\u06d4'): '.',
+    ord('\u0701'): '.',
+    ord('\u0702'): '.',
+    ord('\u1362'): '.',
+    ord('\u166e'): '.',
+    ord('\u1803'): '.',
+    ord('\u1809'): '.',
+    ord('\u2cf9'): '.',
+    ord('\u2cfe'): '.',
+    ord('\u2e3c'): '.',
+    ord('\ua4ff'): '.',
+    ord('\ua60e'): '.',
+    ord('\ua6f3'): '.',
+    ord('\U00016af5'): '.',
+    ord('\U00016e98'): '.',
+    ord('\U0001bc9f'): '.',
+    ord('\U0001da88'): '.',
+}
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
 # Mongolian colon and Bamum colon are the same kind of separator.
 COLON_LIKE = {
@@ -362,6 +383,11 @@ def self_test():
         'docs\u2982accounts.json', 'nested/file\u2af6.netrc', 'ID_RSA\u205dx',
         'readme\U00012471auth.json', 'notes\U00012472id_rsa', 'file\U00012473credentials.json',
         'docs\U00012474accounts.json', 'nested/file\U0001DA8A.netrc', 'ID_RSA\U00012473x',
+        'auth\u06d4json', 'accounts\u0701json', 'credentials\u0702json', 'tokens\u1362json',
+        'notes\u166ebak', '\u1803netrc', 'secrets\u1809env', 'id_ed25519\u2cf9txt',
+        'auth\u2cfejson.txt', 'accounts\u2e3cjson.gz', 'tokens\ua4ffjson', 'credentials\ua60ejson',
+        'auth\ua6f3json', 'notes\U00016af5bak', '\U00016e98netrc', 'id_rsa\U0001bc9ftxt',
+        'accounts\U0001da88json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -386,6 +412,7 @@ def self_test():
         'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
         'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
         'notes\U00012471readme.txt', 'script.go\U00012472Zone.Identifier', 'models.json\U0001DA8Areadme.txt',
+        'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'models.json\u0589readme',
     )
     for rel in blocked:
