@@ -933,16 +933,75 @@ func escapeASCII(r rune) (byte, bool) {
 // foldCredentialPieces maps compatibility letters, digits, and token
 // punctuation, including the percent sign, exclamation mark, reverse
 // solidus, number sign, dollar sign, ampersand, asterisk, question mark,
-// semicolon, comma, curly brackets, and square brackets, to ASCII. Credential redaction does not run NFKC.
+// semicolon, comma, curly brackets, square brackets, and less-than and greater-than signs, to ASCII. Credential redaction does not run NFKC.
 // The percent fold is part of this result because the decode loop consumes
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))
+	return foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))
+	return foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))
+}
+
+// foldLessGreaterPieces maps small and fullwidth less-than and greater-than
+// signs to ASCII '<' and '>'. NFKC folds them, and this pass does not run
+// NFKC, so a stored secret written with those forms would stay visible.
+// Angle brackets, guillemets, and less-than-or-equal signs do not fold to
+// '<' or '>', so they stay out. One output piece covers the original rune.
+func foldLessGreaterPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := lessGreaterASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldLessGreaterString(s string) string {
+	if !lessGreaterFolded(s) {
+		return s
+	}
+	return renderPieces(foldLessGreaterPieces(rawPieces(s)))
+}
+
+func lessGreaterFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := lessGreaterASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func lessGreaterASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE64, 0xFF1C:
+		return '<', true
+	case 0xFE65, 0xFF1E:
+		return '>', true
+	default:
+		return 0, false
+	}
 }
 
 // foldBracketPieces maps vertical and fullwidth square brackets to ASCII

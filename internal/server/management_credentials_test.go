@@ -1372,3 +1372,36 @@ func TestManagementHidesSecretsSplitBySquareBrackets(t *testing.T) {
 		t.Fatalf("note was rewritten: %s", out)
 	}
 }
+
+func TestManagementHidesSecretsSplitByLessGreaterSigns(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9q<Refresh>7f3a"
+	marked := strings.NewReplacer("<", "\uFF1C", ">", "\uFF1E").Replace(acc.RefreshToken)
+	small := strings.NewReplacer("<", "\uFE64", ">", "\uFE65").Replace(acc.RefreshToken)
+	acc.Name = "note " + marked
+	acc.LastError = "rejected " + small
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, marked, small, payload, "eyJ", "Zz9q", "Refresh", "7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	encoded := strings.NewReplacer("<", "%EF%BC%9C", ">", "%EF%BC%9E").Replace(acc.RefreshToken)
+	raw := `{"note":"see ` + encoded + `","access_token":"` + acc.AccessToken + `"}`
+	out := string(f.srv.redactManagementBody([]byte(raw)))
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, encoded, payload, "eyJ", "Zz9q", "Refresh"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}

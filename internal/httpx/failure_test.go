@@ -2497,3 +2497,78 @@ func TestBracketASCIIFoldsOnlySquareBrackets(t *testing.T) {
 		t.Fatalf("bracket fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsLessGreaterSigns(t *testing.T) {
+	secret := "code<ver>1"
+	marked := strings.NewReplacer("<", "\uFE64", ">", "\uFE65").Replace(secret)
+	encoded := strings.NewReplacer("<", "%EF%BC%9C", ">", "%EF%BC%9E").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.NewReplacer("<", "\uFF1C", ">", "\uFF1E").Replace(secret)
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2264 later",
+		"see \u2265 later",
+		"see \u2039 later",
+		"see \u3008 later",
+		"see \u2329 later",
+		"see \u27e8 later",
+		"see \ufe3f later",
+		"path \uff1c file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("less-greater prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestLessGreaterASCIIFoldsOnlySigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE64, '<', true},
+		{0xFF1C, '<', true},
+		{0xFE65, '>', true},
+		{0xFF1E, '>', true},
+		{'<', 0, false},
+		{'>', 0, false},
+		{0x2264, 0, false},
+		{0x2265, 0, false},
+		{0x2039, 0, false},
+		{0x203A, 0, false},
+		{0x2329, 0, false},
+		{0x3008, 0, false},
+		{0x27E8, 0, false},
+		{0xFE3F, 0, false},
+		{0xFF1B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := lessGreaterASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := lessGreaterASCII(r); ok {
+			n++
+		}
+	}
+	if n != 4 {
+		t.Fatalf("less-greater fold count %d", n)
+	}
+}
