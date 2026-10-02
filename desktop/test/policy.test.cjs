@@ -3529,7 +3529,6 @@ test('renderer text drops proxy passwords hidden by a hyphen or dash name', () =
     `user:${password}@my&Hyphen;proxy:7890`,
     `user:${password}@my&DASH;proxy:7890`,
     `user:${password}@my&horbar;proxy:7890`,
-    `user:${password}@my&minus;proxy:7890`,
     `note &hyphen; later`,
     'http://user@127.0.0.1:7890'
   ];
@@ -3596,7 +3595,6 @@ test('renderer text drops proxy passwords hidden by a non-breaking hyphen', () =
     `file${hyphen}name.txt`,
     `user:${password}@my${hyphen}proxy`,
     `user:${password}@my&horbar;proxy:7890`,
-    `user:${password}@my&minus;proxy:7890`,
     `user:${password}@my\u2015proxy:7890`,
     `note ${hyphen} later`,
     'http://user@127.0.0.1:7890'
@@ -3665,7 +3663,6 @@ test('renderer text drops proxy passwords hidden by a figure dash', () => {
     `user:${password}@my${hyphen}proxy`,
     `user:${password}@10${hyphen}1:8080`,
     `user:${password}@my&horbar;proxy:7890`,
-    `user:${password}@my&minus;proxy:7890`,
     `user:${password}@my\u2015proxy:7890`,
     `note ${hyphen} later`,
     'http://user@127.0.0.1:7890'
@@ -3747,7 +3744,6 @@ test('renderer text drops proxy passwords hidden by an en dash', () => {
     `user:${password}@my&Ndash;proxy:7890`,
     `user:${password}@my&NDASH;proxy:7890`,
     `user:${password}@my&horbar;proxy:7890`,
-    `user:${password}@my&minus;proxy:7890`,
     `user:${password}@my\u2015proxy:7890`,
     `note &ndash; later`,
     'http://user@127.0.0.1:7890'
@@ -3829,7 +3825,6 @@ test('renderer text drops proxy passwords hidden by an em dash', () => {
     `user:${password}@my&Mdash;proxy:7890`,
     `user:${password}@my&MDASH;proxy:7890`,
     `user:${password}@my&horbar;proxy:7890`,
-    `user:${password}@my&minus;proxy:7890`,
     `user:${password}@my\u2015proxy:7890`,
     `note &mdash; later`,
     'http://user@127.0.0.1:7890'
@@ -3839,6 +3834,87 @@ test('renderer text drops proxy passwords hidden by an em dash', () => {
   const snap = publicSnapshot({
     settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
     accounts: [{ id: 'acc-1', name: `note user:${password}@my&mdash;proxy:7890`, email: 'a@example.test', last_error: `dial user:${password}@ex${hyphen}ample.com:8080 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial ex-ample.com:8080 failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
+
+test('renderer text drops proxy passwords hidden by a minus sign', () => {
+  const password = 's3cret-token';
+  const hyphen = '\u2212';
+  const nest = (token, extra) => {
+    let out = token;
+    for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const body = value => value.split('').map(char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`).join('');
+  const encoded = encodeURIComponent(hyphen);
+  const cases = [
+    [`user:${password}@my${hyphen}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@ex${hyphen}ample.com:8080`, 'ex-ample.com:8080'],
+    [`user:${password}@ex${hyphen}ample.com`, 'ex-ample.com'],
+    [`user:${password}@my${hyphen}${hyphen}proxy:7890`, 'my--proxy:7890'],
+    [`http://user:${password}@ex${hyphen}ample.com:8080/x`, 'http://ex-ample.com:8080/x'],
+    [`http://us${hyphen}er:${password}@ex-ample.com:8080/x`, 'http://ex-ample.com:8080/x'],
+    [`(user:${password}@my${hyphen}proxy:7890)`, '(my-proxy:7890)'],
+    [`user:${password}@my${encoded}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${encoded.toLowerCase()}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest(encoded, 1)}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest(encoded, 3)}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&minus;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@ex&minus;ample.com:8080`, 'ex-ample.com:8080'],
+    [`user:${password}@ex&minus;ample.com`, 'ex-ample.com'],
+    [`user:${password}@my&#8722;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&#x2212;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&#x2212proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&#X2212;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&#008722;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&amp;minus;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my&#38;minus;proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my%26minus%3Bproxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest('%26minus%3B', 1)}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${body('&minus;')}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest(body('&#x2212;'), 3)}proxy:7890`, 'my-proxy:7890'],
+    [`http://user:${password}@ex&minus;ample.com:8080/x`, 'http://ex-ample.com:8080/x'],
+    [`a=1&user:${password}@my&minus;proxy:7890&b=2`, 'a=1&my-proxy:7890&b=2'],
+    [`note &minus; later user:${password}@10.1:8080`, 'note - later 10.1:8080'],
+    [`note ${hyphen} later user:${password}@10.1:8080`, 'note - later 10.1:8080'],
+    [`two user:${password}@my&minus;proxy:7890) and user:other-secret@10.1:8080.`, 'two my-proxy:7890) and 10.1:8080.'],
+    [`invalid proxy url "http://user:s3cret/token@my&minus;proxy:7890": invalid port ":s3cret" after host`, 'invalid proxy url "http://my-proxy:7890": invalid port ":[凭据已隐藏]" after host']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  const unchanged = [
+    `Build v1${hyphen}2@beta`,
+    `Build v1&minus;2@beta`,
+    `file${hyphen}name.txt`,
+    `score 1&minus;2@10.5`,
+    `user:${password}@my${hyphen}proxy`,
+    `user:${password}@my&minus;proxy`,
+    `user:${password}@10${hyphen}1:8080`,
+    `user:${password}@my&minusproxy:7890`,
+    `user:${password}@my&Minus;proxy:7890`,
+    `user:${password}@my&MINUS;proxy:7890`,
+    `user:${password}@my&horbar;proxy:7890`,
+    `user:${password}@my\u2015proxy:7890`,
+    `note &minus; later`,
+    'http://user@127.0.0.1:7890'
+  ];
+  for (const input of unchanged) assert.equal(redactPublic(input), input);
+  const proxy = `http://user:${password}@my&minus;proxy:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: true, usage_probe: false },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@my&minus;proxy:7890`, email: 'a@example.test', last_error: `dial user:${password}@ex${hyphen}ample.com:8080 failed` }]
   });
   const delivered = rendererPayload(snap);
   assert.equal(delivered.settings.proxy_url, proxy);
