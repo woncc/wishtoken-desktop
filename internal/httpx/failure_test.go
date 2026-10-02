@@ -6038,3 +6038,51 @@ func TestTagLeftParenthesisFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag exclamation mark was treated as a left parenthesis")
 	}
 }
+
+func TestSanitizeFailureStripsTagRightParenthesis(t *testing.T) {
+	secret := "code)verifier12"
+	mark := "code\U000E0029verifier12"
+	encoded := "code%F3%A0%80%A9verifier12"
+	inserted := "code)\U000E0029verifier12"
+	mixedSecret := "rt(Zz9q)ab7f"
+	mixed := "rt\U000E0028Zz9q\U000E0029ab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code)verifier12code)verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E0029verifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag right parenthesis leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0029 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag right parenthesis prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagRightParenthesisFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagRightParenthesisPieces(rawPieces("code\U000E0029verifier12"))
+	if !ok || renderPieces(folded) != "code)verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagRightParenthesisPieces(rawPieces("code)verifier12")); ok {
+		t.Fatalf("ascii right parenthesis was folded")
+	}
+	if foldTagRightParenthesisString("code\U000E0028verifier12") != "code\U000E0028verifier12" {
+		t.Fatalf("tag left parenthesis was treated as a right parenthesis")
+	}
+}
