@@ -656,6 +656,113 @@ def private_filename(name):
     stem = path.stem.replace('_', '-')
     return stem == 'handoff' or stem == 'auth-snapshot' or stem.startswith('auth-snapshot-')
 
+
+def math_ascii(cp):
+    # Same ranges the credential redactor folds. Greek mathematical letters
+    # and the holes reserved for letterlike forms are not ASCII copies.
+    if 0x1D400 <= cp <= 0x1D419:
+        return chr(cp - 0x1D400 + ord('A'))
+    if 0x1D41A <= cp <= 0x1D433:
+        return chr(cp - 0x1D41A + ord('a'))
+    if 0x1D434 <= cp <= 0x1D44D:
+        return chr(cp - 0x1D434 + ord('A'))
+    if 0x1D44E <= cp <= 0x1D454:
+        return chr(cp - 0x1D44E + ord('a'))
+    if 0x1D456 <= cp <= 0x1D467:
+        return chr(cp - 0x1D456 + ord('i'))
+    if 0x1D468 <= cp <= 0x1D481:
+        return chr(cp - 0x1D468 + ord('A'))
+    if 0x1D482 <= cp <= 0x1D49B:
+        return chr(cp - 0x1D482 + ord('a'))
+    if cp == 0x1D49C:
+        return 'A'
+    if 0x1D49E <= cp <= 0x1D49F:
+        return chr(cp - 0x1D49E + ord('C'))
+    if cp == 0x1D4A2:
+        return 'G'
+    if 0x1D4A5 <= cp <= 0x1D4A6:
+        return chr(cp - 0x1D4A5 + ord('J'))
+    if 0x1D4A9 <= cp <= 0x1D4AC:
+        return chr(cp - 0x1D4A9 + ord('N'))
+    if 0x1D4AE <= cp <= 0x1D4B5:
+        return chr(cp - 0x1D4AE + ord('S'))
+    if 0x1D4B6 <= cp <= 0x1D4B9:
+        return chr(cp - 0x1D4B6 + ord('a'))
+    if cp == 0x1D4BB:
+        return 'f'
+    if 0x1D4BD <= cp <= 0x1D4C3:
+        return chr(cp - 0x1D4BD + ord('h'))
+    if 0x1D4C5 <= cp <= 0x1D4CF:
+        return chr(cp - 0x1D4C5 + ord('p'))
+    if 0x1D4D0 <= cp <= 0x1D4E9:
+        return chr(cp - 0x1D4D0 + ord('A'))
+    if 0x1D4EA <= cp <= 0x1D503:
+        return chr(cp - 0x1D4EA + ord('a'))
+    if 0x1D504 <= cp <= 0x1D505:
+        return chr(cp - 0x1D504 + ord('A'))
+    if 0x1D507 <= cp <= 0x1D50A:
+        return chr(cp - 0x1D507 + ord('D'))
+    if 0x1D50D <= cp <= 0x1D514:
+        return chr(cp - 0x1D50D + ord('J'))
+    if 0x1D516 <= cp <= 0x1D51C:
+        return chr(cp - 0x1D516 + ord('S'))
+    if 0x1D51E <= cp <= 0x1D537:
+        return chr(cp - 0x1D51E + ord('a'))
+    if 0x1D538 <= cp <= 0x1D539:
+        return chr(cp - 0x1D538 + ord('A'))
+    if 0x1D53B <= cp <= 0x1D53E:
+        return chr(cp - 0x1D53B + ord('D'))
+    if 0x1D540 <= cp <= 0x1D544:
+        return chr(cp - 0x1D540 + ord('I'))
+    if cp == 0x1D546:
+        return 'O'
+    if 0x1D54A <= cp <= 0x1D550:
+        return chr(cp - 0x1D54A + ord('S'))
+    if 0x1D552 <= cp <= 0x1D56B:
+        return chr(cp - 0x1D552 + ord('a'))
+    if 0x1D56C <= cp <= 0x1D585:
+        return chr(cp - 0x1D56C + ord('A'))
+    if 0x1D586 <= cp <= 0x1D59F:
+        return chr(cp - 0x1D586 + ord('a'))
+    if 0x1D5A0 <= cp <= 0x1D5B9:
+        return chr(cp - 0x1D5A0 + ord('A'))
+    if 0x1D5BA <= cp <= 0x1D5D3:
+        return chr(cp - 0x1D5BA + ord('a'))
+    if 0x1D5D4 <= cp <= 0x1D5ED:
+        return chr(cp - 0x1D5D4 + ord('A'))
+    if 0x1D5EE <= cp <= 0x1D607:
+        return chr(cp - 0x1D5EE + ord('a'))
+    if 0x1D608 <= cp <= 0x1D621:
+        return chr(cp - 0x1D608 + ord('A'))
+    if 0x1D622 <= cp <= 0x1D63B:
+        return chr(cp - 0x1D622 + ord('a'))
+    if 0x1D63C <= cp <= 0x1D655:
+        return chr(cp - 0x1D63C + ord('A'))
+    if 0x1D656 <= cp <= 0x1D66F:
+        return chr(cp - 0x1D656 + ord('a'))
+    if 0x1D670 <= cp <= 0x1D689:
+        return chr(cp - 0x1D670 + ord('A'))
+    if 0x1D68A <= cp <= 0x1D6A3:
+        return chr(cp - 0x1D68A + ord('a'))
+    if 0x1D7CE <= cp <= 0x1D7D7:
+        return chr(cp - 0x1D7CE + ord('0'))
+    if 0x1D7D8 <= cp <= 0x1D7E1:
+        return chr(cp - 0x1D7D8 + ord('0'))
+    if 0x1D7E2 <= cp <= 0x1D7EB:
+        return chr(cp - 0x1D7E2 + ord('0'))
+    if 0x1D7EC <= cp <= 0x1D7F5:
+        return chr(cp - 0x1D7EC + ord('0'))
+    if 0x1D7F6 <= cp <= 0x1D7FF:
+        return chr(cp - 0x1D7F6 + ord('0'))
+    return {
+        0x2102: 'C', 0x210A: 'g', 0x210B: 'H', 0x210C: 'H', 0x210D: 'H',
+        0x210E: 'h', 0x2110: 'I', 0x2111: 'I', 0x2112: 'L', 0x2113: 'l',
+        0x2115: 'N', 0x2119: 'P', 0x211A: 'Q', 0x211B: 'R', 0x211C: 'R',
+        0x211D: 'R', 0x2124: 'Z', 0x2128: 'Z', 0x212C: 'B', 0x212D: 'C',
+        0x212F: 'e', 0x2130: 'E', 0x2131: 'F', 0x2133: 'M', 0x2134: 'o',
+        0x2145: 'D', 0x2146: 'd', 0x2147: 'e', 0x2148: 'i', 0x2149: 'j',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -681,6 +788,14 @@ def fold_content(data):
         # not in this block and stays out, so it cannot join two lines.
         if 0xFF01 <= cp <= 0xFF5E:
             out.append(chr(cp - 0xFEE0))
+            changed = True
+            continue
+        # Mathematical letters and digits NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split. Greek
+        # mathematical letters are not in math_ascii and stay out.
+        mapped = math_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1112,6 +1227,23 @@ def self_test():
     ordinary = '\u8bf4\u660e\uff1a\u4e0d\u8981\u63d0\u4ea4\uff08\u5bc6\u94a5\uff09\uff1b'
     if content_reasons(ordinary.encode()) or content_reasons(('\uff53\uff4b-' + '\uff41' * 10).encode()) or content_reasons('-----\uff22\uff25\uff27\uff29\uff2e PUBLIC KEY-----'.encode()) or content_reasons(('sk-\n' + '\uff41' * 30).encode()):
         raise SystemExit('self-test failed: ordinary fullwidth text was blocked')
+    if math_ascii(0x1D400) != 'A' or math_ascii(0x1D41A) != 'a' or math_ascii(0x1D455) is not None or math_ascii(0x1D6FC) is not None or math_ascii(0x210E) != 'h' or math_ascii(0x1D7CE) != '0' or math_ascii(0x212A) is not None:
+        raise SystemExit('self-test failed: mathematical ASCII fold is wrong')
+    math_token = ('sk-' + '\U0001D41A' * 30).encode()
+    math_digit = ('rt_' + '\U0001D7CE' * 30).encode()
+    math_key = ('-----' + '\U0001D401\U0001D404\U0001D406\U0001D408\U0001D40D' + ' OPENSSH PRIVATE KEY-----').encode()
+    math_jwt = ('\U0001D41E\U0001D432\U0001D409' + '\U0001D41A' * 25 + '.' + '\U0001D41B' * 30 + '.' + '\U0001D41C' * 15).encode()
+    math_path = '\U0001D402:/Users/Mayn/project'.encode()
+    hole = ('sk-' + 'a' * 10 + '\U0001D455' + 'a' * 20).encode()
+    greek = ('sk-' + 'a' * 10 + '\U0001D6FC' + 'a' * 20).encode()
+    if content_reasons(math_token) != ['secret token literal'] or content_reasons(math_digit) != ['secret token literal']:
+        raise SystemExit('self-test failed: a mathematical token was not detected')
+    if content_reasons(math_key) != ['private key'] or content_reasons(math_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a mathematical key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(math_path):
+        raise SystemExit('self-test failed: a mathematical personal path was not detected')
+    if content_reasons(hole) or content_reasons(greek) or content_reasons('\U0001D465 = 1'.encode()) or content_reasons(('-----' + '\U0001D401\U0001D404\U0001D406\U0001D408\U0001D40D' + ' PUBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary mathematical text was blocked')
 
 def main():
     self_test()
