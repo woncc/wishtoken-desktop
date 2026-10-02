@@ -841,6 +841,15 @@ def modifier_ascii(cp):
         0x212A: 'K', 0x2139: 'i',
     }.get(cp)
 
+
+def segmented_digit(cp):
+    # Segmented digits NFKC-fold to one ASCII digit. This pass does not run
+    # NFKC. Circled numbers, parenthesized numbers, and digit full stops are
+    # other folds, so they stay out of this one.
+    if 0x1FBF0 <= cp <= 0x1FBF9:
+        return chr(cp - 0x1FBF0 + ord('0'))
+    return None
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -900,6 +909,13 @@ def fold_content(data):
         # run NFKC, so a token written with them stayed split. Phonetic
         # modifiers that are not ASCII copies stay out.
         mapped = modifier_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Segmented digits NFKC-fold to ASCII digits. This pass does not run
+        # NFKC, so a token or JWT written with them stayed split.
+        mapped = segmented_digit(cp)
         if mapped is not None:
             out.append(mapped)
             changed = True
@@ -1395,15 +1411,25 @@ def self_test():
     mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
     mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
     mod_roman = ('sk-' + 'a' * 10 + '\u2160' + 'a' * 20).encode()
-    mod_segment = ('sk-' + 'a' * 10 + '\U0001fbf0' + 'a' * 20).encode()
     if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
         raise SystemExit('self-test failed: a modifier token was not detected')
     if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a modifier key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(mod_path):
         raise SystemExit('self-test failed: a modifier personal path was not detected')
-    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons(mod_segment) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary modifier text was blocked')
+    if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
+        raise SystemExit('self-test failed: segmented digit fold is wrong')
+    if sum(segmented_digit(cp) is not None for cp in range(0x1FBE0, 0x1FC10)) != 10:
+        raise SystemExit('self-test failed: segmented digit fold count is wrong')
+    seg_token = ('rt_' + '\U0001fbf0' * 30).encode()
+    seg_mix = ('sk-' + 'a' * 10 + '\U0001fbf5' + 'a' * 20).encode()
+    seg_jwt = ('eyJ' + 'a' * 20 + '\U0001fbf1' * 5 + '.' + 'b' * 25 + '\U0001fbf2' * 5 + '.' + 'c' * 10 + '\U0001fbf9' * 5).encode()
+    if content_reasons(seg_token) != ['secret token literal'] or content_reasons(seg_mix) != ['secret token literal'] or content_reasons(seg_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a segmented digit secret was not detected')
+    if content_reasons('see \U0001fbf0 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2474' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2488' + 'a' * 20).encode()) or content_reasons(('rt_' + '\U0001fbf0' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary segmented text was blocked')
 
 def main():
     self_test()
