@@ -563,6 +563,12 @@ TAG_LETTER = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_LETTERS})
 _TAG_DIGITS = range(0xE0030, 0xE003A)
 TAG_DIGIT_CHARS = frozenset(chr(cp) for cp in _TAG_DIGITS)
 TAG_DIGIT = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_DIGITS})
+# Tag low line copies '_' and does not NFKC-fold. Stripping it joins id_rsa
+# into one word. The low-line reading is tried after digits. Folding only the
+# low line still strips any other tag, so an extra tag letter cannot rename
+# the file. A second reading folds the other tag copies too.
+TAG_LOW_LINE = '\U000E005F'
+TAG_LOW_LINE_FOLD = str.maketrans({0xE005F: '_'})
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -595,6 +601,12 @@ def path_reason(rel):
         if reason := component_path_reason(rel.translate(TAG_DIGIT)):
             return reason
         folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT)
+        if reason := component_path_reason(folded):
+            return reason
+    if TAG_LOW_LINE in rel:
+        if reason := component_path_reason(rel.translate(TAG_LOW_LINE_FOLD)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD)
         if reason := component_path_reason(folded):
             return reason
     return ''
@@ -829,6 +841,10 @@ def self_test():
         'id_ed\U000E00325519', 'ID_ED\U000E00325519',
         'id_ed\U000E00325519\U000E0061', 'id_\U000E0065d\U000E00325519',
         'nested/id_ed\U000E00325519/extra.txt', 'id_ed2551\U000E0039',
+        'id\U000E005Frsa', 'ID\U000E005FRSA', 'auth\U000E005Fsnapshot.json',
+        'codex\U000E005Finstances.json', 'id\U000E005Frsa\U000E0061',
+        'i\U000E0064\U000E005Frsa', 'nested/id\U000E005Frsa/extra.txt',
+        'id\U000E005Fed\U000E00325519',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -936,6 +952,7 @@ def self_test():
         'docs/handover-not-private\U000E0061.md',
         'notes\U000E0031.txt', 'script\U000E0030.go', 'id_ed\U000E00325519.pub',
         'readme\U000E0039md',
+        'id\U000E005Frsa.pub', 'script\U000E005F.go', 'notes\U000E005F.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
