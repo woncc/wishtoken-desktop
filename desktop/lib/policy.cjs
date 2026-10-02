@@ -140,6 +140,20 @@ const SECRET_TEXT = [
 // "user:secret@my-proxy\u02D17890" keep the password. A colon before the
 // username is a boundary too, or "note \u02D1user:secret@10.1:8080" keeps
 // the password.
+// The other Unicode confusables that map to one colon are separators too.
+// U+05C3 U+0831 U+0903 U+0A83 U+1361 U+16EC U+205A and U+A4FD do not fold
+// to ":". U+FE30 folds to ".." and already ends a host, but it does not yet
+// divide userinfo or a port. Otherwise "user\u05C3secret@127.0.0.1:7890"
+// and "user:secret@my-proxy\u16EC7890" keep the password. A colon before
+// the username is a boundary too, or "note \u205Auser:secret@10.1:8080"
+// keeps the password.
+// U+2254, U+29F4, and U+2A74 are one mark that confuses with a colon plus
+// more. U+2A74 folds to "::=" under NFKC, but the raw character does not,
+// and U+2254 and U+29F4 do not fold to ":". U+2255 confuses with "=:" and
+// does not fold to ":". Otherwise "user\u2254secret@127.0.0.1:7890" and
+// "user:secret@my-proxy\u2A747890" keep the password. A colon before the
+// username is a boundary too, or "note \u2255user:secret@10.1:8080" keeps
+// the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -153,7 +167,7 @@ const SECRET_TEXT = [
 // U+3002 does not fold to ".". U+FE12 and U+FF61 fold to U+3002. Those marks
 // already end a host, but "user:secret@127%E3%80%820%E3%80%820%E3%80%821:7890"
 // kept the password because they did not split labels.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1]';
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD\u2254\u2255\u29F4\u2A74]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
@@ -179,7 +193,17 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // U+02D1 is the modifier half triangular colon. It does not fold to ":"
 // either. A colon before the username is a boundary too, or
 // "note \u02D1user:secret@10.1:8080" keeps the password.
-const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u1365', '\u1366', '\u1804', '\u02D1'];
+// U+05C3 U+0831 U+0903 U+0A83 U+1361 U+16EC U+205A and U+A4FD map to one
+// colon and do not fold to ":". U+FE30 folds to ".." and is already a host
+// boundary, but it still has to divide userinfo and a port. Otherwise
+// "user\u05C3secret@127.0.0.1:7890" and "user:secret@my-proxy\uFE307890"
+// keep the password.
+// U+2254 maps to ":=", U+29F4 maps to a colon and an arrow, and U+2A74 maps
+// to "::=". U+2A74 folds to "::=" under NFKC; the other two do not fold to
+// ":". U+2255 maps to "=:". They still divide userinfo and a port, or
+// "user\u2254secret@127.0.0.1:7890" and "user:secret@my-proxy\u2A747890"
+// keep the password.
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809', '\u2237', '\u2E2C', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u1365', '\u1366', '\u1804', '\u02D1', '\u05C3', '\u0831', '\u0903', '\u0A83', '\u1361', '\u16EC', '\u205A', '\uA4FD', '\uFE30', '\u2254', '\u2255', '\u29F4', '\u2A74'];
 function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
@@ -194,7 +218,10 @@ function nestPercent(pattern, extra) {
 // U+1393, U+1D108, and U+11DD9 do not fold to ":". The last two are
 // supplementary, so they stay out of the character classes and are only
 // separators. Otherwise "user:secret@my-proxy\u13937890" keeps the password.
-const SIGN_COLONS = ['\u1393', '\u{1D108}', '\u{11DD9}'];
+// U+1015B U+10AF5 U+11002 U+11082 U+11182 U+1123A U+115BE U+116AC and
+// U+11838 map to one colon too. They are supplementary, so they are only
+// separators. Otherwise "user:secret@my-proxy\u{1123A}7890" keeps the password.
+const SIGN_COLONS = ['\u1393', '\u{1D108}', '\u{11DD9}', '\u{1015B}', '\u{10AF5}', '\u{11002}', '\u{11082}', '\u{11182}', '\u{1123A}', '\u{115BE}', '\u{116AC}', '\u{11838}'];
 function colonSeparator() {
   const parts = [':', '%3[Aa]', '%25(?:25){0,2}3[Aa]'];
   for (const char of COLON_CHARS.concat(SIGN_COLONS)) {
