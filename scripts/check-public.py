@@ -269,6 +269,14 @@ SEPARATOR_LIKE = {
     ord('\ufe68'): '/',
     ord('\uff0f'): '/',
     ord('\uff3c'): '/',
+    # These do not NFKC-fold to a slash. Philippine single punctuation, the
+    # box-drawing diagonals, and the mathematical diagonals still split a
+    # private name from the following component.
+    ord('\u1735'): '/',
+    ord('\u2571'): '/',
+    ord('\u2572'): '/',
+    ord('\u27cb'): '/',
+    ord('\u27cd'): '/',
 }
 
 def normalized_rel(rel):
@@ -409,6 +417,9 @@ def self_test():
         'auth.json\u2044secret.txt', 'auth.json\u2215secret.txt', 'accounts.json\u29f8extra.txt',
         'auth.json\u2216secret.txt', 'accounts.json\u29f5extra.txt', 'tokens.json\u29f9notes.txt',
         'Diagnostics\u2216capture.png', 'credentials\u29f9token.txt', 'nested/id_rsa\u29f5x',
+        'auth.json\u1735secret.txt', 'credentials\u2571token.txt', 'notes\u27cbid_rsa',
+        'tokens.json\u2572extra.txt', 'accounts.json\u27cdnotes.txt', 'Diagnostics\u2571capture.png',
+        'nested/id_rsa\u1735x', 'auth.json\u2572notes.txt',
         'auth.json\u00a5secret.txt', 'tokens.json\u20a9extra.txt', 'auth.json\uff0fsecret.txt',
         'accounts.json\uff3cnotes.txt', 'Diagnostics\u2044capture.png', 'auth.json\u200b/payload.txt',
         'auth.json.crdownload', 'auth.json.part', 'credentials.json.partial', 'accounts.json.download',
@@ -470,6 +481,8 @@ def self_test():
         'notes\\readme.txt', 'readme\u2044notes.txt', 'script.go\u00a5extra.txt',
         'models.json\uff0freadme.txt',
         'readme\u2216notes.txt', 'script.go\u29f5extra.txt', 'models.json\u29f9readme.txt',
+        'readme\u2571notes.txt', 'script.go\u27cbextra.txt', 'models.json\u2572readme.txt',
+        'id_rsa.pub\u1735foo.txt', 'notes\u27cdreadme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
         'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
         'notes\u1804readme.txt', 'script.go\ua6f4Zone.Identifier', 'models.json\u1804readme.txt',
