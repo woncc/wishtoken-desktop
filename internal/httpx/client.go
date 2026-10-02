@@ -385,10 +385,12 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 
 // dropMarkPieces removes characters that do not add a base letter: variation
 // selectors and other nonspacing or enclosing marks, format characters such
-// as zero-width spaces, and controls other than ordinary spacing. Tab,
-// newline, and carriage return still separate operator text. The original
-// byte range of a match still covers a dropped character that was sitting
-// inside the secret.
+// as zero-width spaces, controls other than ordinary spacing, and blank
+// fillers that are letters or symbols. Hangul fillers and the braille blank
+// pattern have no ink. U+3164 and U+FFA0 fold to U+1160 under NFKC and stay
+// letters, so a category check never drops them. Tab, newline, and carriage
+// return still separate operator text. The original byte range of a match
+// still covers a dropped character that was sitting inside the secret.
 func dropMarkPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -420,7 +422,15 @@ func ignorableCredentialRune(r rune) bool {
 	if unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
 		return true
 	}
-	return unicode.Is(unicode.Cc, r) && !unicode.IsSpace(r)
+	if unicode.Is(unicode.Cc, r) && !unicode.IsSpace(r) {
+		return true
+	}
+	switch r {
+	case '\u115f', '\u1160', '\u3164', '\uffa0', '\u2800':
+		return true
+	default:
+		return false
+	}
 }
 
 func applySecretSpans(s string, spans [][2]int, repl string) string {

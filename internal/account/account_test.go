@@ -388,3 +388,27 @@ func TestViewHidesCredentialsSplitByControls(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsSplitByBlankFillers(t *testing.T) {
+	refresh := "rt_display_123456789"
+	filler := "rt_\u3164display_123456789"
+	braille := "rt_display_\u2800123456789"
+	encoded := "rt_%EF%BE%A0display_123456789"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u1160dXJl"
+	acc := Account{
+		Name: "note " + filler + " " + encoded, Email: "kept@example.com", PlanType: "plus",
+		Source: "from " + markedJWT, Tags: []string{"team", braille}, LastError: "rejected " + filler,
+		AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, filler, braille, encoded, jwt, markedJWT, "eyJ", "display_123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}

@@ -247,3 +247,32 @@ func TestSanitizeFailureStripsControlsInsideCredentials(t *testing.T) {
 		t.Fatalf("operator text changed: %q", got)
 	}
 }
+
+func TestSanitizeFailureStripsBlankFillersInsideCredentials(t *testing.T) {
+	secret := "code+verifier12"
+	markedSecret := "code+\u3164verifier12"
+	refresh := "rt_submitted_123456"
+	braille := "rt_\u2800submitted_123456"
+	choseong := "rt_sub\u115fmitted_123456"
+	encoded := "rt_%EF%BE%A0submitted_123456"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u1160dXJl"
+	text := "rejected " + markedSecret + " " + braille + " " + choseong + " " + encoded + " " + markedJWT + " later"
+	got := SanitizeFailure(text, secret)
+	for _, leaked := range []string{secret, markedSecret, refresh, braille, choseong, encoded, "submitted_123456", jwt, "eyJ", "c2lnbmF0dXJl"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	plain := "slow\u3164down"
+	if SanitizeFailure(plain) != plain {
+		t.Fatalf("operator text changed: %q", SanitizeFailure(plain))
+	}
+	snake := "session_revoked_\u2800because_of_security_event"
+	if SanitizeFailure(snake) != snake {
+		t.Fatalf("operator reason changed: %q", SanitizeFailure(snake))
+	}
+}

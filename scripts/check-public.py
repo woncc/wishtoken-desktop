@@ -30,6 +30,9 @@ FORBIDDEN_SUFFIXES = {
 }
 COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst', '.br', '.7z', '.tar', '.tgz', '.lz4', '.lzma', '.zstd', '.rar', '.cab'}
 PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
+# Hangul fillers and the braille blank are letters or symbols, so they are not
+# format characters. U+3164 and U+FFA0 NFKC-fold to U+1160. None of them has ink.
+BLANK_FILLERS = frozenset('\u115f\u1160\u3164\uffa0\u2800')
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
 # These other full stops do not NFKC-fold to '.' either. Armenian full stop is a
 # colon lookalike and is folded with the colons instead.
@@ -212,9 +215,10 @@ def normalize_component(name):
     # Colon lookalikes are folded first: double colon equal expands to '::='
     # and would otherwise leave '=' glued to the following stream name.
     # Format, control, and line-separator characters can sit inside a name
-    # without changing how a person reads it.
+    # without changing how a person reads it. Blank fillers are letters or
+    # symbols, so the category check does not remove them.
     folded = fold_separators(name, {}).casefold()
-    cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
+    cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'} and ch not in BLANK_FILLERS)
     return collapse_dots(cleaned)
 
 def strip_edges(value):
@@ -547,6 +551,10 @@ def self_test():
         'tokens.json\u20e3', 'auth.json\u0301', 'a\u0301uth.json', 'auth\u180c.json',
         'Copy of auth.json\ufe0f', 'nested/auth\ufe0e.json/extra.txt',
         'accounts.json\u180d.txt', 'secrets.env\u20dd', 'id_rsa\ufe0f.txt',
+        'auth\u3164.json', 'auth.json\u3164', 'auth\uffa0.json', 'id_rsa\u2800', 'credentials.json\u115f',
+        '.netrc\u1160', 'tokens.json\u2800', 'ID_RSA\uffa0',
+        'nested/auth\u3164.json/extra.txt', 'Copy of auth\u2800.json', 'auth.json\u3164.txt',
+        'secrets.env\u115f', 'auth\u115f.json\u2800',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -601,6 +609,7 @@ def self_test():
         'script.go\u2e2cZone.Identifier',
         'script.go\ufe0e', 'id_rsa.pub\ufe0f', 'notes\u0301.txt', 'readme\u20dd.md',
         'models.json\u0332', 'notes\u180b.txt',
+        'notes\u3164.txt', 'script.go\u2800', 'readme\u1160.md', 'models.json\uffa0',
     )
     for rel in blocked:
         if not path_reason(rel):
