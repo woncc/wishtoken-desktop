@@ -587,6 +587,107 @@ func fullwidthASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldFractionPieces maps vulgar fractions to the ASCII digits and slash
+// NFKC produces. The compatibility decomposition uses a fraction slash;
+// this pass emits the ASCII solidus instead, and it does not run NFKC.
+// A stored secret written with a fraction would otherwise stay visible.
+// Each output byte keeps the original rune's range. Fraction numerator
+// one has no trailing digit and still expands to "1/". Other slashes and
+// the letterlike signs stay out.
+func foldFractionPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := fractionASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldFractionString(s string) string {
+	if !fractionFolded(s) {
+		return s
+	}
+	return renderPieces(foldFractionPieces(rawPieces(s)))
+}
+
+func fractionFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := fractionASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func fractionASCII(r rune) (string, bool) {
+	switch r {
+	case 0x00BC:
+		return "1/4", true
+	case 0x00BD:
+		return "1/2", true
+	case 0x00BE:
+		return "3/4", true
+	case 0x2150:
+		return "1/7", true
+	case 0x2151:
+		return "1/9", true
+	case 0x2152:
+		return "1/10", true
+	case 0x2153:
+		return "1/3", true
+	case 0x2154:
+		return "2/3", true
+	case 0x2155:
+		return "1/5", true
+	case 0x2156:
+		return "2/5", true
+	case 0x2157:
+		return "3/5", true
+	case 0x2158:
+		return "4/5", true
+	case 0x2159:
+		return "1/6", true
+	case 0x215A:
+		return "5/6", true
+	case 0x215B:
+		return "1/8", true
+	case 0x215C:
+		return "3/8", true
+	case 0x215D:
+		return "5/8", true
+	case 0x215E:
+		return "7/8", true
+	case 0x215F:
+		return "1/", true
+	case 0x2189:
+		return "0/3", true
+	default:
+		return "", false
+	}
+}
+
 // foldRupeePieces maps the rupee sign to the ASCII "Rs" NFKC produces.
 // This pass does not run NFKC, so a stored secret written with that sign
 // would stay visible. Each output byte keeps the original rune's range.
@@ -1325,7 +1426,7 @@ func escapeASCII(r rune) (byte, bool) {
 }
 
 // foldCredentialPieces maps compatibility letters, digits, latin
-// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, letterlike signs, square symbols, the rupee sign, and token punctuation, including the percent sign, exclamation
+// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, letterlike signs, square symbols, the rupee sign, vulgar fractions, and token punctuation, including the percent sign, exclamation
 // mark, consecutive equals signs, dot leaders, reverse solidus, number sign, dollar sign,
 // ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
@@ -1336,11 +1437,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldSquarePieces(foldRupeePieces(foldLetterlikePieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldSquarePieces(foldFractionPieces(foldRupeePieces(foldLetterlikePieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldSquareString(foldRupeeString(foldLetterlikeString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldSquareString(foldFractionString(foldRupeeString(foldLetterlikeString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -3110,8 +3211,9 @@ func romanASCII(r rune) (byte, bool) {
 // than one ASCII letter. This pass does not run NFKC, so a stored token or
 // a JWT written with those forms would stay visible. Each output byte keeps
 // the original rune's range. Single-letter numerals are folded elsewhere.
-// Archaic thousand signs, late and early forms, and vulgar fractions do not
-// fold to ASCII letters, so they stay out.
+// Archaic thousand signs and late or early forms do not fold to ASCII
+// letters, so they stay out. Vulgar fractions expand to digits around a
+// slash and are folded separately.
 func foldAdditiveRomanPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

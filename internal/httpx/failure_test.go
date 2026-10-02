@@ -4425,3 +4425,104 @@ func TestRupeeASCIIFoldsOnlyTheRupeeSign(t *testing.T) {
 		t.Fatalf("rupee fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsVulgarFractions(t *testing.T) {
+	pairs := []struct {
+		secret string
+		plain  string
+		mark   string
+	}{
+		{"rt_Zz9q1/27f3a", "1/2", "\u00BD"},
+		{"rt_Aa8k1/10ab", "1/10", "\u2152"},
+		{"rt_Bb7m1/x7f3", "1/", "\u215F"},
+		{"rt_Cc6n0/37f3a", "0/3", "\u2189"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.plain, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.plain)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "1/2", "%C2%BD")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[1].secret, "1/10", "\u2152")
+	got = SanitizeFailure("rejected "+pairs[1].secret+" later", stored)
+	for _, item := range []string{pairs[1].secret, stored, "Aa8k", "1/10", "ab"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u00BD later",
+		"see \u2152 later",
+		"see \u215F later",
+		"see \u2189 later",
+		"see \u2044 later",
+		"see 1/2 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("fraction prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestFractionASCIIFoldsOnlyVulgarFractions(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x00BC, "1/4"},
+		{0x00BD, "1/2"},
+		{0x00BE, "3/4"},
+		{0x2150, "1/7"},
+		{0x2151, "1/9"},
+		{0x2152, "1/10"},
+		{0x2153, "1/3"},
+		{0x2154, "2/3"},
+		{0x2155, "1/5"},
+		{0x2156, "2/5"},
+		{0x2157, "3/5"},
+		{0x2158, "4/5"},
+		{0x2159, "1/6"},
+		{0x215A, "5/6"},
+		{0x215B, "1/8"},
+		{0x215C, "3/8"},
+		{0x215D, "5/8"},
+		{0x215E, "7/8"},
+		{0x215F, "1/"},
+		{0x2189, "0/3"},
+	}
+	for _, check := range checks {
+		got, ok := fractionASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'1', '/', '2', 0x2044, 0x2215, 0x2100, 0x00B0, 0x2160} {
+		if _, ok := fractionASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := fractionASCII(r); ok {
+			n++
+		}
+	}
+	if n != 20 {
+		t.Fatalf("fraction fold count %d", n)
+	}
+}
