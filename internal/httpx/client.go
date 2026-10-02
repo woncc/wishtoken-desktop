@@ -685,6 +685,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleRightCurly != needleLeftCurly {
 		spans = append(spans, exactSecretSpans(rightCurlyBase, needleRightCurly)...)
 	}
+	// Tag comma copies ',' and does not NFKC-fold. It is a format character,
+	// so the drop pass below removes it. That splits a token and misses the
+	// stored comma. Folding it is a separate reading. It runs on the
+	// tag-right-curly-bracket reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag comma cannot hide a token that
+	// has no comma.
+	commaBase := rightCurlyBase
+	if closed, ok := foldTagRightCurlyBracketPieces(rightCurlyBase); ok {
+		commaBase = closed
+	}
+	needleComma := foldTagCommaString(needleRightCurly)
+	if commaed, ok := foldTagCommaPieces(commaBase); ok {
+		spans = append(spans, exactSecretSpans(commaed, needleComma)...)
+	} else if needleComma != needleRightCurly {
+		spans = append(spans, exactSecretSpans(commaBase, needleComma)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1656,6 +1672,46 @@ func foldTagRightCurlyBracketString(s string) string {
 		return s
 	}
 	folded, _ := foldTagRightCurlyBracketPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagCommaPieces maps the Unicode tag comma to ASCII ','. It does not
+// NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes format
+// characters, so a stored comma written with a tag would stay visible. One
+// output piece covers the original rune. The drop reading still runs on the
+// unfolded pieces. Other tag characters stay out.
+func foldTagCommaPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE002C {
+			out = append(out, secretPiece{b: ',', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagCommaString(s string) string {
+	if !strings.ContainsRune(s, 0xE002C) {
+		return s
+	}
+	folded, _ := foldTagCommaPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 

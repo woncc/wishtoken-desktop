@@ -5606,3 +5606,51 @@ func TestTagRightCurlyBracketFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag left curly bracket was treated as a right curly bracket")
 	}
 }
+
+func TestSanitizeFailureStripsTagComma(t *testing.T) {
+	secret := "code,verifier12"
+	mark := "code\U000E002Cverifier12"
+	encoded := "code%F3%A0%80%ACverifier12"
+	inserted := "code,\U000E002Cverifier12"
+	mixedSecret := "rt}Zz9q,ab7f"
+	mixed := "rt\U000E007DZz9q\U000E002Cab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code,verifier12code,verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E002Cverifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag comma leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E002C later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag comma prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagCommaFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagCommaPieces(rawPieces("code\U000E002Cverifier12"))
+	if !ok || renderPieces(folded) != "code,verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagCommaPieces(rawPieces("code,verifier12")); ok {
+		t.Fatalf("ascii comma was folded")
+	}
+	if foldTagCommaString("code\U000E007Dverifier12") != "code\U000E007Dverifier12" {
+		t.Fatalf("tag right curly bracket was treated as a comma")
+	}
+}
