@@ -52,6 +52,11 @@ DOT_LIKE = {
     ord('\U00016e98'): '.',
     ord('\U0001bc9f'): '.',
     ord('\U0001da88'): '.',
+    # These do not NFKC-fold to '.'. Lisu mya ti, the Kharoshthi punctuation
+    # dot, and Meetei Mayek lum iyek still hide auth.json and .netrc.
+    ord('\ua4f8'): '.',
+    ord('\U00010a50'): '.',
+    ord('\uabec'): '.',
 }
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
 # Mongolian colon and Bamum colon are the same kind of separator.
@@ -98,6 +103,40 @@ COLON_LIKE = {
     ord('\U00012473'): ':',
     ord('\U00012474'): ':',
     ord('\U0001DA8A'): ':',
+    # The vertical two-dot leader NFKC-folds to '..', so a following private
+    # name would survive unless it is folded first. The other two-dot marks
+    # do not NFKC-fold to ':' either.
+    ord('\ufe30'): ':',
+    ord('\u16ec'): ':',
+    ord('\u0831'): ':',
+    ord('\U00010af5'): ':',
+    ord('\U0001123a'): ':',
+    ord('\ua4fd'): ':',
+    # Visarga signs are spacing marks shaped like a colon. Bengali visarga is
+    # the confusable prototype; the other script visargas, Tibetan rnam bcad,
+    # and Khmer reahmuk fold with it. None of them NFKC-fold to ':'.
+    ord('\u0903'): ':',
+    ord('\u0a83'): ':',
+    ord('\U00011002'): ':',
+    ord('\U00011082'): ':',
+    ord('\U00011182'): ':',
+    ord('\U000115BE'): ':',
+    ord('\U000116AC'): ':',
+    ord('\U00011838'): ':',
+    ord('\u0983'): ':',
+    ord('\u0a03'): ':',
+    ord('\u0c03'): ':',
+    ord('\u0c83'): ':',
+    ord('\u0d03'): ':',
+    ord('\u0d83'): ':',
+    ord('\u0f7f'): ':',
+    ord('\u1038'): ':',
+    ord('\u17c7'): ':',
+    ord('\U00011303'): ':',
+    ord('\U000114C1'): ':',
+    ord('\U000119DF'): ':',
+    ord('\U00011A39'): ':',
+    ord('\U00011C3E'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -391,6 +430,18 @@ def self_test():
         'docs\u2982accounts.json', 'nested/file\u2af6.netrc', 'ID_RSA\u205dx',
         'readme\U00012471auth.json', 'notes\U00012472id_rsa', 'file\U00012473credentials.json',
         'docs\U00012474accounts.json', 'nested/file\U0001DA8A.netrc', 'ID_RSA\U00012473x',
+        'readme\u16ecauth.json', 'notes\u0831id_rsa', 'file\U00010af5credentials.json',
+        'docs\U0001123aaccounts.json', 'nested/file\ua4fd.netrc', 'ID_RSA\ufe30x',
+        'auth.json\ufe30secret', 'readme\ufe30auth.json',
+        'readme\u0903auth.json', 'readme\u0a83id_rsa', 'readme\U00011002credentials.json',
+        'readme\U00011082accounts.json', 'readme\U00011182.netrc', 'readme\U000115BE.env',
+        'readme\U000116ACtokens.json', 'readme\U00011838secrets.json', 'readme\u0983auth.json',
+        'readme\u0a03id_rsa', 'readme\u0c03credentials.json', 'readme\u0c83accounts.json',
+        'readme\u0d03.netrc', 'readme\u0d83.env', 'readme\u0f7ftokens.json',
+        'readme\u1038secrets.json', 'readme\u17c7auth.json', 'readme\U00011303id_rsa',
+        'readme\U000114C1credentials.json', 'readme\U000119DFaccounts.json',
+        'readme\U00011A39.netrc', 'readme\U00011C3E.env', 'auth.json\u0903secret',
+        'nested/file\u0983.netrc',
         'auth\u06d4json', 'accounts\u0701json', 'credentials\u0702json', 'tokens\u1362json',
         'notes\u166ebak', '\u1803netrc', 'secrets\u1809env', 'id_ed25519\u2cf9txt',
         'auth\u2cfejson.txt', 'accounts\u2e3cjson.gz', 'tokens\ua4ffjson', 'credentials\ua60ejson',
@@ -399,6 +450,9 @@ def self_test():
         'auth..json', 'accounts...json', 'credentials....json', '..netrc', '...netrc',
         'auth\u2025json', 'accounts\u2026json', '\u2026netrc', 'id_rsa\u2025txt',
         'nested/tokens..json/extra.txt', 'Copy of auth...json',
+        'auth\ua4f8json', 'accounts\U00010a50json', 'credentials\uabecjson',
+        '\U00010a50netrc', 'id_rsa\ua4f8txt', 'Copy of auth\uabecjson',
+        'nested/tokens\ua4f8json/extra.txt', 'auth\ua4f8\ua4f8json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -423,8 +477,20 @@ def self_test():
         'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
         'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
         'notes\U00012471readme.txt', 'script.go\U00012472Zone.Identifier', 'models.json\U0001DA8Areadme.txt',
+        'notes\u16ecreadme.txt', 'script.go\u0831Zone.Identifier', 'models.json\U00010af5readme.txt',
+        'notes\U0001123areadme.txt', 'script.go\ua4fdZone.Identifier', 'id_rsa.pub\ufe30extra',
+        'readme\ufe30md',
+        'notes\u0903readme.txt', 'notes\u0a83readme.txt', 'notes\U00011002readme.txt',
+        'notes\U00011082readme.txt', 'notes\U00011182readme.txt', 'notes\U000115BEreadme.txt',
+        'notes\U000116ACreadme.txt', 'notes\U00011838readme.txt', 'notes\u0983readme.txt',
+        'notes\u0a03readme.txt', 'notes\u0c03readme.txt', 'notes\u0c83readme.txt',
+        'notes\u0d03readme.txt', 'notes\u0d83readme.txt', 'notes\u0f7freadme.txt',
+        'notes\u1038readme.txt', 'notes\u17c7readme.txt', 'notes\U00011303readme.txt',
+        'notes\U000114C1readme.txt', 'notes\U000119DFreadme.txt', 'notes\U00011A39readme.txt',
+        'notes\U00011C3Ereadme.txt', 'script.go\u0903Zone.Identifier', 'id_rsa.pub\u0983extra',
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
+        'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
         'models.json\u0589readme',
     )
     for rel in blocked:
