@@ -659,8 +659,9 @@ def private_filename(name):
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
-    # token. Fold the copies, then drop the remaining format characters.
-    # Line breaks stay put so a wrapped sk- line is not glued to the next line.
+    # token. Combining marks do the same. Fold the copies, then drop format
+    # characters and marks. Line breaks stay put so a wrapped sk- line is not
+    # glued to the next line.
     try:
         text = data.decode('utf-8')
     except UnicodeDecodeError:
@@ -673,7 +674,10 @@ def fold_content(data):
             out.append(chr(cp - 0xE0000))
             changed = True
             continue
-        if unicodedata.category(ch) == 'Cf':
+        # Mn/Me/Mc add no base letter. Dropping them keeps a split token
+        # visible to the byte patterns. Cc and line separators stay, so a
+        # wrapped line is not joined.
+        if unicodedata.category(ch) in {'Cf', 'Mn', 'Me', 'Mc'}:
             changed = True
             continue
         out.append(ch)
@@ -1078,6 +1082,13 @@ def self_test():
         raise SystemExit('self-test failed: ordinary wrapped text was blocked')
     if content_reasons('-----BEGIN PU\U000E0042LIC KEY-----'.encode()):
         raise SystemExit('self-test failed: a tagged public key was blocked')
+    marked_token = ('sk-' + 'a' * 10 + '\u0301' + 'a' * 20).encode()
+    marked_key = '-----BEGIN OPE\u0301NSSH PRIVATE KEY-----'.encode()
+    marked_jwt = b'eyJ' + b'a' * 25 + b'.' + ('b' * 10 + '\u0301' + 'b' * 20).encode() + b'.' + b'c' * 15
+    if content_reasons(marked_token) != ['secret token literal'] or content_reasons(marked_key) != ['private key'] or content_reasons(marked_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a mark-hidden secret was not detected')
+    if content_reasons('caf\u0301e'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0301' + 'short').encode()):
+        raise SystemExit('self-test failed: an ordinary mark was blocked')
 
 def main():
     self_test()
