@@ -161,3 +161,29 @@ func TestSanitizeFailureStripsAtSignLookalikes(t *testing.T) {
 		t.Fatal("address with a fullwidth at was rewritten")
 	}
 }
+
+func TestSanitizeFailureStripsMarksInsideCredentials(t *testing.T) {
+	secret := "code+verifier12"
+	markedSecret := "code+\uFE0Everifier12"
+	refresh := "rt_submitted_123456"
+	markedRefresh := "rt_\uFE0Esubmitted_123456"
+	encodedMark := "rt_%EF%B8%8Esubmitted_123456"
+	acute := "rt_submi\u0301tted_123456"
+	enclosed := "rt_submitted_\u20dd123456"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\uFE0FdXJl"
+	text := "rejected " + markedSecret + " " + markedRefresh + " " + encodedMark + " " + acute + " " + enclosed + " " + markedJWT + " later"
+	got := SanitizeFailure(text, secret)
+	for _, leaked := range []string{secret, markedSecret, refresh, markedRefresh, "submitted_123456", jwt, "eyJ", "c2lnbmF0dXJl"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	plain := "slow\uFE0Edown"
+	if SanitizeFailure(plain) != plain {
+		t.Fatalf("operator text changed: %q", SanitizeFailure(plain))
+	}
+}

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Options tunes a client.
@@ -355,6 +357,15 @@ func decodePieces(in []secretPiece) []secretPiece {
 }
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
+	spans := exactSecretSpans(pieces, secret)
+	dropped := dropMarkPieces(pieces)
+	if len(dropped) != len(pieces) {
+		spans = append(spans, exactSecretSpans(dropped, secret)...)
+	}
+	return spans
+}
+
+func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	if len(secret) == 0 || len(pieces) < len(secret) {
 		return nil
 	}
@@ -370,6 +381,30 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 		spans = append(spans, [2]int{pieces[i].start, pieces[i+len(secret)-1].end})
 		from = i + len(secret)
 	}
+}
+
+// dropMarkPieces removes variation selectors and other marks that do not add
+// a base letter. The original byte range of a match still covers a mark that
+// was sitting inside the secret.
+func dropMarkPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r != utf8.RuneError && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r)) {
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	return out
 }
 
 func applySecretSpans(s string, spans [][2]int, repl string) string {
