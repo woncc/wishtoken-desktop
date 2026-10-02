@@ -933,16 +933,246 @@ func escapeASCII(r rune) (byte, bool) {
 // foldCredentialPieces maps compatibility letters, digits, and token
 // punctuation, including the percent sign, exclamation mark, reverse
 // solidus, number sign, dollar sign, ampersand, asterisk, question mark,
-// semicolon, comma, curly brackets, square brackets, and less-than and greater-than signs, to ASCII. Credential redaction does not run NFKC.
+// semicolon, comma, curly brackets, square brackets, less-than and
+// greater-than signs, the grave accent, the circumflex accent, the vertical
+// line, and the apostrophe, to ASCII. Credential redaction does not run NFKC.
 // The percent fold is part of this result because the decode loop consumes
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))
+	return foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))
+	return foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))
+}
+
+// foldApostrophePieces maps the fullwidth apostrophe to ASCII '\”.
+// NFKC folds it, and this pass does not run NFKC, so a stored secret written
+// with that form would stay visible. Curly single quotes, the modifier
+// apostrophe, prime, and the Armenian apostrophe do not fold to '\”, so
+// they stay out. One output piece covers the original rune.
+func foldApostrophePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := apostropheASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldApostropheString(s string) string {
+	if !apostropheFolded(s) {
+		return s
+	}
+	return renderPieces(foldApostrophePieces(rawPieces(s)))
+}
+
+func apostropheFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := apostropheASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func apostropheASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFF07:
+		return '\'', true
+	default:
+		return 0, false
+	}
+}
+
+// foldVerticalLinePieces maps the fullwidth vertical line to ASCII '|'.
+// NFKC folds it, and this pass does not run NFKC, so a stored secret written
+// with that form would stay visible. Broken bar, divides, the dental click,
+// and box-drawing verticals do not fold to '|', so they stay out. One output
+// piece covers the original rune.
+func foldVerticalLinePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := verticalLineASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldVerticalLineString(s string) string {
+	if !verticalLineFolded(s) {
+		return s
+	}
+	return renderPieces(foldVerticalLinePieces(rawPieces(s)))
+}
+
+func verticalLineFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := verticalLineASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func verticalLineASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFF5C:
+		return '|', true
+	default:
+		return 0, false
+	}
+}
+
+// foldCircumflexPieces maps the fullwidth circumflex accent to ASCII '^'.
+// NFKC folds it, and this pass does not run NFKC, so a stored secret written
+// with that form would stay visible. Modifier letter circumflex, the caret,
+// the up arrowhead, and combining circumflex do not fold to '^', so they stay
+// out. One output piece covers the original rune.
+func foldCircumflexPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := circumflexASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldCircumflexString(s string) string {
+	if !circumflexFolded(s) {
+		return s
+	}
+	return renderPieces(foldCircumflexPieces(rawPieces(s)))
+}
+
+func circumflexFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := circumflexASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func circumflexASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFF3E:
+		return '^', true
+	default:
+		return 0, false
+	}
+}
+
+// foldGravePieces maps Greek varia and the fullwidth grave accent to ASCII
+// '`'. NFKC folds them, and this pass does not run NFKC, so a stored secret
+// written with those forms would stay visible. Modifier letter grave accent,
+// combining grave, acute accent, and Greek psili do not fold to '`', so they
+// stay out. One output piece covers the original rune.
+func foldGravePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := graveASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldGraveString(s string) string {
+	if !graveFolded(s) {
+		return s
+	}
+	return renderPieces(foldGravePieces(rawPieces(s)))
+}
+
+func graveFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := graveASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func graveASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x1FEF, 0xFF40:
+		return '`', true
+	default:
+		return 0, false
+	}
 }
 
 // foldLessGreaterPieces maps small and fullwidth less-than and greater-than
