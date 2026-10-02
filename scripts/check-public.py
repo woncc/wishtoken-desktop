@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import subprocess
+import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PARTS = {
@@ -28,7 +29,8 @@ FORBIDDEN_SUFFIXES = {
     '.gpg', '.pgp', '.age',
 }
 COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst'}
-INVISIBLE = dict.fromkeys(map(ord, '\u200b\u200c\u200d\ufeff\u2060'))
+# NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
+DOT_LIKE = {ord('\u3002'): '.'}
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
     '.swp', '.swo', '.swn', '.tmp',
@@ -53,19 +55,38 @@ def forbidden_name(folded):
     bare = folded[1:] if folded.startswith('.') else folded
     return bare in FOLD_NAMES
 
+def normalize_component(name):
+    # Compatibility forms such as fullwidth letters and colons fold to ASCII.
+    # Format, control, and line-separator characters can sit inside a name
+    # without changing how a person reads it.
+    folded = unicodedata.normalize('NFKC', name).translate(DOT_LIKE).casefold()
+    return ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
+
+def strip_edges(value):
+    while value and (value[0] in ' \t' or value[-1] in ' \t.'):
+        if value[0] in ' \t':
+            value = value[1:]
+        else:
+            value = value[:-1]
+    return value
+
+def glue_extension(value):
+    # A space beside the last dot hides auth.json as "auth .json".
+    stem, dot, ext = value.rpartition('.')
+    if not dot:
+        return value
+    return stem.rstrip(' \t') + dot + ext.lstrip(' \t')
+
 def visible_name(name):
-    # Windows ignores trailing dots and spaces. Editors and NTFS streams can
-    # also hide a forbidden name behind invisible characters or a colon suffix.
-    folded = name.casefold().translate(INVISIBLE).strip(' \t')
-    while folded.endswith('.'):
-        folded = folded[:-1]
+    # Windows ignores trailing dots and spaces. Editors, NTFS streams, and
+    # Unicode lookalikes can hide the same forbidden name.
+    folded = strip_edges(normalize_component(name))
     if ':' in folded:
-        folded = folded.split(':', 1)[0].strip(' \t')
-        while folded.endswith('.'):
-            folded = folded[:-1]
-    return folded
+        folded = strip_edges(folded.split(':', 1)[0])
+    return glue_extension(folded)
 
 def strip_alias(folded):
+    folded = glue_extension(strip_edges(folded))
     if folded.startswith('.#'):
         folded = folded[2:]
     if folded.startswith('#') and folded.endswith('#') and len(folded) > 2:
@@ -75,6 +96,7 @@ def strip_alias(folded):
     changed = True
     while changed and folded:
         changed = False
+        folded = glue_extension(strip_edges(folded))
         editor = EDITOR_NUMBER.search(folded)
         if editor and editor.start() > 0:
             folded = folded[:editor.start()]
@@ -88,7 +110,7 @@ def strip_alias(folded):
             continue
         if suffix in BACKUP_SUFFIXES or suffix in COMPRESSED_SUFFIXES or suffix == '.txt' or NUMBERED_BACKUP.fullmatch(suffix) or re.fullmatch(r'\.\d+', suffix):
             if stem and stem != folded:
-                folded = stem
+                folded = strip_edges(stem)
                 changed = True
                 continue
         if stem and COPY_INDEX.search(stem):
@@ -194,6 +216,12 @@ def self_test():
         'auth.json.', 'accounts.json ', ' auth.json', 'Copy of auth.json.',
         'id_rsa.gpg', 'secrets.age', 'keys/backup.pgp', 'auth.json.gz', 'nested/credentials.json.bz2',
         'auth.json\u200b', 'auth\u200b.json', 'accounts.json::$DATA', 'id_rsa:secret', 'tokens.json.xz',
+        'auth.json\u00a0', 'auth.json\u3000', 'auth.json\u202f', 'auth.json\u205f', 'auth.json\u202e',
+        '\u202eauth.json', 'auth.json\u200e', 'id_rsa\u200f', 'credentials.json\u2066',
+        'auth.json\r', 'auth.json\n', 'auth.json\x00', 'secrets.env\u00a0', 'notes.bak\u3000',
+        'auth.json\u2024', 'auth.json\u3002', 'auth\uff0ejson', '\uff41\uff55\uff54\uff48.json', '\uff41\uff43\uff43\uff4f\uff55\uff4e\uff54\uff53\uff0e\uff4a\uff53\uff4f\uff4e',
+        'auth.json\uff1a$DATA', 'Copy of auth.json\u00a0', 'auth.json\u00a0.txt', 'auth .json',
+        'Diagnostics\u00a0/capture.png', 'auth.json\u2028', 'accounts .json.gz',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -203,7 +231,8 @@ def self_test():
         'id_rsa.pub', 'script (1).go', 'notes.bak3', 'Copy of README.md', '._script.go',
         'notes.txt', 'docs/readme.txt', 'script.go.txt',
         'models.json.txt', 'notes.txt.', 'readme.gz', 'script.go.xz', 'models.json.gz',
-        'script.go:Zone.Identifier',
+        'script.go:Zone.Identifier', 'notes\u00a0.txt', 'readme\u3002txt', 'script.go\u200b',
+        'notes .txt', 'models .json.gz', 'id_rsa.pub\u200e', 'id_rsa .pub',
     )
     for rel in blocked:
         if not path_reason(rel):
