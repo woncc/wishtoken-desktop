@@ -383,3 +383,26 @@ func TestSanitizeFailureStripsHyphenLookalikes(t *testing.T) {
 		t.Fatalf("operator reason changed: %q", got)
 	}
 }
+
+func TestSanitizeFailureStripsEmDashes(t *testing.T) {
+	secret := "code-verifier12"
+	em := "code\u2014verifier12"
+	bar := "code\u2015verifier12"
+	vertical := "code\ufe31verifier12"
+	refresh := "rt_sub-mitted_123456"
+	marked := "rt_sub\u2014mitted_123456"
+	got := SanitizeFailure("rejected "+em+" "+bar+" "+vertical+" "+marked+" later", secret)
+	for _, leaked := range []string{secret, em, bar, vertical, refresh, marked, "verifier12", "mitted_123456"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"re\u2014try later", "re\u2015try later", "re\ufe31try later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("dash prose changed: %q -> %q", prose, got)
+		}
+	}
+}
