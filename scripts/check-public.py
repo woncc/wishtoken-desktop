@@ -850,6 +850,32 @@ def segmented_digit(cp):
         return chr(cp - 0x1FBF0 + ord('0'))
     return None
 
+
+def roman_ascii(cp):
+    # Roman numerals that NFKC-fold to one ASCII letter. Additive numerals
+    # expand to more than one letter and stay out. Archaic thousand signs
+    # do not fold to ASCII.
+    return {
+        0x2160: 'I', 0x2164: 'V', 0x2169: 'X', 0x216C: 'L',
+        0x216D: 'C', 0x216E: 'D', 0x216F: 'M',
+        0x2170: 'i', 0x2174: 'v', 0x2179: 'x', 0x217C: 'l',
+        0x217D: 'c', 0x217E: 'd', 0x217F: 'm',
+    }.get(cp)
+
+
+def additive_roman(cp):
+    # Roman numerals that NFKC expands to more than one ASCII letter.
+    # Single-letter numerals are folded by roman_ascii. Archaic thousand
+    # signs and late forms do not fold to ASCII letters.
+    return {
+        0x2161: 'II', 0x2162: 'III', 0x2163: 'IV', 0x2165: 'VI',
+        0x2166: 'VII', 0x2167: 'VIII', 0x2168: 'IX',
+        0x216A: 'XI', 0x216B: 'XII',
+        0x2171: 'ii', 0x2172: 'iii', 0x2173: 'iv', 0x2175: 'vi',
+        0x2176: 'vii', 0x2177: 'viii', 0x2178: 'ix',
+        0x217A: 'xi', 0x217B: 'xii',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -918,6 +944,22 @@ def fold_content(data):
         mapped = segmented_digit(cp)
         if mapped is not None:
             out.append(mapped)
+            changed = True
+            continue
+        # Single-letter roman numerals NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split. Additive
+        # numerals expand to more than one letter and stay out.
+        mapped = roman_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Additive roman numerals expand to more than one ASCII letter.
+        # This pass does not run NFKC, so a token written with them stayed
+        # split. One numeral is not long enough to spell a token by itself.
+        expanded = additive_roman(cp)
+        if expanded is not None:
+            out.append(expanded)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1410,14 +1452,13 @@ def self_test():
     mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
     mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
     mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
-    mod_roman = ('sk-' + 'a' * 10 + '\u2160' + 'a' * 20).encode()
     if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
         raise SystemExit('self-test failed: a modifier token was not detected')
     if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a modifier key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(mod_path):
         raise SystemExit('self-test failed: a modifier personal path was not detected')
-    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary modifier text was blocked')
     if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
         raise SystemExit('self-test failed: segmented digit fold is wrong')
@@ -1430,6 +1471,34 @@ def self_test():
         raise SystemExit('self-test failed: a segmented digit secret was not detected')
     if content_reasons('see \U0001fbf0 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2474' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2488' + 'a' * 20).encode()) or content_reasons(('rt_' + '\U0001fbf0' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary segmented text was blocked')
+    if roman_ascii(0x215F) is not None or roman_ascii(0x2160) != 'I' or roman_ascii(0x2161) is not None or roman_ascii(0x2164) != 'V' or roman_ascii(0x2169) != 'X' or roman_ascii(0x216C) != 'L' or roman_ascii(0x216D) != 'C' or roman_ascii(0x216E) != 'D' or roman_ascii(0x216F) != 'M' or roman_ascii(0x2170) != 'i' or roman_ascii(0x2171) is not None or roman_ascii(0x2174) != 'v' or roman_ascii(0x2179) != 'x' or roman_ascii(0x217C) != 'l' or roman_ascii(0x217D) != 'c' or roman_ascii(0x217E) != 'd' or roman_ascii(0x217F) != 'm' or roman_ascii(0x2180) is not None or roman_ascii(0x2183) is not None:
+        raise SystemExit('self-test failed: roman numeral fold is wrong')
+    if sum(roman_ascii(cp) is not None for cp in range(0x2150, 0x2190)) != 14:
+        raise SystemExit('self-test failed: roman numeral fold count is wrong')
+    roman_token = ('sk-' + '\u2170' * 30).encode()
+    roman_upper = ('ghp_' + '\u2164' * 30).encode()
+    roman_key = ('-----BEGIN OPENSSH PR' + '\u2160' + 'VATE KEY-----').encode()
+    roman_jwt = ('eyJ' + '\u2170' * 25 + '.' + '\u2174' * 30 + '.' + '\u2179' * 15).encode()
+    roman_path = ('\u216d' + ':/Users/Mayn/project').encode()
+    if content_reasons(roman_token) != ['secret token literal'] or content_reasons(roman_upper) != ['secret token literal']:
+        raise SystemExit('self-test failed: a roman token was not detected')
+    if content_reasons(roman_key) != ['private key'] or content_reasons(roman_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a roman key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(roman_path):
+        raise SystemExit('self-test failed: a roman personal path was not detected')
+    if content_reasons('chapter \u2160 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2170' * 10).encode()) or content_reasons(('-----BEGIN ' + '\u216d' + 'ERTIFICATE-----').encode()):
+        raise SystemExit('self-test failed: ordinary roman text was blocked')
+    if additive_roman(0x2161) != 'II' or additive_roman(0x2162) != 'III' or additive_roman(0x2163) != 'IV' or additive_roman(0x2165) != 'VI' or additive_roman(0x2166) != 'VII' or additive_roman(0x2167) != 'VIII' or additive_roman(0x2168) != 'IX' or additive_roman(0x216A) != 'XI' or additive_roman(0x216B) != 'XII' or additive_roman(0x2171) != 'ii' or additive_roman(0x2172) != 'iii' or additive_roman(0x2173) != 'iv' or additive_roman(0x2175) != 'vi' or additive_roman(0x2176) != 'vii' or additive_roman(0x2177) != 'viii' or additive_roman(0x2178) != 'ix' or additive_roman(0x217A) != 'xi' or additive_roman(0x217B) != 'xii' or additive_roman(0x2160) is not None or additive_roman(0x2164) is not None or additive_roman(0x2170) is not None or additive_roman(0x2180) is not None or additive_roman(0x2185) is not None or additive_roman(0x2153) is not None:
+        raise SystemExit('self-test failed: additive roman fold is wrong')
+    if sum(additive_roman(cp) is not None for cp in range(0x2150, 0x2190)) != 18:
+        raise SystemExit('self-test failed: additive roman fold count is wrong')
+    add_token = ('rt_' + '\u2166' * 9).encode()
+    add_mix = ('sk-' + 'a' * 10 + '\u2161' + 'a' * 20).encode()
+    add_jwt = ('eyJ' + '\u2177' * 7 + '.' + '\u2176' * 10 + '.' + '\u2175' * 8).encode()
+    if content_reasons(add_token) != ['secret token literal'] or content_reasons(add_mix) != ['secret token literal'] or content_reasons(add_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: an additive roman secret was not detected')
+    if content_reasons('see \u2161 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2185' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2166' * 2).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2153' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary additive roman text was blocked')
 
 def main():
     self_test()
