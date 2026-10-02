@@ -397,6 +397,14 @@ SEPARATOR_LIKE = {
     ord('\u1735'): '/',
     ord('\u2571'): '/',
     ord('\u2572'): '/',
+    # Short box-drawing diagonals are those strokes cut in half. None of
+    # them NFKC-fold to a slash, but each one still splits the next
+    # component. The diagonal cross, the chevron diagonals, and the
+    # negative diagonal stay out.
+    ord('\U0001fba0'): '/',
+    ord('\U0001fba1'): '/',
+    ord('\U0001fba2'): '/',
+    ord('\U0001fba3'): '/',
     ord('\u27cb'): '/',
     ord('\u27cd'): '/',
     # The caret insertion point does not NFKC-fold to a slash, but it is
@@ -1730,7 +1738,7 @@ def self_test():
         raise SystemExit('self-test failed: a colon-lookalike personal path was not detected')
     if content_reasons('see \u2236 later'.encode()) or content_reasons('see \u0903 later'.encode()) or content_reasons('C\u2236/Users/other'.encode()) or content_reasons('C\u2025/Users/Mayn'.encode()) or content_reasons(('sk-' + '\u2236' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0903' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary colon text was blocked')
-    if len(SEPARATOR_LIKE) != 86 or SEPARATOR_LIKE[0x00A5] != '/' or SEPARATOR_LIKE[0x20A9] != '/' or SEPARATOR_LIKE[0x2215] != '/' or SEPARATOR_LIKE[0x2216] != '/' or SEPARATOR_LIKE[0x2044] != '/' or SEPARATOR_LIKE[0xFE68] != '/' or SEPARATOR_LIKE[0x00BC] != '/' or SEPARATOR_LIKE[0xFF0F] != '/' or SEPARATOR_LIKE[0xFF3C] != '/' or SEPARATOR_LIKE.get(ord('/')) is not None or SEPARATOR_LIKE.get(0x2025) is not None:
+    if len(SEPARATOR_LIKE) != 90 or SEPARATOR_LIKE[0x00A5] != '/' or SEPARATOR_LIKE[0x20A9] != '/' or SEPARATOR_LIKE[0x2215] != '/' or SEPARATOR_LIKE[0x2216] != '/' or SEPARATOR_LIKE[0x2044] != '/' or SEPARATOR_LIKE[0xFE68] != '/' or SEPARATOR_LIKE[0x00BC] != '/' or SEPARATOR_LIKE[0xFF0F] != '/' or SEPARATOR_LIKE[0xFF3C] != '/' or SEPARATOR_LIKE.get(ord('/')) is not None or SEPARATOR_LIKE.get(0x2025) is not None:
         raise SystemExit('self-test failed: slash lookalike table is wrong')
     slash_yen = 'C:\u00a5Users\u00a5Mayn'.encode()
     slash_won = 'D:\u20a9Git_Project\u20a9kawang'.encode()
@@ -1746,9 +1754,13 @@ def self_test():
     slash_circled = 'C:\u2298Users\u2298Mayn'.encode()
     slash_circled_back = 'C:\u29b8Users\u29b8kawang'.encode()
     slash_apl_circle = 'C:\u2349Users\u2349kawang'.encode()
-    if any('personal Windows path' not in content_reasons(item) for item in (slash_yen, slash_won, slash_div, slash_set, slash_small, slash_frac, slash_wide, slash_apl, slash_apl_back, slash_quad, slash_quad_back, slash_circled, slash_circled_back, slash_apl_circle)):
+    slash_short = 'C:\U0001fba0Users\U0001fba0Mayn'.encode()
+    slash_short_back = 'D:\U0001fba1Git_Project\U0001fba1kawang'.encode()
+    slash_short_lower = 'C:\U0001fba2Users\U0001fba2rain'.encode()
+    slash_short_rise = 'C:\U0001fba3Users\U0001fba3gptbridge'.encode()
+    if any('personal Windows path' not in content_reasons(item) for item in (slash_yen, slash_won, slash_div, slash_set, slash_small, slash_frac, slash_wide, slash_apl, slash_apl_back, slash_quad, slash_quad_back, slash_circled, slash_circled_back, slash_apl_circle, slash_short, slash_short_back, slash_short_lower, slash_short_rise)):
         raise SystemExit('self-test failed: a slash-lookalike personal path was not detected')
-    if content_reasons('see \u00a5 later'.encode()) or content_reasons('see \u3031 later'.encode()) or content_reasons('see \u3035 later'.encode()) or content_reasons('see \u30ce later'.encode()) or content_reasons('about \u00bc later'.encode()) or content_reasons('see \u233f later'.encode()) or content_reasons('see \u2340 later'.encode()) or content_reasons('see \u2341 later'.encode()) or content_reasons('see \u2342 later'.encode()) or content_reasons('see \u2298 later'.encode()) or content_reasons('see \u29b8 later'.encode()) or content_reasons('see \u2349 later'.encode()) or content_reasons('see \u20e0 later'.encode()) or content_reasons('C:\u2349Users\u2349other'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2349' + 'a' * 20).encode()) or content_reasons('see \u2a38 later'.encode()) or content_reasons('C:\u2298Users\u2298other'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2298' + 'a' * 20).encode()) or content_reasons('C:\u2215Users\u2215other'.encode()) or content_reasons('C:\u2215tmp\u2215Mayn'.encode()) or content_reasons('C:\u233fUsers\u233fother'.encode()) or content_reasons(('sk-' + '\u2215' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u00a5' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u233f' + 'a' * 20).encode()):
+    if content_reasons('see \u00a5 later'.encode()) or content_reasons('see \u3031 later'.encode()) or content_reasons('see \u3035 later'.encode()) or content_reasons('see \u30ce later'.encode()) or content_reasons('about \u00bc later'.encode()) or content_reasons('see \u233f later'.encode()) or content_reasons('see \u2340 later'.encode()) or content_reasons('see \u2341 later'.encode()) or content_reasons('see \u2342 later'.encode()) or content_reasons('see \u2298 later'.encode()) or content_reasons('see \u29b8 later'.encode()) or content_reasons('see \u2349 later'.encode()) or content_reasons('see \u20e0 later'.encode()) or content_reasons('C:\u2349Users\u2349other'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2349' + 'a' * 20).encode()) or content_reasons('see \u2a38 later'.encode()) or content_reasons('C:\u2298Users\u2298other'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2298' + 'a' * 20).encode()) or content_reasons('C:\u2215Users\u2215other'.encode()) or content_reasons('C:\u2215tmp\u2215Mayn'.encode()) or content_reasons('C:\u233fUsers\u233fother'.encode()) or content_reasons(('sk-' + '\u2215' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u00a5' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u233f' + 'a' * 20).encode()) or content_reasons('see \U0001fba0 later'.encode()) or content_reasons('see \u2573 later'.encode()) or content_reasons('see \U0001fba4 later'.encode()) or content_reasons('see \U0001fbbe later'.encode()) or content_reasons('C:\U0001fba0Users\U0001fba0other'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\U0001fba0' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary slash text was blocked')
 
 def main():
