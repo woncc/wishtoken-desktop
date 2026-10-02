@@ -576,11 +576,12 @@ function htmlProxyChar(cp) {
   // letters that fold to one ASCII letter do too, and so do superscript and
   // subscript letters, roman numerals that fold to one letter,
   // mathematical letters, enclosed letters, outlined capitals, outlined
-  // digits, circled digits, and mathematical digits do too. A numeric
-  // reference has to yield the same character so the label fold can see it.
+  // digits, circled digits, mathematical digits, and segmented digits do
+  // too. A numeric reference has to yield the same character so the label
+  // fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp)) return char;
   if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -848,7 +849,7 @@ function foldLabelHyphens(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\uFF4Dproxy:7890" and "user:secret@ex\uFF41mple.com:8080"
-// keep the password. Segmented digits at U+1FBF0 stay as written.
+// keep the password. A circled number past one digit, such as U+2469, stays as written.
 function readEncodedFullwidthLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -884,8 +885,8 @@ function foldFullwidthLetters(text) {
 // host already allows those letters. Their literal, percent-encoded, and
 // numeric forms kept the password too. Otherwise
 // "user:secret@my\u24DCproxy:7890" and "user:secret@ex\u24D0mple.com:8080"
-// keep the password. Parenthesized letters and segmented digits at U+1FBF0
-// stay as written.
+// keep the password. Parenthesized letters stay as written. A circled number
+// past one digit, such as U+2469, stays as written.
 function readEncodedCircledLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -925,7 +926,7 @@ function foldCircledLetters(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u212Aproxy:7890" and "user:secret@ex\u2139mple.com:8080"
 // keep the password. Symbols that expand to more than one character, such
-// as U+2121, stay as written. Segmented digits at U+1FBF0 stay as written.
+// as U+2121, stay as written. A circled number past one digit, such as U+2469, stays as written.
 const LETTERLIKE_ASCII = {
   '\u2102': 'C',
   '\u210A': 'g',
@@ -999,7 +1000,7 @@ function foldLetterlikeLetters(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u017Fproxy:7890" and "user:secret@ex\u00AAmple.com:8080"
-// keep the password. The micro sign and segmented digits at U+1FBF0 stay as written.
+// keep the password. The micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
 const LATIN_COMPAT_ASCII = {
   '\u00AA': 'a',
   '\u00BA': 'o',
@@ -1047,8 +1048,8 @@ function foldLatinCompatLetters(text) {
 // and numeric forms kept the password too. Otherwise
 // "user:secret@my\u02B0proxy:7890" and "user:secret@ex\u1D43mple.com:8080"
 // keep the password. U+107A5 is the supplementary small q. A modifier letter
-// that expands past one ASCII letter stays as written. The micro sign and
-// segmented digits at U+1FBF0 stay as written.
+// that expands past one ASCII letter stays as written. The micro sign stays
+// as written. A circled number past one digit, such as U+2469, stays as written.
 const MODIFIER_LETTER_ASCII = new Map([
   [0x02B0, 'h'],
   [0x02B2, 'j'],
@@ -1151,7 +1152,7 @@ function foldModifierLetters(text) {
 // letters. Their literal, percent-encoded, and numeric forms kept the
 // password. Otherwise "user:secret@my\u2071proxy:7890" and
 // "user:secret@ex\u2090mple.com:8080" keep the password. Superscript digits
-// are already port digits. The micro sign and segmented digits at U+1FBF0 stay as written.
+// are already port digits. The micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
 const SUP_SUB_LETTER_ASCII = new Map([
   [0x1D62, 'i'],
   [0x1D63, 'r'],
@@ -1226,7 +1227,7 @@ function foldSupSubLetters(text) {
 // Otherwise "user:secret@my\u2160proxy:7890" and
 // "user:secret@ex\u2170mple.com:8080" keep the password. A numeral that
 // expands to more than one letter, such as U+2161, stays as written. The
-// micro sign and segmented digits at U+1FBF0 stay as written.
+// micro sign stays as written. A circled number past one digit, such as U+2469, stays as written.
 const ROMAN_LETTER_ASCII = new Map([
   [0x2160, 'I'],
   [0x2164, 'V'],
@@ -1294,8 +1295,8 @@ function foldRomanLetters(text) {
 // host letters too. U+1D400 folds to "A" and U+1D433 folds to "z". The italic
 // h hole at U+1D455 is not a letter. Their literal, percent-encoded, and
 // numeric forms kept the password. Otherwise a bold or monospace letter
-// inside the host keeps the password. Greek mathematical letters stay as written. Segmented digits
-// at U+1FBF0 stay as written.
+// inside the host keeps the password. Greek mathematical letters stay as written. A circled
+// number past one digit, such as U+2469, stays as written.
 const MATH_LETTER_RANGES = [
   [0x1D400, 0x1D419, 0x41],
   [0x1D41A, 0x1D433, 0x61],
@@ -1394,7 +1395,7 @@ function foldMathLetters(text) {
 // U+1F130 through U+1F149 are the squared capitals. U+1F12B and U+1F12C are
 // the circled italic C and R. Their literal, percent-encoded, and numeric
 // forms kept the password. Otherwise "user:secret@my\u{1F130}proxy:7890"
-// keeps the password. Segmented digits at U+1FBF0 stay as written.
+// keeps the password. A circled number past one digit, such as U+2469, stays as written.
 const ENCLOSED_LETTER_RANGES = [
   [0x1F12B, 0x1F12B, 0x43],
   [0x1F12C, 0x1F12C, 0x52],
@@ -1454,8 +1455,8 @@ function foldEnclosedLetters(text) {
 // single-label or dotted host already allows those letters. Their literal,
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u{1CCD6}proxy:7890" and
-// "user:secret@ex\u{1CCD6}mple.com:8080" keep the password. Segmented digits
-// at U+1FBF0 stay as written.
+// "user:secret@ex\u{1CCD6}mple.com:8080" keep the password. A circled number
+// past one digit, such as U+2469, stays as written.
 function outlinedLetterAscii(cp) {
   if (cp >= 0x1CCD6 && cp <= 0x1CCEF) return String.fromCharCode(0x41 + (cp - 0x1CCD6));
   return '';
@@ -1507,8 +1508,8 @@ function foldOutlinedLetters(text) {
 // host, a dotted host, a numeric host, and a port already allow those digits.
 // Their literal, percent-encoded, and numeric forms kept the password too.
 // Otherwise "user:secret@my\u{1CCF0}proxy:7890" and
-// "user:secret@ex\u{1CCF1}ample.com:8080" keep the password. Segmented digits
-// at U+1FBF0 stay as written.
+// "user:secret@ex\u{1CCF1}ample.com:8080" keep the password. A circled number
+// past one digit, such as U+2469, stays as written.
 function outlinedDigitAscii(cp) {
   if (cp >= 0x1CCF0 && cp <= 0x1CCF9) return String.fromCharCode(0x30 + (cp - 0x1CCF0));
   return '';
@@ -1561,8 +1562,7 @@ function foldOutlinedDigits(text) {
 // those digits. Their literal, percent-encoded, and numeric forms kept the
 // password too. Otherwise "user:secret@my\u24EAproxy:7890" and
 // "user:secret@ex\u2460ample.com:8080" keep the password. A circled number
-// that expands past one digit, such as U+2469, stays as written. Segmented
-// digits at U+1FBF0 stay as written.
+// that expands past one digit, such as U+2469, stays as written.
 function circledDigitAscii(cp) {
   if (cp === 0x24EA) return '0';
   if (cp >= 0x2460 && cp <= 0x2468) return String.fromCharCode(0x31 + (cp - 0x2460));
@@ -1610,8 +1610,8 @@ function foldCircledDigits(text) {
 // host, a dotted host, a numeric host, and a port already allow those digits.
 // Their literal, percent-encoded, and numeric forms kept the password too.
 // Otherwise "user:secret@my\u{1D7CE}proxy:7890" and
-// "user:secret@ex\u{1D7CF}ample.com:8080" keep the password. Segmented digits
-// at U+1FBF0 stay as written.
+// "user:secret@ex\u{1D7CF}ample.com:8080" keep the password. A circled number
+// past one digit, such as U+2469, stays as written.
 function mathDigitAscii(cp) {
   if (cp >= 0x1D7CE && cp <= 0x1D7FF) return String.fromCharCode(0x30 + ((cp - 0x1D7CE) % 10));
   return '';
@@ -1659,8 +1659,61 @@ function foldMathDigits(text) {
   }
   return out;
 }
+// Segmented digits U+1FBF0..U+1FBF9 fold to 0-9 under NFKC. A single-label
+// host, a dotted host, a numeric host, and a port already allow those digits.
+// Their literal, percent-encoded, and numeric forms kept the password too.
+// Otherwise "user:secret@my\u{1FBF0}proxy:7890" and
+// "user:secret@ex\u{1FBF1}ample.com:8080" keep the password. A circled number
+// past one digit, such as U+2469, stays as written.
+function segmentedDigitAscii(cp) {
+  if (cp >= 0x1FBF0 && cp <= 0x1FBF9) return String.fromCharCode(0x30 + (cp - 0x1FBF0));
+  return '';
+}
+function isSegmentedDigit(cp) {
+  return segmentedDigitAscii(cp) !== '';
+}
+function readEncodedSegmentedDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 4; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xF0 || lead > 0xF4) return null;
+  for (let count = 1; count < 4; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isSegmentedDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedSegmentedDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedSegmentedDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldSegmentedDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += segmentedDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
 function redactProxyCredentials(text) {
-  const decoded = foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))));
+  const decoded = foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
