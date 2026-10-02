@@ -360,12 +360,12 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Mathematical
-	// alphanumeric symbols and fullwidth letters and digits are folded
-	// first. Then drop marks. Spacing marks shaped like full stops keep
-	// both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(secret))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(pieces))))
+	// token together and miss the stored ASCII byte. Enclosed letters and
+	// digits, mathematical alphanumeric symbols, and fullwidth letters and
+	// digits are folded first. Then drop marks. Spacing marks shaped like
+	// full stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(secret)))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(pieces)))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -782,6 +782,78 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldEnclosedPieces maps circled and squared Latin letters and digits to
+// ASCII. NFKC folds them, and this pass does not run NFKC, so a stored
+// token or a JWT written with those forms would stay visible. Circled
+// italic C and R are the only circled italic letters. Parenthesized
+// letters, circled numbers from ten up, digit full stops, negative circled
+// letters, and squared digraphs such as HV expand to more than one
+// character or do not fold, so they stay out. One output piece covers the
+// original rune.
+func foldEnclosedPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := enclosedASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldEnclosedString(s string) string {
+	if !enclosedFolded(s) {
+		return s
+	}
+	return renderPieces(foldEnclosedPieces(rawPieces(s)))
+}
+
+func enclosedFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := enclosedASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func enclosedASCII(r rune) (byte, bool) {
+	switch {
+	case r >= 0x2460 && r <= 0x2468:
+		return byte(r - 0x2460 + '1'), true
+	case r >= 0x24B6 && r <= 0x24CF:
+		return byte(r - 0x24B6 + 'A'), true
+	case r >= 0x24D0 && r <= 0x24E9:
+		return byte(r - 0x24D0 + 'a'), true
+	case r == 0x24EA:
+		return '0', true
+	case r == 0x1F12B:
+		return 'C', true
+	case r == 0x1F12C:
+		return 'R', true
+	case r >= 0x1F130 && r <= 0x1F149:
+		return byte(r - 0x1F130 + 'A'), true
 	default:
 		return 0, false
 	}
