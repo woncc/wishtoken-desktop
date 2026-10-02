@@ -83,8 +83,12 @@ func maskCredentialPatterns(detail string) string {
 	pieces := rawPieces(detail)
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
-		spans = append(spans, credentialPatternSpans(renderPieces(pieces), pieces)...)
-		if dropped := dropMarkPieces(pieces); len(dropped) != len(pieces) {
+		// Fold hyphen lookalikes before the ASCII token classes run, and
+		// before marks are dropped. A non-breaking hyphen is not itself a
+		// mark, but a spacing mark shaped like one has to become '-' first.
+		folded := foldHyphenPieces(pieces)
+		spans = append(spans, credentialPatternSpans(renderPieces(folded), folded)...)
+		if dropped := dropMarkPieces(folded); len(dropped) != len(folded) {
 			rendered := renderPieces(dropped)
 			spans = append(spans, credentialPatternSpans(rendered, dropped)...)
 			spans = append(spans, gluedBearerSpans(rendered, dropped)...)

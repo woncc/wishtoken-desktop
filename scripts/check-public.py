@@ -166,6 +166,28 @@ COLON_LIKE = {
     ord('\u2237'): ':',
     ord('\u2e2c'): ':',
 }
+# These do not NFKC-fold to '-'. Non-breaking hyphen folds to U+2010, and
+# small em dash folds to an em dash, so both are listed. Arabic full stop is
+# already a dot above; skeletoning it as a hyphen would hide auth.json.
+# Batak panongonan and the Tai Laing tone mark are spacing marks, so they
+# have to be folded before those marks are stripped.
+HYPHEN_LIKE = {
+    ord('\u2010'): '-',
+    ord('\u2011'): '-',
+    ord('\u2012'): '-',
+    ord('\u2013'): '-',
+    ord('\uFE58'): '-',
+    ord('\u2043'): '-',
+    ord('\u02D7'): '-',
+    ord('\u2212'): '-',
+    ord('\u2796'): '-',
+    ord('\U00010191'): '-',
+    ord('\u2CBA'): '-',
+    ord('\u2CBB'): '-',
+    ord('\u174D'): '-',
+    ord('\u1BF3'): '-',
+    ord('\uAA7D'): '-',
+}
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
     '.swp', '.swo', '.swn', '.tmp',
@@ -206,15 +228,17 @@ def strip_marks(value):
     return ''.join(ch for ch in value if unicodedata.category(ch) not in {'Mn', 'Me', 'Mc'})
 
 def fold_separators(value, separators):
-    # Colon and dot lookalikes are translated before marks are removed.
+    # Colon, dot, and hyphen lookalikes are translated before marks are removed.
     # The musical augmentation dot is a spacing mark and must stay a dot.
     # Ogham space is the only space separator that does not NFKC-fold to
     # ASCII space, so a trailing mark would otherwise hide id_rsa.
+    # A spacing mark shaped like a hyphen has to become '-' before it is
+    # stripped, or launch-history.json collapses into one word.
     value = value.replace('\u1680', ' ')
-    value = value.translate(COLON_LIKE).translate(DOT_LIKE).translate(separators)
+    value = value.translate(COLON_LIKE).translate(DOT_LIKE).translate(HYPHEN_LIKE).translate(separators)
     value = strip_marks(value)
     value = unicodedata.normalize('NFKC', value)
-    value = value.translate(DOT_LIKE).translate(separators).translate(COLON_LIKE)
+    value = value.translate(DOT_LIKE).translate(separators).translate(COLON_LIKE).translate(HYPHEN_LIKE)
     value = strip_marks(value)
     return value
 
@@ -483,6 +507,12 @@ def self_test():
         'nested/state.sqlite3-wal', 'CACHE.SQLITE3-SHM', 'app.sqlite3-journal',
         'vault.db-wal', 'vault.db-shm', 'vault.db-journal',
         'Copy of cache.sqlite-wal', 'state.sqlite-wal.txt', 'nested/vault.db-shm/extra.txt',
+        'launch\u2010history.json', 'cache.sqlite\u2011wal', 'vault.db\u2212journal',
+        'cockpit\u2013integration.json', 'bridge\u2012identity.json', 'nested/state.sqlite3\ufe58shm',
+        'sub2api\u2043account-1.json', 'handoff\u02d7notes.txt', 'config.toml.bak\u2796date',
+        'codex_instances.json.gptbridge\U00010191backup-1', 'Copy of cache.sqlite\u2cbbwal',
+        'launch\u1bf3history.json', 'cockpit\uaa7dprocess.json', 'nested/vault.db\u2cbashm/extra.txt',
+        'auth.json.gptbridge\u174dbackup-1',
         'accounts.json.bak3', 'auth.json.backup2', 'credentials.json.1', '._auth.json',
         '._accounts.json', 'auth.json.~1~', 'auth.json~1', 'id_rsa.old2', 'tokens.json.orig2',
         'config.json.save1', 'home/.netrc.bak3', 'Copy of auth.json', 'auth (1).json',
@@ -674,6 +704,8 @@ def self_test():
         'readme\u1680md',
         'notes\u093e.txt', 'script\u093e.go', 'id_rsa\u093e.pub', 'readme\u302e.md',
         'models\u302f.json', 'notes\u0bbereadme.txt',
+        'notes\u2010readme.txt', 'au\u2010th.json', 'script.go\u2212extra',
+        'readme\u2014md', 'auth\u174djson',
     )
     for rel in blocked:
         if not path_reason(rel):

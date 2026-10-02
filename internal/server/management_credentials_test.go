@@ -288,3 +288,35 @@ func TestManagementHidesJSONEscapedOAuthSecrets(t *testing.T) {
 		t.Fatalf("log context lost: %s", out)
 	}
 }
+
+func TestManagementHidesSecretsSplitByHyphens(t *testing.T) {
+	refresh := "rt_display-123456789"
+	hyphen := "rt_display\u2010" + "123456789"
+	encoded := "rt_display%E2%80%91123456789"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = refresh
+	acc.Name = "note " + hyphen
+	acc.LastError = "rejected " + hyphen
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	for _, leaked := range []string{refresh, hyphen, "display-123456789", "123456789"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	bodyBytes := []byte(`{"note":"see ` + hyphen + ` and ` + encoded + `","access_token":"` + acc.AccessToken + `"}`)
+	out := string(f.srv.redactManagementBody(bodyBytes))
+	for _, leaked := range []string{refresh, hyphen, encoded, acc.AccessToken, "123456789"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}
