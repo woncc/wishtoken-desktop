@@ -2881,3 +2881,76 @@ func TestQuotationASCIIFoldsOnlyQuotationMarks(t *testing.T) {
 		t.Fatalf("quotation fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCompatibilityColons(t *testing.T) {
+	secret := "code:ver:1"
+	vertical := strings.NewReplacer(":", "\uFE13").Replace(secret)
+	small := strings.NewReplacer(":", "\uFE55").Replace(secret)
+	full := strings.NewReplacer(":", "\uFF1A").Replace(secret)
+	encoded := strings.NewReplacer(":", "%EF%BC%9A").Replace(secret)
+	got := SanitizeFailure("rejected "+full+" "+encoded+" later", secret)
+	for _, item := range []string{secret, full, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+vertical+" "+small+" later", secret)
+	for _, item := range []string{secret, vertical, small, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("small leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2236 later",
+		"see \u02D0 later",
+		"see \uA789 later",
+		"see \uFE30 later",
+		"see \u1804 later",
+		"see \u0589 later",
+		"path \uFF1A file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("colon prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestColonASCIIFoldsOnlyCompatibilityColons(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE13, ':', true},
+		{0xFE55, ':', true},
+		{0xFF1A, ':', true},
+		{':', 0, false},
+		{0x2236, 0, false},
+		{0x02D0, 0, false},
+		{0x02D1, 0, false},
+		{0xA789, 0, false},
+		{0xFE30, 0, false},
+		{0x1804, 0, false},
+		{0x0589, 0, false},
+		{0x205A, 0, false},
+		{0xFF1B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := colonASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := colonASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("colon fold count %d", n)
+	}
+}
