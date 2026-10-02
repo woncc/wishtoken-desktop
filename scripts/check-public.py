@@ -346,6 +346,8 @@ SEPARATOR_LIKE = {
     # to a slash, but each one still splits the next component.
     ord('\U0001f67c'): '/',
     ord('\U0001f67d'): '/',
+    # The dotted solidus does not NFKC-fold to a slash either.
+    ord('\u2e4a'): '/',
 }
 
 def normalized_rel(rel):
@@ -551,6 +553,8 @@ def self_test():
         'nested/id_rsa\U0001d23bx', 'Diagnostics\u3033capture.png', 'tokens.json\U0001d23aextra.txt',
         'auth.json\U0001f67csecret.txt', 'credentials\U0001f67dtoken.txt', 'notes\U0001f67cid_rsa',
         'nested/id_rsa\U0001f67dx', 'Diagnostics\U0001f67ccapture.png', 'tokens.json\U0001f67dextra.txt',
+        'auth.json\u2e4asecret.txt', 'credentials\u2e4atoken.txt', 'notes\u2e4aid_rsa',
+        'nested/id_rsa\u2e4ax', 'Diagnostics\u2e4acapture.png', 'tokens.json\u2e4aextra.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -620,6 +624,8 @@ def self_test():
         'models.json\U0001d23breadme.txt',
         'notes\U0001f67creadme.txt', 'script.go\U0001f67dZone.Identifier', 'id_rsa.pub\U0001f67cfoo.txt',
         'models.json\U0001f67dreadme.txt',
+        'notes\u2e4areadme.txt', 'script.go\u2e4aZone.Identifier', 'id_rsa.pub\u2e4afoo.txt',
+        'models.json\u2e4areadme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
