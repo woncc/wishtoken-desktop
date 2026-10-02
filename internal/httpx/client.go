@@ -135,7 +135,7 @@ func Redact(raw string) string {
 }
 
 // splitEncodedPassword finds a colon hidden by one or more layers of percent
-// encoding, including a compatibility colon such as the fullwidth form.
+// encoding, including a compatibility colon or another colon lookalike.
 // The decoded username and password are returned separately.
 func splitEncodedPassword(userinfo string) (string, string, bool) {
 	decoded := userinfo
@@ -153,17 +153,26 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 	return name, secret, true
 }
 
-// foldUserinfoColons maps colon characters that NFKC folds to ASCII ':'.
-// The Go core has no Unicode normalization dependency, so the three
-// compatibility colons are listed directly.
+// foldUserinfoColons maps colon characters that can conceal a proxy password.
+// NFKC folds the three compatibility colons to ASCII ':'. Ratio, modifier,
+// Syriac, and Armenian lookalikes do not, but they still divide userinfo.
+// The Go core has no Unicode normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	if !strings.ContainsAny(s, "\ufe13\ufe55\uff1a") {
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\ua789\u02f8\u0703\u0704\u0589"
+	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
 	return strings.NewReplacer(
 		"\ufe13", ":",
 		"\ufe55", ":",
 		"\uff1a", ":",
+		"\u2236", ":",
+		"\u02d0", ":",
+		"\ua789", ":",
+		"\u02f8", ":",
+		"\u0703", ":",
+		"\u0704", ":",
+		"\u0589", ":",
 	).Replace(s)
 }
 
