@@ -384,8 +384,9 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 }
 
 // dropMarkPieces removes characters that do not add a base letter: variation
-// selectors and other nonspacing or enclosing marks, format characters such
-// as zero-width spaces, controls other than ordinary spacing, blank fillers,
+// selectors, nonspacing and enclosing marks, spacing combining marks such as
+// vowel signs and Hangul tone marks, format characters such as zero-width
+// spaces, controls other than ordinary spacing, blank fillers,
 // and Unicode spaces other than ASCII space. Hangul fillers and the braille
 // blank pattern have no ink. U+3164 and U+FFA0 fold to U+1160 under NFKC and
 // stay letters, so a category check never drops them. Ogham space is a real
@@ -417,7 +418,10 @@ func ignorableCredentialRune(r rune) bool {
 	if r == utf8.RuneError {
 		return false
 	}
-	if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Cf, r) {
+	// Spacing combining marks sit beside a letter without becoming one.
+	// Visarga is also a colon lookalike, but proxy redaction folds that shape
+	// before this pass. Left in place, a vowel sign hides the token.
+	if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Mc, r) || unicode.Is(unicode.Cf, r) {
 		return true
 	}
 	if unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
