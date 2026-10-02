@@ -50,7 +50,36 @@ const SECRET_TEXT = [
 const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
-const proxyPort = '(?::|%3[Aa])';
+// Compatibility colons and other colon-shaped marks still divide userinfo.
+// U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
+// U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
+// Percent-encoding of those UTF-8 bytes, including extra %25 layers, and a
+// nested ASCII colon such as %253A, are separators as well. A lookalike in
+// the port is a separator too, or the same mark before the port keeps the password.
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589'];
+function percentColon(char) {
+  return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
+    const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
+    return `%${hex.toUpperCase().split('').map(cls).join('')}`;
+  });
+}
+function nestPercent(pattern, extra) {
+  let out = pattern;
+  for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
+  return out;
+}
+function colonSeparator() {
+  const parts = [':', '%3[Aa]', '%25(?:25){0,2}3[Aa]'];
+  for (const char of COLON_CHARS) {
+    parts.push(char);
+    const encoded = percentColon(char);
+    for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
+  }
+  return `(?:${parts.join('|')})`;
+}
+const COLON_SEP = colonSeparator();
+const SCHEME_USER = '[^\\s/?#:@' + COLON_CHARS.join('') + ']+';
+const proxyPort = COLON_SEP;
 const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
 const PROXY_HOST = '(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|' + numericLabel + '(?:\\.' + numericLabel + '){3})(?:' + proxyPort + '\\d+)?|(?:' + numericLabel + '(?:\\.' + numericLabel + '){0,2}|\\d{4,10}|[A-Za-z][A-Za-z0-9_-]*)' + proxyPort + '\\d{2,5})(?=$|' + PROXY_TAIL + ')';
 function noteSecret(secrets, secret) {
@@ -65,21 +94,22 @@ function redactProxyCredentials(text) {
   // / ? # inside a password would end a real URL authority. Only the schemeless
   // pass can consume them, and a slash there cannot start "//" or it would eat
   // the scheme of "http://user@host".
-  const sep = '(?::|%3[Aa])';
+  const sep = COLON_SEP;
+  const bareUser = PROXY_USER.slice(0, -1) + COLON_CHARS.join('') + ']';
   const at = '(?:@|%40)';
   const userinfo = String.raw`[^\s\/?#@]+(?:${at}[^\s\/?#@]+)*${at}`;
   // A later colon after / ? # means this match ran into the next credential
   // (host:port#user:secret). Reject that start so the inner password can match.
   const tightPiece = String.raw`(?:[^\s@/]|/(?!/))`;
-  const tightGuard = String.raw`(?![^\s@]*(?:[/?#])[^\s@]*:)`;
+  const tightGuard = String.raw`(?![^\s@]*(?:[/?#])[^\s@]*${COLON_SEP})`;
   const tightPassword = String.raw`(${tightGuard}${tightPiece}+(?:${at}${tightPiece}+)*)`;
   const tightSpaced = String.raw`(${tightGuard}(?:[^\s/]|/(?!/))*\s(?:[^\s/]|/(?!/)){0,200}?)`;
-  const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'gi');
-  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'gi');
-  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'g');
-  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
-  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${tightPassword}${at}(?=${PROXY_HOST})`, 'g');
-  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${tightSpaced}${at}(?=${PROXY_HOST})`, 'g');
+  const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)${SCHEME_USER}${sep}${userinfo}`, 'gi');
+  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)${SCHEME_USER}${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'gi');
+  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)${SCHEME_USER}${sep}${userinfo}`, 'g');
+  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)${SCHEME_USER}${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${bareUser}+${sep}${tightPassword}${at}(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${bareUser}+${sep}${tightSpaced}${at}(?=${PROXY_HOST})`, 'g');
   const secrets = [];
   // Schemeless matching runs first. A scheme pass stops at the first @, so
   // "user:p@ss/word@host" would otherwise keep the slash and the rest.
@@ -91,7 +121,7 @@ function redactProxyCredentials(text) {
     .replace(relative, '$1$2')
     .replace(relativeSpaced, '$1$2');
   if (!secrets.length) return text;
-  return text.replace(/invalid port ":([^"]*)"/g, (all, port) => {
+  return text.replace(new RegExp(`invalid port "(?:${sep})([^"]*)"`, 'g'), (all, port) => {
     const leaked = secrets.some(secret => secret === port || secret.startsWith(`${port}/`) || secret.startsWith(`${port}?`) || secret.startsWith(`${port}#`) || secret.startsWith(`${port}\\`));
     return leaked ? 'invalid port ":[凭据已隐藏]"' : all;
   });
