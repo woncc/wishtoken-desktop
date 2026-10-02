@@ -43,6 +43,9 @@ const SECRET_TEXT = [
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
 // A query, path, or fragment marker is a boundary too. Otherwise
 // "http://example.com/?x=user:secret@10.0.0.8:1080" keeps the password.
+// The same markers can sit inside the password. A URL parser rejects
+// "http://user:secret/token@10.0.0.8:1080", but the raw text, and the
+// "invalid port" fragment of that error, still contain the secret.
 // "=" and "&" are not part of the username, so a query key stays in place.
 const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉]';
@@ -50,28 +53,48 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 const proxyPort = '(?::|%3[Aa])';
 const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
 const PROXY_HOST = '(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|' + numericLabel + '(?:\\.' + numericLabel + '){3})(?:' + proxyPort + '\\d+)?|(?:' + numericLabel + '(?:\\.' + numericLabel + '){0,2}|\\d{4,10}|[A-Za-z][A-Za-z0-9_-]*)' + proxyPort + '\\d{2,5})(?=$|' + PROXY_TAIL + ')';
+function noteSecret(secrets, secret) {
+  if (secret) secrets.push(secret);
+}
 function redactProxyCredentials(text) {
   // %3A is a colon. user%3Apassword decodes to a password, but a username-only
   // check never sees a separator and would leave the secret in renderer text.
   // The same encoding hides a port in user:password@127.0.0.1%3A7890.
   // %40 is @. user:password%40host still carries the password when that is the
   // only terminator a literal-at check would look for.
+  // / ? # inside a password would end a real URL authority. Only the schemeless
+  // pass can consume them, and a slash there cannot start "//" or it would eat
+  // the scheme of "http://user@host".
   const sep = '(?::|%3[Aa])';
   const at = '(?:@|%40)';
   const userinfo = String.raw`[^\s\/?#@]+(?:${at}[^\s\/?#@]+)*${at}`;
+  // A later colon after / ? # means this match ran into the next credential
+  // (host:port#user:secret). Reject that start so the inner password can match.
+  const tightPiece = String.raw`(?:[^\s@/]|/(?!/))`;
+  const tightGuard = String.raw`(?![^\s@]*(?:[/?#])[^\s@]*:)`;
+  const tightPassword = String.raw`(${tightGuard}${tightPiece}+(?:${at}${tightPiece}+)*)`;
+  const tightSpaced = String.raw`(${tightGuard}(?:[^\s/]|/(?!/))*\s(?:[^\s/]|/(?!/)){0,200}?)`;
   const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'gi');
   const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'gi');
   const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'g');
   const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
-  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${userinfo}(?=${PROXY_HOST})`, 'g');
-  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
-  return text
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${tightPassword}${at}(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${tightSpaced}${at}(?=${PROXY_HOST})`, 'g');
+  const secrets = [];
+  // Schemeless matching runs first. A scheme pass stops at the first @, so
+  // "user:p@ss/word@host" would otherwise keep the slash and the rest.
+  text = text
+    .replace(bare, (_match, bound, secret) => { noteSecret(secrets, secret); return bound; })
+    .replace(bareSpaced, (_match, bound, secret) => { noteSecret(secrets, secret); return bound; })
     .replace(compact, '$1')
     .replace(spaced, '$1')
     .replace(relative, '$1$2')
-    .replace(relativeSpaced, '$1$2')
-    .replace(bare, '$1')
-    .replace(bareSpaced, '$1');
+    .replace(relativeSpaced, '$1$2');
+  if (!secrets.length) return text;
+  return text.replace(/invalid port ":([^"]*)"/g, (all, port) => {
+    const leaked = secrets.some(secret => secret === port || secret.startsWith(`${port}/`) || secret.startsWith(`${port}?`) || secret.startsWith(`${port}#`) || secret.startsWith(`${port}\\`));
+    return leaked ? 'invalid port ":[凭据已隐藏]"' : all;
+  });
 }
 function redactText(value) {
   let text = String(value);
