@@ -3101,3 +3101,288 @@ func TestSpaceASCIIFoldsOnlyCompatibilitySpaces(t *testing.T) {
 		t.Fatalf("space fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsLatinLigatures(t *testing.T) {
+	secret := "rt_Zz9qstaff7f3a"
+	st := strings.ReplaceAll(secret, "st", "\uFB06")
+	longST := strings.ReplaceAll(secret, "st", "\uFB05")
+	fiSecret := "officeToken12"
+	fi := strings.ReplaceAll(fiSecret, "fi", "\uFB01")
+	ffi := "o" + "\uFB03" + "ceToken12"
+	ij := "\u0133" + "TokenValue12"
+	encoded := strings.ReplaceAll(secret, "st", "%EF%AC%86")
+	fiEncoded := strings.ReplaceAll(fiSecret, "fi", "%EF%AC%81")
+	got := SanitizeFailure("rejected "+st+" "+longST+" "+fi+" "+ffi+" "+ij+" "+encoded+" "+fiEncoded+" later", secret, fiSecret, "officeToken12", "ijTokenValue12")
+	for _, item := range []string{secret, st, longST, fiSecret, fi, ffi, ij, encoded, fiEncoded, "ijTokenValue12", "Zz9q", "staff", "7f3a", "office", "Token12"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.officemore12"
+	markedJWT := strings.ReplaceAll(jwt, "fi", "\uFB01")
+	got = SanitizeFailure("rejected " + markedJWT + " later")
+	for _, item := range []string{jwt, markedJWT, "officemore12", "eyJ", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("jwt leaked %q in %q", item, got)
+		}
+	}
+	opaque := "staffToken12staffToken12tokenAb1"
+	markedOpaque := strings.ReplaceAll(opaque, "st", "\uFB06")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "staffToken12", "tokenAb1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	stored := strings.ReplaceAll(secret, "st", "\uFB05")
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, item := range []string{secret, stored, "Zz9q", "staff", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored ligature leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \uFB05 later",
+		"the \uFB01le stays",
+		"see \u2161 later",
+		"see \u2122 later",
+		"see \u3373 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("ligature prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestLigatureASCIIFoldsOnlyLatinLigatures(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x0132, "IJ"},
+		{0x0133, "ij"},
+		{0x01C7, "LJ"},
+		{0x01C8, "Lj"},
+		{0x01C9, "lj"},
+		{0x01CA, "NJ"},
+		{0x01CB, "Nj"},
+		{0x01CC, "nj"},
+		{0x01F1, "DZ"},
+		{0x01F2, "Dz"},
+		{0x01F3, "dz"},
+		{0xFB00, "ff"},
+		{0xFB01, "fi"},
+		{0xFB02, "fl"},
+		{0xFB03, "ffi"},
+		{0xFB04, "ffl"},
+		{0xFB05, "st"},
+		{0xFB06, "st"},
+	}
+	for _, check := range checks {
+		got, ok := ligatureASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'f', 'i', 0x017F, 0x2161, 0x2171, 0x2122, 0x2116, 0x3373, 0xFB07} {
+		if _, ok := ligatureASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := ligatureASCII(r); ok {
+			n++
+		}
+	}
+	if n != 18 {
+		t.Fatalf("ligature fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsAdditiveRomanNumerals(t *testing.T) {
+	secret := "rt_Zz9qVII7f3a"
+	seven := strings.ReplaceAll(secret, "VII", "\u2166")
+	eightSecret := "rt_Zz9qVIII7f3a"
+	eight := strings.ReplaceAll(eightSecret, "VIII", "\u2167")
+	lowerSecret := "rt_Zz9qviii7f3a"
+	lower := strings.ReplaceAll(lowerSecret, "viii", "\u2177")
+	encoded := strings.ReplaceAll(secret, "VII", "%E2%85%A6")
+	got := SanitizeFailure("rejected "+seven+" "+eight+" "+lower+" "+encoded+" later", secret, eightSecret, lowerSecret)
+	for _, item := range []string{secret, seven, eightSecret, eight, lowerSecret, lower, encoded, "Zz9q", "VII", "VIII", "viii", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.VIIValue12"
+	markedJWT := strings.ReplaceAll(jwt, "VII", "\u2166")
+	got = SanitizeFailure("rejected " + markedJWT + " later")
+	for _, item := range []string{jwt, markedJWT, "VIIValue12", "eyJ", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("jwt leaked %q in %q", item, got)
+		}
+	}
+	opaque := "VIIValue12VIIValue12VIIValue12ab"
+	markedOpaque := strings.ReplaceAll(opaque, "VII", "\u2166")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "VIIValue12"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	stored := strings.ReplaceAll(secret, "VII", "\u2166")
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, item := range []string{secret, stored, "Zz9q", "VII", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored numeral leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2161 later",
+		"see \u2166 later",
+		"archaic \u2180 later",
+		"late \u2185 later",
+		"chapter \u2160 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("roman prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestAdditiveRomanASCIIFoldsOnlyAdditiveNumerals(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2161, "II"},
+		{0x2162, "III"},
+		{0x2163, "IV"},
+		{0x2165, "VI"},
+		{0x2166, "VII"},
+		{0x2167, "VIII"},
+		{0x2168, "IX"},
+		{0x216A, "XI"},
+		{0x216B, "XII"},
+		{0x2171, "ii"},
+		{0x2172, "iii"},
+		{0x2173, "iv"},
+		{0x2175, "vi"},
+		{0x2176, "vii"},
+		{0x2177, "viii"},
+		{0x2178, "ix"},
+		{0x217A, "xi"},
+		{0x217B, "xii"},
+	}
+	for _, check := range checks {
+		got, ok := additiveRomanASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{0x2160, 0x2164, 0x2169, 0x216C, 0x2170, 0x2174, 0x2180, 0x2185, 0x2153} {
+		if _, ok := additiveRomanASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := additiveRomanASCII(r); ok {
+			n++
+		}
+	}
+	if n != 18 {
+		t.Fatalf("additive roman fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsDoublePunctuation(t *testing.T) {
+	pairs := []struct {
+		secret string
+		mark   string
+	}{
+		{"rt_Zz9q!!7f3a", "\u203C"},
+		{"rt_Zz9q??7f3a", "\u2047"},
+		{"rt_Zz9q?!7f3a", "\u2048"},
+		{"rt_Zz9q!?7f3a", "\u2049"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		asciiPair := pair.secret[len("rt_Zz9q") : len("rt_Zz9q")+2]
+		marked := strings.ReplaceAll(pair.secret, asciiPair, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, asciiPair)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "!!", "%E2%80%BC")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[0].secret, "!!", "\u203C")
+	got = SanitizeFailure("rejected "+pairs[0].secret+" later", stored)
+	for _, item := range []string{pairs[0].secret, stored, "Zz9q", "!!", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u203C later",
+		"see \u2047 later",
+		"see \u203D later",
+		"see \u00A1 later",
+		"see \u2026 later",
+		"see \u2A74 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("punctuation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDoublePunctuationASCIIFoldsOnlyDoubledMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x203C, "!!"},
+		{0x2047, "??"},
+		{0x2048, "?!"},
+		{0x2049, "!?"},
+	}
+	for _, check := range checks {
+		got, ok := doublePunctuationASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'!', '?', 0x203D, 0x00A1, 0x00BF, 0x2025, 0x2026, 0x2A74, 0x2A75, 0xFE15, 0xFF01} {
+		if _, ok := doublePunctuationASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := doublePunctuationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 4 {
+		t.Fatalf("double punctuation fold count %d", n)
+	}
+}

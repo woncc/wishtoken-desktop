@@ -937,9 +937,10 @@ func escapeASCII(r rune) (byte, bool) {
 	return 0, false
 }
 
-// foldCredentialPieces maps compatibility letters, digits, and token
-// punctuation, including the percent sign, exclamation mark, reverse
-// solidus, number sign, dollar sign, ampersand, asterisk, question mark,
+// foldCredentialPieces maps compatibility letters, digits, latin
+// ligatures, and token punctuation, including the percent sign, exclamation
+// mark, reverse solidus, number sign, dollar sign, ampersand, asterisk,
+// question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
 // greater-than signs, the grave accent, the circumflex accent, the vertical
 // line, the apostrophe, the quotation mark, the colon, and the commercial
@@ -948,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -1710,10 +1711,11 @@ func semicolonASCII(r rune) (byte, bool) {
 // foldQuestionPieces maps vertical, small, and fullwidth question marks to
 // ASCII '?'. NFKC folds them, and this pass does not run NFKC, so a stored
 // secret written with those forms would stay visible. A double question mark
-// expands to "??", and a question exclamation mark expands to "?!". Inverted
-// and Arabic question marks, the interrobang, and question-mark ornaments do
-// not fold to '?'. The Greek question mark folds to ';', so it stays out. One
-// output piece covers the original rune.
+// expands to "??", and a question exclamation mark expands to "?!". Those two
+// are folded with the doubled exclamation marks. Inverted and Arabic question
+// marks, the interrobang, and question-mark ornaments do not fold to '?'.
+// The Greek question mark folds to ';', so it stays out. One output piece
+// covers the original rune.
 func foldQuestionPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2051,13 +2053,81 @@ func reverseSolidusASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldDoublePunctuationPieces maps the doubled question and exclamation
+// marks to the ASCII pairs NFKC produces. This pass does not run NFKC, so a
+// stored secret written with those marks would stay visible. Each output
+// byte keeps the original rune's range. The interrobang, inverted marks,
+// two-dot leaders, ellipses, and consecutive equals signs are not these
+// four marks, so they stay out.
+func foldDoublePunctuationPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := doublePunctuationASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldDoublePunctuationString(s string) string {
+	if !doublePunctuationFolded(s) {
+		return s
+	}
+	return renderPieces(foldDoublePunctuationPieces(rawPieces(s)))
+}
+
+func doublePunctuationFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := doublePunctuationASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func doublePunctuationASCII(r rune) (string, bool) {
+	switch r {
+	case 0x203C:
+		return "!!", true
+	case 0x2047:
+		return "??", true
+	case 0x2048:
+		return "?!", true
+	case 0x2049:
+		return "!?", true
+	default:
+		return "", false
+	}
+}
+
 // foldExclamationPieces maps exclamation marks to ASCII '!'.
 // NFKC folds them, and this pass does not run NFKC, so a stored secret
 // written with those forms would stay visible. A double exclamation mark
-// expands to "!!", and an exclamation question mark expands to "!?".
-// Inverted exclamation, the retroflex click, and heavy exclamation
-// ornaments do not fold to '!', so they stay out. One output piece covers
-// the original rune.
+// expands to "!!", and an exclamation question mark expands to "!?". Those
+// two are folded with the doubled question marks. Inverted exclamation, the
+// retroflex click, and heavy exclamation ornaments do not fold to '!', so
+// they stay out. One output piece covers the original rune.
 func foldExclamationPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2347,11 +2417,107 @@ func plusEqualsASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldLigaturePieces maps latin ligatures and compatibility digraphs to
+// the ASCII letters NFKC produces. This pass does not run NFKC, so a stored
+// token or a JWT written with those forms would stay visible. Each output
+// byte keeps the original rune's range, so redaction removes the whole
+// character. Roman numerals that expand to more than one letter, squared
+// unit symbols, and the trademark sign are not latin ligatures, so they
+// stay out.
+func foldLigaturePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := ligatureASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldLigatureString(s string) string {
+	if !ligatureFolded(s) {
+		return s
+	}
+	return renderPieces(foldLigaturePieces(rawPieces(s)))
+}
+
+func ligatureFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := ligatureASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func ligatureASCII(r rune) (string, bool) {
+	switch r {
+	case 0x0132:
+		return "IJ", true
+	case 0x0133:
+		return "ij", true
+	case 0x01C7:
+		return "LJ", true
+	case 0x01C8:
+		return "Lj", true
+	case 0x01C9:
+		return "lj", true
+	case 0x01CA:
+		return "NJ", true
+	case 0x01CB:
+		return "Nj", true
+	case 0x01CC:
+		return "nj", true
+	case 0x01F1:
+		return "DZ", true
+	case 0x01F2:
+		return "Dz", true
+	case 0x01F3:
+		return "dz", true
+	case 0xFB00:
+		return "ff", true
+	case 0xFB01:
+		return "fi", true
+	case 0xFB02:
+		return "fl", true
+	case 0xFB03:
+		return "ffi", true
+	case 0xFB04:
+		return "ffl", true
+	case 0xFB05, 0xFB06:
+		return "st", true
+	default:
+		return "", false
+	}
+}
+
 // foldLongSPieces maps latin small letter long s to ASCII s.
 // NFKC folds it, and this pass does not run NFKC, so a stored token or a
 // JWT written with that form would stay visible. Long s with a dot or a
-// stroke stays a phonetic letter, and the long s t ligature expands to two
-// letters, so those stay out. One output piece covers the original rune.
+// stroke stays a phonetic letter. The long s t ligature expands to "st" and
+// is folded with the other latin ligatures. One output piece covers the
+// original rune.
 func foldLongSPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2405,9 +2571,9 @@ func longSASCII(r rune) (byte, bool) {
 // foldRomanPieces maps roman numerals to ASCII when NFKC folds them
 // to one letter. Credential redaction does not run NFKC, so a stored token
 // or a JWT written with those forms would stay visible. Two, three, four,
-// and the other additive numerals expand to more than one letter. The
-// archaic thousand signs do not fold to ASCII. Those stay out. One output
-// piece covers the original rune.
+// and the other additive numerals expand to more than one letter and are
+// folded separately. The archaic thousand signs do not fold to ASCII.
+// Those stay out. One output piece covers the original rune.
 func foldRomanPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2483,6 +2649,102 @@ func romanASCII(r rune) (byte, bool) {
 		return 'm', true
 	default:
 		return 0, false
+	}
+}
+
+// foldAdditiveRomanPieces maps roman numerals that NFKC expands to more
+// than one ASCII letter. This pass does not run NFKC, so a stored token or
+// a JWT written with those forms would stay visible. Each output byte keeps
+// the original rune's range. Single-letter numerals are folded elsewhere.
+// Archaic thousand signs, late and early forms, and vulgar fractions do not
+// fold to ASCII letters, so they stay out.
+func foldAdditiveRomanPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := additiveRomanASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldAdditiveRomanString(s string) string {
+	if !additiveRomanFolded(s) {
+		return s
+	}
+	return renderPieces(foldAdditiveRomanPieces(rawPieces(s)))
+}
+
+func additiveRomanFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := additiveRomanASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func additiveRomanASCII(r rune) (string, bool) {
+	switch r {
+	case 0x2161:
+		return "II", true
+	case 0x2162:
+		return "III", true
+	case 0x2163:
+		return "IV", true
+	case 0x2165:
+		return "VI", true
+	case 0x2166:
+		return "VII", true
+	case 0x2167:
+		return "VIII", true
+	case 0x2168:
+		return "IX", true
+	case 0x216A:
+		return "XI", true
+	case 0x216B:
+		return "XII", true
+	case 0x2171:
+		return "ii", true
+	case 0x2172:
+		return "iii", true
+	case 0x2173:
+		return "iv", true
+	case 0x2175:
+		return "vi", true
+	case 0x2176:
+		return "vii", true
+	case 0x2177:
+		return "viii", true
+	case 0x2178:
+		return "ix", true
+	case 0x217A:
+		return "xi", true
+	case 0x217B:
+		return "xii", true
+	default:
+		return "", false
 	}
 }
 
