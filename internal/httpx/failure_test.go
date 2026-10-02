@@ -1421,3 +1421,77 @@ func TestPlusEqualsASCIIFoldsOnlySigns(t *testing.T) {
 		t.Fatalf("plus fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsLowLines(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl_ab12"
+	marked := strings.ReplaceAll(jwt, "_", "\uff3f")
+	encoded := strings.Replace(jwt, "_", "%EF%BC%BF", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "code_verifier1"
+	markedSecret := strings.ReplaceAll(secret, "_", "\ufe4d")
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "verifier1", "code"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	opaque := "tokenValue1tokenValue1tokenVal_1"
+	markedOpaque := strings.ReplaceAll(opaque, "_", "\ufe33")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "tokenValue1", "tokenVal"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2017 later",
+		"see \u02cd later",
+		"low \uff3f line",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("low line prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestLowLineASCIIFoldsOnlyLowLines(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE33, '_', true},
+		{0xFE34, '_', true},
+		{0xFE4D, '_', true},
+		{0xFE4E, '_', true},
+		{0xFE4F, '_', true},
+		{0xFF3F, '_', true},
+		{'_', 0, false},
+		{0x2017, 0, false},
+		{0x02CD, 0, false},
+		{0xFF0D, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := lowLineASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := lowLineASCII(r); ok {
+			n++
+		}
+	}
+	if n != 6 {
+		t.Fatalf("low line fold count %d", n)
+	}
+}

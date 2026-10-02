@@ -360,14 +360,14 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Plus and equals signs,
-	// long s, roman numerals, segmented digits, modifier letters,
-	// superscripts and subscripts, enclosed letters and digits, mathematical
-	// alphanumeric symbols, and fullwidth letters and digits are folded
-	// first. Then drop marks. Spacing marks shaped like full stops keep
-	// both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(secret)))))))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(pieces)))))))))))
+	// token together and miss the stored ASCII byte. Low lines, plus and
+	// equals signs, long s, roman numerals, segmented digits, modifier
+	// letters, superscripts and subscripts, enclosed letters and digits,
+	// mathematical alphanumeric symbols, and fullwidth letters and digits
+	// are folded first. Then drop marks. Spacing marks shaped like full
+	// stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(secret))))))))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(pieces))))))))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -784,6 +784,63 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldLowLinePieces maps low lines to ASCII '_'.
+// NFKC folds them, and this pass does not run NFKC, so a JWT or an opaque
+// token written with those forms would stay visible. A double low line
+// expands to a space plus a mark, and a low macron does not fold to '_',
+// so those stay out. One output piece covers the original rune.
+func foldLowLinePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := lowLineASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldLowLineString(s string) string {
+	if !lowLineFolded(s) {
+		return s
+	}
+	return renderPieces(foldLowLinePieces(rawPieces(s)))
+}
+
+func lowLineFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := lowLineASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func lowLineASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE33, 0xFE34, 0xFE4D, 0xFE4E, 0xFE4F, 0xFF3F:
+		return '_', true
 	default:
 		return 0, false
 	}
