@@ -569,6 +569,14 @@ TAG_DIGIT = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_DIGITS})
 # the file. A second reading folds the other tag copies too.
 TAG_LOW_LINE = '\U000E005F'
 TAG_LOW_LINE_FOLD = str.maketrans({0xE005F: '_'})
+# Tag tilde copies '~' and does not NFKC-fold. It is a format character, so
+# the component reading strips it. That turns auth.json~1 into auth.json1 and
+# the editor-number alias never runs. The tilde reading is tried after the
+# low line. Folding only the tilde still strips any other tag, so an extra
+# tag letter cannot rename the file. A second reading folds the other tag
+# copies too.
+TAG_TILDE = '\U000E007E'
+TAG_TILDE_FOLD = str.maketrans({0xE007E: '~'})
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -607,6 +615,12 @@ def path_reason(rel):
         if reason := component_path_reason(rel.translate(TAG_LOW_LINE_FOLD)):
             return reason
         folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD)
+        if reason := component_path_reason(folded):
+            return reason
+    if TAG_TILDE in rel:
+        if reason := component_path_reason(rel.translate(TAG_TILDE_FOLD)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD).translate(TAG_TILDE_FOLD)
         if reason := component_path_reason(folded):
             return reason
     return ''
@@ -845,6 +859,10 @@ def self_test():
         'codex\U000E005Finstances.json', 'id\U000E005Frsa\U000E0061',
         'i\U000E0064\U000E005Frsa', 'nested/id\U000E005Frsa/extra.txt',
         'id\U000E005Fed\U000E00325519',
+        'auth.json\U000E007E1', 'tokens.json\U000E007E2',
+        'nested/credentials.json\U000E007E1', 'ID_RSA\U000E007E3',
+        'au\U000E0074h.json\U000E007E1', 'id\U000E005Frsa\U000E007E1',
+        'Copy of auth.json\U000E007E1',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -953,6 +971,8 @@ def self_test():
         'notes\U000E0031.txt', 'script\U000E0030.go', 'id_ed\U000E00325519.pub',
         'readme\U000E0039md',
         'id\U000E005Frsa.pub', 'script\U000E005F.go', 'notes\U000E005F.txt',
+        'notes\U000E007E.txt', 'readme\U000E007Emd', 'notes\U000E007E1.txt',
+        'script.go\U000E007E1', 'id_rsa.pub\U000E007E1',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
