@@ -135,16 +135,40 @@ def secret_alias(name):
     # A trailing .txt can hide a forbidden suffix, as in accounts.json.bak.txt.
     return Path(folded).suffix in FORBIDDEN_SUFFIXES
 
-def path_reason(rel):
-    path = Path(rel)
-    parts = {visible_name(part) for part in path.parts}
-    parts.discard('')
-    name = visible_name(path.name)
-    if parts & FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
-        return 'private state or generated artifact path'
+# NFKC already folds fullwidth solidus and reverse solidus. These remaining
+# slash lookalikes, plus the yen and won signs Windows still treats as
+# separators, must split a path before any component is judged.
+SEPARATOR_LIKE = {
+    ord('\\'): '/',
+    ord('\u00a5'): '/',
+    ord('\u20a9'): '/',
+    ord('\u2044'): '/',
+    ord('\u2215'): '/',
+    ord('\u29f8'): '/',
+    ord('\ufe68'): '/',
+    ord('\uff0f'): '/',
+    ord('\uff3c'): '/',
+}
+
+def normalized_rel(rel):
+    folded = unicodedata.normalize('NFKC', rel).translate(DOT_LIKE).translate(SEPARATOR_LIKE)
+    return folded.replace('\\', '/')
+
+def component_private(part):
+    name = visible_name(part)
+    if not name:
+        return False
+    if name in FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
+        return True
     suffix = Path(name).suffix
-    if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or suffix in FORBIDDEN_SUFFIXES or path.suffix.casefold() in FORBIDDEN_SUFFIXES:
-        return 'private state or generated artifact path'
+    return name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or suffix in FORBIDDEN_SUFFIXES
+
+def path_reason(rel):
+    # A private name is not safe just because a later component looks ordinary.
+    # auth.json/payload.txt and a backslash twin are the same leak.
+    for part in Path(normalized_rel(rel)).parts:
+        if component_private(part):
+            return 'private state or generated artifact path'
     return ''
 
 def private_filename(name):
@@ -225,6 +249,17 @@ def self_test():
         'Diagnostics\u00a0/capture.png', 'auth.json\u2028', 'accounts .json.gz',
         'auth.json.br', 'accounts.json.7z', 'credentials.json.tar', 'auth.json.tgz', 'tokens.json.lz4',
         'secrets.json.lzma', 'id_rsa.rar', 'nested/auth.json.cab', 'auth.json.tar.gz', 'tokens.json.zstd',
+        'credentials/notes.txt', 'auth.json/payload.txt', 'nested/accounts.json/extra.txt',
+        'accounts.json.bak/notes.txt', 'Copy of auth.json/secret.txt', 'auth.json.gz/readme.txt',
+        '.env.local/settings.yml', 'config/.env.production/app.txt', 'handoff-notes/readme.md',
+        '.owner-12345/state.txt', 'auth-snapshot-1/data.txt', 'id_rsa/x',
+        'ID_RSA/x', 'secrets.env/x', 'sub2api-account-1.json/x',
+        'notes.bak/readme.md', 'auth.json.tar.gz/x', 'tokens.json.crdownload/x',
+        '.#tokens.json/x', '._auth.json/x', 'config.toml.bak-20261001/x',
+        'auth.json:secret/file.txt', 'auth.json\\notes.txt', 'credentials\\token.txt',
+        'auth.json\u2044secret.txt', 'auth.json\u2215secret.txt', 'accounts.json\u29f8extra.txt',
+        'auth.json\u00a5secret.txt', 'tokens.json\u20a9extra.txt', 'auth.json\uff0fsecret.txt',
+        'accounts.json\uff3cnotes.txt', 'Diagnostics\u2044capture.png', 'auth.json\u200b/payload.txt',
         'auth.json.crdownload', 'auth.json.part', 'credentials.json.partial', 'accounts.json.download',
     )
     allowed = (
@@ -237,6 +272,10 @@ def self_test():
         'models.json.txt', 'notes.txt.', 'readme.gz', 'script.go.xz', 'models.json.gz',
         'script.go:Zone.Identifier', 'notes\u00a0.txt', 'readme\u3002txt', 'script.go\u200b',
         'notes .txt', 'models .json.gz', 'id_rsa.pub\u200e', 'id_rsa .pub',
+        'notes.bak3/readme.md', 'script.go.swp/foo.txt', 'models.json.gz/foo.txt',
+        'id_rsa.pub/foo.txt', 'Copy of README.md/img.png', 'docs/handover-not-private/readme.md',
+        'notes\\readme.txt', 'readme\u2044notes.txt', 'script.go\u00a5extra.txt',
+        'models.json\uff0freadme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
     )
     for rel in blocked:
