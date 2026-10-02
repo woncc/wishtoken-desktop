@@ -395,6 +395,23 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 		// The stored secret uses a tag and the response already has ASCII.
 		spans = append(spans, exactSecretSpans(folded, needleTag)...)
 	}
+	// Tag letters copy A-Z and a-z and do not NFKC-fold. They are format
+	// characters, so the drop pass below removes them. That deletes the
+	// stored letter and misses the token. Folding them is a separate reading.
+	// It runs on the tag-punctuation reading so one secret can use both a tag
+	// slash and a tag letter. The drop reading still runs, so an inserted tag
+	// letter cannot hide a token that has no tag letter. Digits, the language
+	// tag, and cancel tag are not letters and stay out.
+	letterBase := folded
+	if tagged, ok := foldTagPunctuationPieces(folded); ok {
+		letterBase = tagged
+	}
+	needleLetters := foldTagLetterString(needleTag)
+	if lettered, ok := foldTagLetterPieces(letterBase); ok {
+		spans = append(spans, exactSecretSpans(lettered, needleLetters)...)
+	} else if needleLetters != needleTag {
+		spans = append(spans, exactSecretSpans(letterBase, needleLetters)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -594,6 +611,65 @@ func tagPunctuationASCII(r rune) (byte, bool) {
 		return ':', true
 	case 0xE005C:
 		return '\\', true
+	default:
+		return 0, false
+	}
+}
+
+// foldTagLetterPieces maps Unicode tag letters to the ASCII letters they
+// copy. None of them NFKC-fold. This pass does not run NFKC, and
+// dropMarkPieces removes format characters, so a stored letter written with
+// a tag would stay visible. One output piece covers the original rune. The
+// drop reading still runs on the unfolded pieces. Tag digits, tag
+// punctuation, the language tag, and cancel tag stay out.
+func foldTagLetterPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := tagLetterASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagLetterString(s string) string {
+	if !tagLetterFolded(s) {
+		return s
+	}
+	folded, _ := foldTagLetterPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func tagLetterFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := tagLetterASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func tagLetterASCII(r rune) (byte, bool) {
+	switch {
+	case r >= 0xE0041 && r <= 0xE005A, r >= 0xE0061 && r <= 0xE007A:
+		return byte(r - 0xE0000), true
 	default:
 		return 0, false
 	}

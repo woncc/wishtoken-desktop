@@ -4687,3 +4687,81 @@ func TestTagPunctuationASCIIFoldsOnlyThose(t *testing.T) {
 		t.Fatalf("tag punctuation fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsTagLetters(t *testing.T) {
+	secret := "tokenValue1"
+	lower := "t\U000E006FkenValue1"
+	upper := "token\U000E0056alue1"
+	encoded := "t%F3%A0%81%AFkenValue1"
+	inserted := "token\U000E0061Value1"
+	mixedSecret := "code/ver1"
+	mixed := "code\U000E002Fv\U000E0065r1"
+	text := "rejected " + lower + " " + upper + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "tokenValue1tokenValue1")
+	for _, leaked := range []string{secret, lower, upper, encoded, inserted, mixedSecret, mixed, "kenValue1", "alue1", "ver1"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "t\U000E006FkenValue1"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "kenValue1"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag letter leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0061 later",
+		"see \U000E0041 later",
+		"see \U000E007A later",
+		"see \U000E0031 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag letter prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagLetterASCIIFoldsOnlyLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xE0041, 'A', true},
+		{0xE005A, 'Z', true},
+		{0xE0061, 'a', true},
+		{0xE007A, 'z', true},
+		{0xE0040, 0, false},
+		{0xE005B, 0, false},
+		{0xE0060, 0, false},
+		{0xE007B, 0, false},
+		{0xE0030, 0, false},
+		{0xE0020, 0, false},
+		{0xE002F, 0, false},
+		{'a', 0, false},
+		{'A', 0, false},
+		{0xE0001, 0, false},
+		{0xE007F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := tagLetterASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0xE007F; r++ {
+		if _, ok := tagLetterASCII(r); ok {
+			n++
+		}
+	}
+	if n != 52 {
+		t.Fatalf("tag letter fold count %d", n)
+	}
+}
