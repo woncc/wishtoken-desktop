@@ -3202,3 +3202,102 @@ func TestLigatureASCIIFoldsOnlyLatinLigatures(t *testing.T) {
 		t.Fatalf("ligature fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsAdditiveRomanNumerals(t *testing.T) {
+	secret := "rt_Zz9qVII7f3a"
+	seven := strings.ReplaceAll(secret, "VII", "\u2166")
+	eightSecret := "rt_Zz9qVIII7f3a"
+	eight := strings.ReplaceAll(eightSecret, "VIII", "\u2167")
+	lowerSecret := "rt_Zz9qviii7f3a"
+	lower := strings.ReplaceAll(lowerSecret, "viii", "\u2177")
+	encoded := strings.ReplaceAll(secret, "VII", "%E2%85%A6")
+	got := SanitizeFailure("rejected "+seven+" "+eight+" "+lower+" "+encoded+" later", secret, eightSecret, lowerSecret)
+	for _, item := range []string{secret, seven, eightSecret, eight, lowerSecret, lower, encoded, "Zz9q", "VII", "VIII", "viii", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.VIIValue12"
+	markedJWT := strings.ReplaceAll(jwt, "VII", "\u2166")
+	got = SanitizeFailure("rejected " + markedJWT + " later")
+	for _, item := range []string{jwt, markedJWT, "VIIValue12", "eyJ", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("jwt leaked %q in %q", item, got)
+		}
+	}
+	opaque := "VIIValue12VIIValue12VIIValue12ab"
+	markedOpaque := strings.ReplaceAll(opaque, "VII", "\u2166")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "VIIValue12"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	stored := strings.ReplaceAll(secret, "VII", "\u2166")
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, item := range []string{secret, stored, "Zz9q", "VII", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored numeral leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2161 later",
+		"see \u2166 later",
+		"archaic \u2180 later",
+		"late \u2185 later",
+		"chapter \u2160 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("roman prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestAdditiveRomanASCIIFoldsOnlyAdditiveNumerals(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2161, "II"},
+		{0x2162, "III"},
+		{0x2163, "IV"},
+		{0x2165, "VI"},
+		{0x2166, "VII"},
+		{0x2167, "VIII"},
+		{0x2168, "IX"},
+		{0x216A, "XI"},
+		{0x216B, "XII"},
+		{0x2171, "ii"},
+		{0x2172, "iii"},
+		{0x2173, "iv"},
+		{0x2175, "vi"},
+		{0x2176, "vii"},
+		{0x2177, "viii"},
+		{0x2178, "ix"},
+		{0x217A, "xi"},
+		{0x217B, "xii"},
+	}
+	for _, check := range checks {
+		got, ok := additiveRomanASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{0x2160, 0x2164, 0x2169, 0x216C, 0x2170, 0x2174, 0x2180, 0x2185, 0x2153} {
+		if _, ok := additiveRomanASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := additiveRomanASCII(r); ok {
+			n++
+		}
+	}
+	if n != 18 {
+		t.Fatalf("additive roman fold count %d", n)
+	}
+}

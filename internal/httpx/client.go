@@ -949,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -2502,9 +2502,9 @@ func longSASCII(r rune) (byte, bool) {
 // foldRomanPieces maps roman numerals to ASCII when NFKC folds them
 // to one letter. Credential redaction does not run NFKC, so a stored token
 // or a JWT written with those forms would stay visible. Two, three, four,
-// and the other additive numerals expand to more than one letter. The
-// archaic thousand signs do not fold to ASCII. Those stay out. One output
-// piece covers the original rune.
+// and the other additive numerals expand to more than one letter and are
+// folded separately. The archaic thousand signs do not fold to ASCII.
+// Those stay out. One output piece covers the original rune.
 func foldRomanPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2580,6 +2580,102 @@ func romanASCII(r rune) (byte, bool) {
 		return 'm', true
 	default:
 		return 0, false
+	}
+}
+
+// foldAdditiveRomanPieces maps roman numerals that NFKC expands to more
+// than one ASCII letter. This pass does not run NFKC, so a stored token or
+// a JWT written with those forms would stay visible. Each output byte keeps
+// the original rune's range. Single-letter numerals are folded elsewhere.
+// Archaic thousand signs, late and early forms, and vulgar fractions do not
+// fold to ASCII letters, so they stay out.
+func foldAdditiveRomanPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := additiveRomanASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldAdditiveRomanString(s string) string {
+	if !additiveRomanFolded(s) {
+		return s
+	}
+	return renderPieces(foldAdditiveRomanPieces(rawPieces(s)))
+}
+
+func additiveRomanFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := additiveRomanASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func additiveRomanASCII(r rune) (string, bool) {
+	switch r {
+	case 0x2161:
+		return "II", true
+	case 0x2162:
+		return "III", true
+	case 0x2163:
+		return "IV", true
+	case 0x2165:
+		return "VI", true
+	case 0x2166:
+		return "VII", true
+	case 0x2167:
+		return "VIII", true
+	case 0x2168:
+		return "IX", true
+	case 0x216A:
+		return "XI", true
+	case 0x216B:
+		return "XII", true
+	case 0x2171:
+		return "ii", true
+	case 0x2172:
+		return "iii", true
+	case 0x2173:
+		return "iv", true
+	case 0x2175:
+		return "vi", true
+	case 0x2176:
+		return "vii", true
+	case 0x2177:
+		return "viii", true
+	case 0x2178:
+		return "ix", true
+	case 0x217A:
+		return "xi", true
+	case 0x217B:
+		return "xii", true
+	default:
+		return "", false
 	}
 }
 
