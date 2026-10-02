@@ -90,12 +90,22 @@ func ParseProxyURL(raw string) (*url.URL, error) {
 // Redact hides credentials embedded in a proxy URL for logging and management
 // responses. A schemeless user:password@host value is recognized too.
 // A space or bad percent escape makes url.Parse fail; those passwords are
-// scrubbed instead of returned unchanged.
+// scrubbed instead of returned unchanged. A fullwidth or small commercial at,
+// and a percent-encoded at-sign, still ends a password when url.Parse never
+// sees a userinfo separator.
 func Redact(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
+	redacted, _ := redactParsed(raw)
+	if next, ok := maskHiddenProxyPasswords(redacted); ok {
+		return next
+	}
+	return redacted
+}
+
+func redactParsed(raw string) (string, bool) {
 	candidate := raw
 	restore := ""
 	if !strings.Contains(raw, "://") {
@@ -125,13 +135,13 @@ func Redact(raw string) string {
 			case "//":
 				redacted = "//" + strings.TrimPrefix(redacted, "http://")
 			}
-			return redacted
+			return redacted, true
 		}
 	}
 	if scrubbed, ok := scrubProxyUserinfo(raw); ok {
-		return scrubbed
+		return scrubbed, true
 	}
-	return raw
+	return raw, false
 }
 
 // splitEncodedPassword finds a colon hidden by one or more layers of percent
