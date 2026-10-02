@@ -151,6 +151,10 @@ COLON_LIKE = {
     ord('\u1393'): ':',
     ord('\U0001d108'): ':',
     ord('\U00011dd9'): ':',
+    # Proportion and squared four-dot punctuation are confusable with '::'
+    # and do not NFKC-fold to ':'. A following private name still has to split.
+    ord('\u2237'): ':',
+    ord('\u2e2c'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -491,6 +495,9 @@ def self_test():
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
         'readme\u1393auth\u0660json',
+        'readme\u2237auth.json', 'notes\u2e2cid_rsa', 'file\u2237credentials.json',
+        'docs\u2e2caccounts.json', 'nested/file\u2237.netrc', 'ID_RSA\u2e2cx',
+        'auth.json\u2237secret', 'readme\u2e2c.env', 'file\u2237.netrc',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -535,6 +542,8 @@ def self_test():
         'notes\u0660txt', 'script\u06f0go', 'models\U0001ecaejson', 'id_rsa\u0660pub', 'readme\U0001d16dmd',
         'notes\u2041readme.txt', 'script.go\u2041Zone.Identifier', 'id_rsa.pub\u2041foo.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
+        'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
+        'script.go\u2e2cZone.Identifier',
     )
     for rel in blocked:
         if not path_reason(rel):

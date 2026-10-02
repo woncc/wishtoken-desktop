@@ -420,6 +420,33 @@ func TestManagementHidesSignColonProxyPasswords(t *testing.T) {
 	}
 }
 
+func TestManagementHidesDoubleColonConfusableProxyPasswords(t *testing.T) {
+	const password = "s3cret-proxy"
+	proxyURL := "http://user\u2237" + password + "@127.0.0.1:7890"
+	encodedColon := encodeEveryByte("\u2e2c")
+	encoded := "http://user" + encodedColon + password + "@127.0.0.1:7890"
+	hiddenAt := "http://user\u2e2c" + password + "\uFF20127.0.0.1:7890"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	cfg.ProxyURL = proxyURL
+	acc := testAccount("acct_one", "one@example.test")
+	acc.ProxyURL = encoded
+	acc.Name = "note " + hiddenAt
+	acc.LastError = "dial " + encoded
+	f := newFixture(t, cfg, acc)
+	for _, route := range []string{"/api/status", "/api/accounts", "/api/settings"} {
+		status, body := getRaw(t, f, route)
+		if status != http.StatusOK || strings.Contains(body, password) || strings.Contains(body, encodedColon+password) || strings.Contains(body, "\u2237"+password) || strings.Contains(body, "\u2e2c"+password) {
+			t.Fatalf("%s leaked double-colon confusable: %d %s", route, status, body)
+		}
+	}
+	redacted := httpx.Redact(cfg.ProxyURL)
+	status, body := putJSON(t, f, "/api/settings", `{"proxy_url":"`+redacted+`"}`)
+	if status != http.StatusOK || strings.Contains(body, password) || f.srv.Config().ProxyURL != cfg.ProxyURL {
+		t.Fatalf("redacted save: %d %s stored %q", status, body, f.srv.Config().ProxyURL)
+	}
+}
+
 func TestManagementHidesAtSignProxyPasswords(t *testing.T) {
 	const password = "s3cret-proxy"
 	proxyURL := "http://user:" + password + "\uFF20127.0.0.1:7890"
