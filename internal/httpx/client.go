@@ -360,14 +360,15 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Fullwidth solidus and
-	// tilde, low lines, plus and equals signs, long s, roman numerals,
+	// token together and miss the stored ASCII byte. Parentheses, fullwidth
+	// solidus and tilde, low lines, plus and equals signs, long s, roman
+	// numerals,
 	// segmented digits, modifier letters, superscripts and subscripts,
 	// enclosed letters and digits, mathematical alphanumeric symbols, and
 	// fullwidth letters and digits are folded first. Then drop marks.
 	// Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(secret)))))))))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(pieces)))))))))))))
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(secret))))))))))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(pieces))))))))))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -784,6 +785,66 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldParenPieces maps parentheses to ASCII. NFKC folds them, and this
+// pass does not run NFKC, so a stored secret written with those forms would
+// stay visible. Parenthesized digits and parenthesized hangul expand to more
+// than one character. Flattened, white, double, and ornament parentheses do
+// not fold to ASCII, so they stay out. One output piece covers the original
+// rune.
+func foldParenPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := parenASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldParenString(s string) string {
+	if !parenFolded(s) {
+		return s
+	}
+	return renderPieces(foldParenPieces(rawPieces(s)))
+}
+
+func parenFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := parenASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func parenASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x207D, 0x208D, 0xFE35, 0xFE59, 0xFF08:
+		return '(', true
+	case 0x207E, 0x208E, 0xFE36, 0xFE5A, 0xFF09:
+		return ')', true
 	default:
 		return 0, false
 	}
@@ -1329,9 +1390,9 @@ func modifierASCII(r rune) (byte, bool) {
 // to ASCII. NFKC folds them, and this pass does not run NFKC, so a stored
 // token or a JWT written with those forms would stay visible. The feminine
 // and masculine ordinals are superscript a and o. Superscript and subscript
-// minus are already hyphen folds. Plus, equals, parentheses, and subscript
-// schwa do not become an ASCII letter or digit, so they stay out. One
-// output piece covers the original rune.
+// minus are already hyphen folds. Plus and equals are their own fold, and
+// parentheses are their own fold. Subscript schwa does not become an ASCII
+// letter, so it stays out. One output piece covers the original rune.
 func foldSuperSubPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
