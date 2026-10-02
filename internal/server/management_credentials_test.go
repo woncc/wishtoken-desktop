@@ -2158,3 +2158,26 @@ func TestManagementHidesSecretsSplitByTagGrave(t *testing.T) {
 		t.Fatalf("display context lost: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesSecretsSplitByTagLessThan(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt<`Zz9qab7f3a"
+	half := strings.NewReplacer("<", "\U000E003C").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("<", "%F3%A0%80%BC").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("<", "\U000E003C", "`", "\U000E0060").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
