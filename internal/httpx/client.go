@@ -4353,8 +4353,9 @@ func numberSignASCII(r rune) (byte, bool) {
 // short box drawings from upper centre to middle right and from middle left
 // to lower centre, the mathematical falling diagonal, the squared falling
 // diagonal, CJK stroke D,
-// the dot radical, the very heavy reverse solidus, the Greek notation
-// slashes, and the kana repeat lower half. This pass does not run NFKC.
+// the dot radical, the very heavy reverse solidus, the upper right
+// block diagonal, the Greek notation slashes, and the kana repeat
+// lower half. This pass does not run NFKC.
 // Forward solidus lookalikes fold to '/'. The dot radical's ideograph
 // folds here too. Reverse solidus preceding subset expands to a backslash
 // plus a syllabic letter and does not NFKC-fold to a backslash. It stays
@@ -4371,7 +4372,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // circle cannot glue the token back together. The circled division sign
 // and the combining enclosing circle backslash stay out. The diagonal
 // cross, the chevron diagonals, and the negative diamond stay out. The
-// negative short diagonal folds to a slash.
+// negative short diagonal folds to a slash. The upper right block
+// diagonal from upper centre to lower right is that falling stroke as a
+// narrow block and does not NFKC-fold to a backslash. It stays one
+// backslash. The wider upper-right block diagonals stay out.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4419,7 +4423,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2:
+	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FB66:
 		return '\\', true
 	default:
 		return 0, false
@@ -4685,7 +4689,7 @@ func parenASCII(r rune) (byte, bool) {
 // either: Philippine punctuation, the caret insertion point, box drawings,
 // the short box drawings from upper centre to middle left and from middle
 // right to lower centre, a rising mathematical diagonal, dotted and heavy
-// solidi, the modifier letter dot slash, squared rising diagonal, CJK strokes P and SP, the slash radical, the double and
+// solidi, the modifier letter dot slash, the upper left block diagonal, squared rising diagonal, CJK strokes P and SP, the slash radical, the double and
 // triple solidus operators, the kana repeat upper halves, the slash
 // radical's ideograph, katakana no, and both Old Coptic esh letters.
 // Halfwidth katakana no and circled katakana no NFKC-fold to katakana no
@@ -4714,7 +4718,10 @@ func parenASCII(r rune) (byte, bool) {
 // diagonals, and the negative diamond stay out. The modifier letter dot
 // slash is that dotted stroke in small form and does not NFKC-fold to a
 // slash. It stays one slash. The dot vertical bar and the dot horizontal
-// bar stay out. Other letters stay out.
+// bar stay out. The upper left block diagonal from lower left to upper
+// centre is that rising stroke as a narrow block and does not NFKC-fold
+// to a slash. It stays one slash. The wider upper-left block diagonals
+// stay out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -4763,7 +4770,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBBE:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FB5B, 0x1FBBE:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
