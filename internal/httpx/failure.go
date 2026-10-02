@@ -83,7 +83,8 @@ func maskCredentialPatterns(detail string) string {
 	pieces := rawPieces(detail)
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
-		// Fold superscripts and subscripts, enclosed letters and digits,
+		// Fold roman numerals, segmented digits, modifier letters,
+		// superscripts and subscripts, enclosed letters and digits,
 		// mathematical alphanumeric symbols, fullwidth letters and digits,
 		// hyphen lookalikes, and full stops before the ASCII token classes
 		// run, and before marks are dropped. This pass does not run NFKC.
@@ -92,7 +93,7 @@ func maskCredentialPatterns(detail string) string {
 		// become '.' or the JWT pattern misses the token. Spacing marks
 		// shaped like full stops are a second reading so an inserted mark
 		// can still be dropped.
-		folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(pieces))))))
+		folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(pieces)))))))))
 		spans = append(spans, credentialPatternSpans(renderPieces(folded), folded)...)
 		if spacing, ok := foldSpacingStopPieces(folded); ok {
 			spans = append(spans, credentialPatternSpans(renderPieces(spacing), spacing)...)

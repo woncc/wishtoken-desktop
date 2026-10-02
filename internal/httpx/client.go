@@ -360,12 +360,13 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Superscripts and
-	// subscripts, enclosed letters and digits, mathematical alphanumeric
-	// symbols, and fullwidth letters and digits are folded first. Then drop
-	// marks. Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(secret))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(pieces))))))
+	// token together and miss the stored ASCII byte. Roman numerals,
+	// segmented digits, modifier letters, superscripts and subscripts,
+	// enclosed letters and digits, mathematical alphanumeric symbols, and
+	// fullwidth letters and digits are folded first. Then drop marks.
+	// Spacing marks shaped like full stops keep both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(secret)))))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(pieces)))))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -579,8 +580,8 @@ func fullwidthASCII(r rune) (byte, bool) {
 // holes for letters that already lived in the letterlike block, including
 // Planck's constant for italic h. Those holes, and the few double-struck
 // italic letters, are listed here. Kelvin sign and information source also
-// fold to one ASCII letter, but they are not mathematical letters. One
-// output piece covers the original rune.
+// fold to one ASCII letter, but they are not mathematical letters, so the
+// modifier fold lists them. One output piece covers the original rune.
 func foldMathPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -782,6 +783,310 @@ func mathASCII(r rune) (byte, bool) {
 		return 'i', true
 	case 0x2149:
 		return 'j', true
+	default:
+		return 0, false
+	}
+}
+
+// foldRomanPieces maps roman numerals to ASCII when NFKC folds them
+// to one letter. Credential redaction does not run NFKC, so a stored token
+// or a JWT written with those forms would stay visible. Two, three, four,
+// and the other additive numerals expand to more than one letter. The
+// archaic thousand signs do not fold to ASCII. Those stay out. One output
+// piece covers the original rune.
+func foldRomanPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := romanASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldRomanString(s string) string {
+	if !romanFolded(s) {
+		return s
+	}
+	return renderPieces(foldRomanPieces(rawPieces(s)))
+}
+
+func romanFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := romanASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func romanASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x2160:
+		return 'I', true
+	case 0x2164:
+		return 'V', true
+	case 0x2169:
+		return 'X', true
+	case 0x216C:
+		return 'L', true
+	case 0x216D:
+		return 'C', true
+	case 0x216E:
+		return 'D', true
+	case 0x216F:
+		return 'M', true
+	case 0x2170:
+		return 'i', true
+	case 0x2174:
+		return 'v', true
+	case 0x2179:
+		return 'x', true
+	case 0x217C:
+		return 'l', true
+	case 0x217D:
+		return 'c', true
+	case 0x217E:
+		return 'd', true
+	case 0x217F:
+		return 'm', true
+	default:
+		return 0, false
+	}
+}
+
+// foldSegmentedPieces maps segmented digits to ASCII.
+// NFKC folds them, and this pass does not run NFKC, so a stored token or a
+// JWT written with those forms would stay visible. Circled, parenthesized,
+// and full-stop digits expand to more than one character or are already
+// covered by another fold, so they stay out. One output piece covers the
+// original rune.
+func foldSegmentedPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := segmentedASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldSegmentedString(s string) string {
+	if !segmentedFolded(s) {
+		return s
+	}
+	return renderPieces(foldSegmentedPieces(rawPieces(s)))
+}
+
+func segmentedFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := segmentedASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func segmentedASCII(r rune) (byte, bool) {
+	if r >= 0x1FBF0 && r <= 0x1FBF9 {
+		return byte(r - 0x1FBF0 + '0'), true
+	}
+	return 0, false
+}
+
+// foldModifierPieces maps modifier letters to ASCII when NFKC folds
+// them to one letter. Latin subscript letters in the same phonetic blocks
+// do the same, so they are listed too. Kelvin sign and information source
+// are the letterlike symbols with that one-letter fold. Long s, roman
+// numerals, segmented digits, and modifier letters that stay phonetic or
+// expand past one character stay out. This pass does not run NFKC, so a
+// stored token or a JWT written with these forms would stay visible. One
+// output piece covers the original rune.
+func foldModifierPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := modifierASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldModifierString(s string) string {
+	if !modifierFolded(s) {
+		return s
+	}
+	return renderPieces(foldModifierPieces(rawPieces(s)))
+}
+
+func modifierFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := modifierASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func modifierASCII(r rune) (byte, bool) {
+	switch r {
+	case 0x02B0:
+		return 'h', true
+	case 0x02B2:
+		return 'j', true
+	case 0x02B3:
+		return 'r', true
+	case 0x02B7:
+		return 'w', true
+	case 0x02B8:
+		return 'y', true
+	case 0x02E1:
+		return 'l', true
+	case 0x02E2:
+		return 's', true
+	case 0x02E3:
+		return 'x', true
+	case 0x1D2C:
+		return 'A', true
+	case 0x1D2E:
+		return 'B', true
+	case 0x1D30:
+		return 'D', true
+	case 0x1D31:
+		return 'E', true
+	case 0x1D33:
+		return 'G', true
+	case 0x1D34:
+		return 'H', true
+	case 0x1D35:
+		return 'I', true
+	case 0x1D36:
+		return 'J', true
+	case 0x1D37:
+		return 'K', true
+	case 0x1D38:
+		return 'L', true
+	case 0x1D39:
+		return 'M', true
+	case 0x1D3A:
+		return 'N', true
+	case 0x1D3C:
+		return 'O', true
+	case 0x1D3E:
+		return 'P', true
+	case 0x1D3F:
+		return 'R', true
+	case 0x1D40:
+		return 'T', true
+	case 0x1D41:
+		return 'U', true
+	case 0x1D42:
+		return 'W', true
+	case 0x1D43:
+		return 'a', true
+	case 0x1D47:
+		return 'b', true
+	case 0x1D48:
+		return 'd', true
+	case 0x1D49:
+		return 'e', true
+	case 0x1D4D:
+		return 'g', true
+	case 0x1D4F:
+		return 'k', true
+	case 0x1D50:
+		return 'm', true
+	case 0x1D52:
+		return 'o', true
+	case 0x1D56:
+		return 'p', true
+	case 0x1D57:
+		return 't', true
+	case 0x1D58:
+		return 'u', true
+	case 0x1D5B:
+		return 'v', true
+	case 0x1D62:
+		return 'i', true
+	case 0x1D63:
+		return 'r', true
+	case 0x1D64:
+		return 'u', true
+	case 0x1D65:
+		return 'v', true
+	case 0x1D9C:
+		return 'c', true
+	case 0x1DA0:
+		return 'f', true
+	case 0x1DBB:
+		return 'z', true
+	case 0x2C7C:
+		return 'j', true
+	case 0x2C7D:
+		return 'V', true
+	case 0xA7F2:
+		return 'C', true
+	case 0xA7F3:
+		return 'F', true
+	case 0xA7F4:
+		return 'Q', true
+	case 0x107A5:
+		return 'q', true
+	case 0x212A:
+		return 'K', true
+	case 0x2139:
+		return 'i', true
 	default:
 		return 0, false
 	}
