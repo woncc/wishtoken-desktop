@@ -4193,3 +4193,183 @@ func TestLetterlikeASCIIFoldsOnlySigns(t *testing.T) {
 		t.Fatalf("letterlike fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSquareSymbols(t *testing.T) {
+	pairs := []struct {
+		secret string
+		plain  string
+		mark   string
+	}{
+		{"rt_Zz9qkg7f3a", "kg", "\u338F"},
+		{"rt_Aa8ka.m.7f", "a.m.", "\u33C2"},
+		{"rt_Bb7mPTE7f", "PTE", "\u3250"},
+		{"rt_Cc6ngal7f", "gal", "\u33FF"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.plain, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.plain)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "kg", "%E3%8E%8F")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[3].secret, "gal", "\u33FF")
+	got = SanitizeFailure("rejected "+pairs[3].secret+" later", stored)
+	for _, item := range []string{pairs[3].secret, stored, "Cc6n", "gal", "7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u338F later",
+		"see \u33C2 later",
+		"see \u3250 later",
+		"see \u33FF later",
+		"see \u20A8 later",
+		"see \u2A74 later",
+		"see \uFE30 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("square prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x3250, "PTE"},
+		{0x32CC, "Hg"},
+		{0x32CD, "erg"},
+		{0x32CE, "eV"},
+		{0x32CF, "LTD"},
+		{0x3371, "hPa"},
+		{0x3372, "da"},
+		{0x3373, "AU"},
+		{0x3374, "bar"},
+		{0x3375, "oV"},
+		{0x3376, "pc"},
+		{0x3377, "dm"},
+		{0x3378, "dm2"},
+		{0x3379, "dm3"},
+		{0x337A, "IU"},
+		{0x3380, "pA"},
+		{0x3381, "nA"},
+		{0x3383, "mA"},
+		{0x3384, "kA"},
+		{0x3385, "KB"},
+		{0x3386, "MB"},
+		{0x3387, "GB"},
+		{0x3388, "cal"},
+		{0x3389, "kcal"},
+		{0x338A, "pF"},
+		{0x338B, "nF"},
+		{0x338E, "mg"},
+		{0x338F, "kg"},
+		{0x3390, "Hz"},
+		{0x3391, "kHz"},
+		{0x3392, "MHz"},
+		{0x3393, "GHz"},
+		{0x3394, "THz"},
+		{0x3396, "ml"},
+		{0x3397, "dl"},
+		{0x3398, "kl"},
+		{0x3399, "fm"},
+		{0x339A, "nm"},
+		{0x339C, "mm"},
+		{0x339D, "cm"},
+		{0x339E, "km"},
+		{0x339F, "mm2"},
+		{0x33A0, "cm2"},
+		{0x33A1, "m2"},
+		{0x33A2, "km2"},
+		{0x33A3, "mm3"},
+		{0x33A4, "cm3"},
+		{0x33A5, "m3"},
+		{0x33A6, "km3"},
+		{0x33A9, "Pa"},
+		{0x33AA, "kPa"},
+		{0x33AB, "MPa"},
+		{0x33AC, "GPa"},
+		{0x33AD, "rad"},
+		{0x33B0, "ps"},
+		{0x33B1, "ns"},
+		{0x33B3, "ms"},
+		{0x33B4, "pV"},
+		{0x33B5, "nV"},
+		{0x33B7, "mV"},
+		{0x33B8, "kV"},
+		{0x33B9, "MV"},
+		{0x33BA, "pW"},
+		{0x33BB, "nW"},
+		{0x33BD, "mW"},
+		{0x33BE, "kW"},
+		{0x33BF, "MW"},
+		{0x33C2, "a.m."},
+		{0x33C3, "Bq"},
+		{0x33C4, "cc"},
+		{0x33C5, "cd"},
+		{0x33C7, "Co."},
+		{0x33C8, "dB"},
+		{0x33C9, "Gy"},
+		{0x33CA, "ha"},
+		{0x33CB, "HP"},
+		{0x33CC, "in"},
+		{0x33CD, "KK"},
+		{0x33CE, "KM"},
+		{0x33CF, "kt"},
+		{0x33D0, "lm"},
+		{0x33D1, "ln"},
+		{0x33D2, "log"},
+		{0x33D3, "lx"},
+		{0x33D4, "mb"},
+		{0x33D5, "mil"},
+		{0x33D6, "mol"},
+		{0x33D7, "PH"},
+		{0x33D8, "p.m."},
+		{0x33D9, "PPM"},
+		{0x33DA, "PR"},
+		{0x33DB, "sr"},
+		{0x33DC, "Sv"},
+		{0x33DD, "Wb"},
+		{0x33FF, "gal"},
+	}
+	if len(checks) != 95 {
+		t.Fatalf("square table %d", len(checks))
+	}
+	for _, check := range checks {
+		got, ok := squareASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'k', 'g', '.', 0x20A8, 0x2A74, 0xFE30, 0x3382, 0x338C, 0x33C0, 0x1F190, 0x1F14A} {
+		if _, ok := squareASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := squareASCII(r); ok {
+			n++
+		}
+	}
+	if n != 95 {
+		t.Fatalf("square fold count %d", n)
+	}
+}
