@@ -4589,3 +4589,89 @@ func TestFractionASCIIFoldsOnlyVulgarFractions(t *testing.T) {
 		t.Fatalf("fraction fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsTagPunctuation(t *testing.T) {
+	secret := "code/ver1"
+	solidus := "code\U000E002Fver1"
+	dotSecret := "code.ver1x"
+	dot := "code\U000E002Ever1x"
+	hyphenSecret := "code-verifier12"
+	hyphen := "code\U000E002Dverifier12"
+	colonSecret := "code:ver1x"
+	colon := "code\U000E003Aver1x"
+	slashSecret := "code\\ver1x"
+	rev := "code\U000E005Cver1x"
+	encoded := "code%F3%A0%80%AFver1"
+	inserted := "tokenValue1\U000E002FtokenValue1"
+	text := "rejected " + solidus + " " + dot + " " + hyphen + " " + colon + " " + rev + " " + encoded + " " + inserted + " later"
+	got := SanitizeFailure(text, secret, dotSecret, hyphenSecret, colonSecret, slashSecret, "tokenValue1tokenValue1")
+	for _, leaked := range []string{
+		secret, solidus, dotSecret, dot, hyphenSecret, hyphen, colonSecret, colon, slashSecret, rev,
+		encoded, inserted, "ver1", "verifier12", "tokenValue1",
+	} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E002Fver1"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "ver1"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E002F later",
+		"see \U000E005C later",
+		"see \U000E002E later",
+		"see \U000E002D later",
+		"see \U000E003A later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagPunctuationASCIIFoldsOnlyThose(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xE002D, '-', true},
+		{0xE002E, '.', true},
+		{0xE002F, '/', true},
+		{0xE003A, ':', true},
+		{0xE005C, '\\', true},
+		{'-', 0, false},
+		{'.', 0, false},
+		{'/', 0, false},
+		{':', 0, false},
+		{'\\', 0, false},
+		{0xE0001, 0, false},
+		{0xE0061, 0, false},
+		{0xE007F, 0, false},
+		{0x00AD, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := tagPunctuationASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0xE007F; r++ {
+		if _, ok := tagPunctuationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 5 {
+		t.Fatalf("tag punctuation fold count %d", n)
+	}
+}

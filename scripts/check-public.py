@@ -536,6 +536,21 @@ def component_private(part):
                 return True
     return False
 
+# Unicode tag punctuation does not NFKC-fold. It is a format character, so
+# the component reading strips it. That still blocks a tag sitting inside
+# auth.json, but it also glues auth.json to the next component and deletes
+# the dot, colon, or hyphen the private name needs. The punctuation reading
+# is tried only after that strip reading fails. Language tag and cancel tag
+# are not ASCII copies and stay out.
+TAG_PUNCT_CHARS = frozenset('\U000E002D\U000E002E\U000E002F\U000E003A\U000E005C')
+TAG_PUNCT = str.maketrans({
+    0xE002D: '-',
+    0xE002E: '.',
+    0xE002F: '/',
+    0xE003A: ':',
+    0xE005C: '/',
+})
+
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
     # auth.json/payload.txt and a backslash twin are the same leak.
@@ -545,9 +560,12 @@ def path_reason(rel):
     if reason := component_path_reason(rel):
         return reason
     shy = chr(0x00AD)
-    if shy not in rel:
-        return ''
-    return component_path_reason(rel.replace(shy, '-'))
+    if shy in rel:
+        if reason := component_path_reason(rel.replace(shy, '-')):
+            return reason
+    if any(ch in TAG_PUNCT_CHARS for ch in rel):
+        return component_path_reason(rel.translate(TAG_PUNCT))
+    return ''
 
 def component_path_reason(rel):
     for part in Path(normalized_rel(rel)).parts:
@@ -760,6 +778,14 @@ def self_test():
         'auth.json\u29c4secret.txt', 'credentials\u29c5token.txt', 'notes\u29c4id_rsa',
         'nested/id_rsa\u29c5x', 'Diagnostics\u29c4capture.png', 'tokens.json\u29c5extra.txt',
         'readme\u29c4auth.json', 'file\u29c5.netrc', 'ID_RSA\u29c4x',
+        'auth.json\U000E002Fsecret.txt', 'credentials\U000E005Ctoken.txt', 'notes\U000E002Fid_rsa',
+        'nested/id_rsa\U000E005Cx', 'Diagnostics\U000E002Fcapture.png', 'tokens.json\U000E002Fextra.txt',
+        'readme\U000E005Cauth.json', 'file\U000E002F.netrc', 'ID_RSA\U000E005Cx',
+        'auth\U000E002Ejson', 'accounts\U000E002Ejson', '\U000E002Enetrc',
+        'notes\U000E003Aid_rsa', 'launch\U000E002Dhistory.json',
+        'readme\U000E003Aauth.json', 'Copy of auth\U000E002Ejson',
+        'nested/tokens\U000E002Ejson/extra.txt', 'au\U000E002Fth.json', 'a\U000E002Euth.json',
+        'auth.json\U000E0001',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -855,6 +881,11 @@ def self_test():
         'models.json\u27c9readme.txt', 'readme\u27c8md',
         'notes\u29c4readme.txt', 'script.go\u29c5Zone.Identifier', 'id_rsa.pub\u29c4foo.txt',
         'models.json\u29c5readme.txt', 'readme\u29c4md',
+        'notes\U000E002Freadme.txt', 'script.go\U000E005CZone.Identifier', 'id_rsa.pub\U000E002Ffoo.txt',
+        'models.json\U000E002Freadme.txt', 'readme\U000E002Fmd',
+        'notes\U000E002Etxt', 'script\U000E002Ego', 'id_rsa\U000E002Epub',
+        'notes\U000E003Areadme.txt', 'script.go\U000E002Dextra',
+        'au\U000E002Fth.txt', 'notes\U000E0001readme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
