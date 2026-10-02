@@ -489,6 +489,10 @@ SEPARATOR_LIKE = {
     # letter, and that letter glues a private name to the next component.
     ord('\u27c8'): '/',
     ord('\u27c9'): '/',
+    # Squared rising and falling diagonal slashes do not NFKC-fold to a
+    # slash, but each one still splits the next component.
+    ord('\u29c4'): '/',
+    ord('\u29c5'): '/',
 }
 
 def normalized_rel(rel):
@@ -753,6 +757,9 @@ def self_test():
         'auth.json\u27c8secret.txt', 'credentials\u27c9token.txt', 'notes\u27c8id_rsa',
         'nested/id_rsa\u27c9x', 'Diagnostics\u27c8capture.png', 'tokens.json\u27c9extra.txt',
         'readme\u27c8auth.json', 'file\u27c9.netrc', 'ID_RSA\u27c8x',
+        'auth.json\u29c4secret.txt', 'credentials\u29c5token.txt', 'notes\u29c4id_rsa',
+        'nested/id_rsa\u29c5x', 'Diagnostics\u29c4capture.png', 'tokens.json\u29c5extra.txt',
+        'readme\u29c4auth.json', 'file\u29c5.netrc', 'ID_RSA\u29c4x',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -846,6 +853,8 @@ def self_test():
         'models.json\u33c6readme.txt', 'readme\u33dfmd',
         'notes\u27c8readme.txt', 'script.go\u27c9Zone.Identifier', 'id_rsa.pub\u27c8foo.txt',
         'models.json\u27c9readme.txt', 'readme\u27c8md',
+        'notes\u29c4readme.txt', 'script.go\u29c5Zone.Identifier', 'id_rsa.pub\u29c4foo.txt',
+        'models.json\u29c5readme.txt', 'readme\u29c4md',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
