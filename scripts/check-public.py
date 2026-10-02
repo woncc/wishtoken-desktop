@@ -862,6 +862,20 @@ def roman_ascii(cp):
         0x217D: 'c', 0x217E: 'd', 0x217F: 'm',
     }.get(cp)
 
+
+def additive_roman(cp):
+    # Roman numerals that NFKC expands to more than one ASCII letter.
+    # Single-letter numerals are folded by roman_ascii. Archaic thousand
+    # signs and late forms do not fold to ASCII letters.
+    return {
+        0x2161: 'II', 0x2162: 'III', 0x2163: 'IV', 0x2165: 'VI',
+        0x2166: 'VII', 0x2167: 'VIII', 0x2168: 'IX',
+        0x216A: 'XI', 0x216B: 'XII',
+        0x2171: 'ii', 0x2172: 'iii', 0x2173: 'iv', 0x2175: 'vi',
+        0x2176: 'vii', 0x2177: 'viii', 0x2178: 'ix',
+        0x217A: 'xi', 0x217B: 'xii',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -938,6 +952,14 @@ def fold_content(data):
         mapped = roman_ascii(cp)
         if mapped is not None:
             out.append(mapped)
+            changed = True
+            continue
+        # Additive roman numerals expand to more than one ASCII letter.
+        # This pass does not run NFKC, so a token written with them stayed
+        # split. One numeral is not long enough to spell a token by itself.
+        expanded = additive_roman(cp)
+        if expanded is not None:
+            out.append(expanded)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1464,8 +1486,19 @@ def self_test():
         raise SystemExit('self-test failed: a roman key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(roman_path):
         raise SystemExit('self-test failed: a roman personal path was not detected')
-    if content_reasons('chapter \u2160 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2161' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2170' * 10).encode()) or content_reasons(('-----BEGIN ' + '\u216d' + 'ERTIFICATE-----').encode()):
+    if content_reasons('chapter \u2160 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2170' * 10).encode()) or content_reasons(('-----BEGIN ' + '\u216d' + 'ERTIFICATE-----').encode()):
         raise SystemExit('self-test failed: ordinary roman text was blocked')
+    if additive_roman(0x2161) != 'II' or additive_roman(0x2162) != 'III' or additive_roman(0x2163) != 'IV' or additive_roman(0x2165) != 'VI' or additive_roman(0x2166) != 'VII' or additive_roman(0x2167) != 'VIII' or additive_roman(0x2168) != 'IX' or additive_roman(0x216A) != 'XI' or additive_roman(0x216B) != 'XII' or additive_roman(0x2171) != 'ii' or additive_roman(0x2172) != 'iii' or additive_roman(0x2173) != 'iv' or additive_roman(0x2175) != 'vi' or additive_roman(0x2176) != 'vii' or additive_roman(0x2177) != 'viii' or additive_roman(0x2178) != 'ix' or additive_roman(0x217A) != 'xi' or additive_roman(0x217B) != 'xii' or additive_roman(0x2160) is not None or additive_roman(0x2164) is not None or additive_roman(0x2170) is not None or additive_roman(0x2180) is not None or additive_roman(0x2185) is not None or additive_roman(0x2153) is not None:
+        raise SystemExit('self-test failed: additive roman fold is wrong')
+    if sum(additive_roman(cp) is not None for cp in range(0x2150, 0x2190)) != 18:
+        raise SystemExit('self-test failed: additive roman fold count is wrong')
+    add_token = ('rt_' + '\u2166' * 9).encode()
+    add_mix = ('sk-' + 'a' * 10 + '\u2161' + 'a' * 20).encode()
+    add_jwt = ('eyJ' + '\u2177' * 7 + '.' + '\u2176' * 10 + '.' + '\u2175' * 8).encode()
+    if content_reasons(add_token) != ['secret token literal'] or content_reasons(add_mix) != ['secret token literal'] or content_reasons(add_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: an additive roman secret was not detected')
+    if content_reasons('see \u2161 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2185' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2166' * 2).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2153' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary additive roman text was blocked')
 
 def main():
     self_test()
