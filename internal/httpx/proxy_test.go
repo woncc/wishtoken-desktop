@@ -1842,4 +1842,12 @@ func TestRedactHidesTagSolidusInProxyPassword(t *testing.T) {
 	if got := Redact(plain); got != plain {
 		t.Fatalf("address changed: %q", got)
 	}
+	spaced := "rt_Zz9q ab7f3a"
+	spaceMark := strings.ReplaceAll(spaced, " ", "\U000E0020")
+	got = Redact("http://user:" + url.PathEscape(spaced) + "@127.0.0.1:7890?q=" + spaceMark)
+	for _, leaked := range []string{spaced, spaceMark, "Zz9q", "ab7f3a"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("tag space leaked %q in %q", leaked, got)
+		}
+	}
 }
