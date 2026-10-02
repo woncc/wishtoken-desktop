@@ -113,7 +113,9 @@ const SECRET_TEXT = [
 // Otherwise "user:secret@my-proxy:7890%2Enext" keeps the password.
 // A colon after the port ends the host too. A literal colon already does.
 // Percent-encoding hides that cut, including a nested %253A, and so do the
-// colon lookalikes. Otherwise "user:secret@my-proxy:7890%3Anext" keeps the password.
+// colon lookalikes. Mongolian and Manchu full stops are the same kind of
+// separator. Otherwise "user:secret@my-proxy:7890%3Anext" and
+// "user:secret@my-proxy\u18037890" keep the password.
 // A middle dot after the port ends the host too. These marks do not fold to
 // "." or "。" under NFKC, so the period cut never sees them. U+0387 folds to
 // U+00B7 and U+FF65 folds to U+30FB. Percent-encoding hides the same cut,
@@ -133,10 +135,12 @@ const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，
 // Compatibility colons and other colon-shaped marks still divide userinfo.
 // U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
+// U+1803 and U+1809 do not fold to ":" either. They still divide userinfo
+// and a port, or "user:secret@my-proxy\u18037890" keeps the password.
 // Percent-encoding of those UTF-8 bytes, including extra %25 layers, and a
 // nested ASCII colon such as %253A, are separators as well. A lookalike in
 // the port is a separator too, or the same mark before the port keeps the password.
-const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589'];
+const COLON_CHARS = ['\uFE13', '\uFE55', '\uFF1A', '\u2236', '\u02D0', '\uA789', '\u02F8', '\u0703', '\u0704', '\u0589', '\u1803', '\u1809'];
 function percentBytes(char) {
   return encodeURIComponent(char).replace(/%([0-9A-F]{2})/g, (_match, hex) => {
     const cls = digit => (digit >= 'A' && digit <= 'F' ? `[${digit}${digit.toLowerCase()}]` : digit);
@@ -175,12 +179,15 @@ const AT_SEP = atSeparator();
 // U+3002 does not. U+FE12 and U+FF61 fold to it, and a label split still hid
 // the password. Middle dots, bullets, danda, Arabic and Syriac full stops, and
 // the two-dot leader do not fold to "." either. They still split a host.
+// Mongolian and Manchu full stops do not fold to "." either. A numeric host
+// can hide a password behind them the same way a colon can.
 const DOT_CHARS = ['\uFF0E', '\uFE52', '\u2024', '\u3002', '\uFE12', '\uFF61'];
 const MIDDLE_CHARS = ['\u00B7', '\u0387', '\u1427', '\u2027', '\u2219', '\u22C5', '\u2E31', '\u30FB', '\uFF65'];
 const STOP_CHARS = ['\u2022', '\u2023', '\u2043', '\u204C', '\u204D', '\u25E6', '\u29BF', '\u0964', '\u0965', '\u06D4', '\u0701', '\u0702', '\u2025', '\uFE30'];
+const MONGOLIAN_STOPS = ['\u1803', '\u1809'];
 function dotSeparator() {
   const parts = ['\\.', '%2[Ee]', '%25(?:25){0,2}2[Ee]'];
-  for (const char of DOT_CHARS.concat(MIDDLE_CHARS, STOP_CHARS)) {
+  for (const char of DOT_CHARS.concat(MIDDLE_CHARS, STOP_CHARS, MONGOLIAN_STOPS)) {
     parts.push(char);
     const encoded = percentBytes(char);
     for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
