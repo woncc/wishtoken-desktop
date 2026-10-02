@@ -3571,3 +3571,90 @@ func TestCircledNumberASCIIFoldsOnlyTensThroughFifty(t *testing.T) {
 		t.Fatalf("circled number fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsDotLeaders(t *testing.T) {
+	pairs := []struct {
+		secret string
+		dots   string
+		mark   string
+	}{
+		{"rt_Zz9q..7f3a", "..", "\u2025"},
+		{"rt_Zz9q...7f3a", "...", "\u2026"},
+		{"rt_Aa8k...7f3a", "...", "\uFE19"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.dots, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.dots)
+	}
+	bearer := "Bearer q7.Zz9q..token7"
+	bearerMarked := strings.ReplaceAll(bearer, "..", "\u2025")
+	parts = append(parts, bearerMarked)
+	leaked = append(leaked, bearer, bearerMarked, "token7")
+	encoded := strings.ReplaceAll(pairs[0].secret, "..", "%E2%80%A5")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[1].secret, "...", "\u2026")
+	got = SanitizeFailure("rejected "+pairs[1].secret+" later", stored)
+	for _, item := range []string{pairs[1].secret, stored, "Zz9q", "...", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2025 later",
+		"see \u2026 later",
+		"see \uFE19 later",
+		"see \uFE30 later",
+		"see \u2024 later",
+		"see \u22EF later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("leader prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDotLeaderASCIIFoldsOnlyLeaders(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2025, ".."},
+		{0x2026, "..."},
+		{0xFE19, "..."},
+	}
+	for _, check := range checks {
+		got, ok := dotLeaderASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'.', 0x2024, 0x2027, 0x22EF, 0xFE30, 0xFE52, 0xFF0E} {
+		if _, ok := dotLeaderASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := dotLeaderASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("dot leader fold count %d", n)
+	}
+}
