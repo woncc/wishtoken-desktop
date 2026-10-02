@@ -287,8 +287,18 @@ const ALT_DIGIT = '[\\u00B2\\u00B3\\u00B9\\u2070\\u2074-\\u2079\\u2080-\\u2089]'
 const ALT_DIGIT_ENC = '(?:%(?:25){0,3}[Cc]2%(?:25){0,3}[Bb][239]|%(?:25){0,3}[Ee]2%(?:25){0,3}81%(?:25){0,3}[Bb][04-9]|%(?:25){0,3}[Ee]2%(?:25){0,3}82%(?:25){0,3}8\\d)';
 const DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
 const numericLabel = `(?:(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){1,4}|0[xX][0-9A-Fa-f]{1,8})`;
-const domainLabel = `(?:[A-Za-z0-9-](?:${MARK}(?=[A-Za-z0-9-]))?)+`;
-const literalDomain = `(?:[A-Za-z0-9.-](?:${MARK}(?=[A-Za-z0-9.-]))?)+\\.(?:[A-Za-z](?:${MARK}(?=[A-Za-z]))?){2,}`;
+// Fullwidth, superscript, and subscript digits already count in a numeric host
+// and a port. A letter label accepted only an ASCII digit, so the same marks
+// kept the password in "user:secret@my\uFF10proxy:7890" and
+// "user:secret@ex\u00B2ample.com:8080". Percent-encoding hides that digit too,
+// including a nested %25. The redacted text keeps the original digit.
+const LABEL_DIGIT = `(?:[\\uFF10-\\uFF19]|${ALT_DIGIT}|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
+const DOMAIN_UNIT = `(?:[A-Za-z0-9-]|${LABEL_DIGIT})`;
+const domainLabel = `(?:${DOMAIN_UNIT}(?:${MARK}(?=${DOMAIN_UNIT}))?)+`;
+const LITERAL_UNIT = `(?:[A-Za-z0-9.-]|${LABEL_DIGIT})`;
+const literalDomain = `(?:${LITERAL_UNIT}(?:${MARK}(?=${LITERAL_UNIT}))?)+\\.(?:[A-Za-z](?:${MARK}(?=[A-Za-z]))?){2,}`;
+const SINGLE_UNIT = `(?:[A-Za-z0-9_-]|${LABEL_DIGIT})`;
+const singleLabel = `[A-Za-z](?:${SINGLE_UNIT}|${MARK}(?=${SINGLE_UNIT}))*`;
 const encodedDomain = `${domainLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${domainLabel})*${MARK}?(?=${DOT_SEP})${DOT_SEP}(?:[A-Za-z](?:${MARK}(?=[A-Za-z]))?){2,}`;
 const fourNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numericLabel}){3}`;
 const shortNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numericLabel}){0,2}`;
@@ -448,7 +458,7 @@ function stopTail() {
   return `(?:${parts.join('|')})`;
 }
 const STOP_JOIN = stopTail();
-const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_HOST}|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${MARK}*${proxyPort}${PORT_SOME})?|(?:${MARK})*(?:${shortNumeric}|(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){4,10}|[A-Za-z](?:[A-Za-z0-9_-]|${MARK}(?=[A-Za-z0-9_-]))*)${MARK}*${proxyPort}${PORT_REQUIRED})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
+const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_HOST}|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${MARK}*${proxyPort}${PORT_SOME})?|(?:${MARK})*(?:${shortNumeric}|(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){4,10}|${singleLabel})${MARK}*${proxyPort}${PORT_REQUIRED})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
 // "&#58;", "&#x3A;", and "&colon;" are a colon. "&#64;" and "&commat;" are "@".
 // The same references hide a digit or a host dot, and a numeric reference may
 // omit its semicolon. Nested "&amp;#58;" is still a colon. Decode those marks
