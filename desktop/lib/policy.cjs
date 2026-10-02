@@ -49,15 +49,19 @@ const SECRET_TEXT = [
 // single-label host count.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
+// A backtick, pipe, or backslash after the port is a boundary too, including
+// the fullwidth forms. Curly quotes count because straight quotes already do.
+// Otherwise a single-label host such as "user:secret@my-proxy:7890`next"
+// keeps the password.
 // A query, path, or fragment marker is a boundary too. Otherwise
 // "http://example.com/?x=user:secret@10.0.0.8:1080" keeps the password.
 // The same markers can sit inside the password. A URL parser rejects
 // "http://user:secret/token@10.0.0.8:1080", but the raw text, and the
 // "invalid port" fragment of that error, still contain the secret.
 // "=" and "&" are not part of the username, so a query key stays in place.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉]';
-const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉]';
-const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”]';
+const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”]';
+const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
 // U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
