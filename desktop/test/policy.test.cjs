@@ -1907,3 +1907,67 @@ test('renderer text drops proxy passwords when fullwidth digits are encoded', ()
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords when superscript or subscript digits hide the host', () => {
+  const password = 's3cret-token';
+  const superDigit = { 0: '\u2070', 1: '\u00B9', 2: '\u00B2', 3: '\u00B3', 4: '\u2074', 5: '\u2075', 6: '\u2076', 7: '\u2077', 8: '\u2078', 9: '\u2079' };
+  const subDigit = digit => String.fromCodePoint(0x2080 + Number(digit));
+  const mapDigits = (text, digit) => text.split('').map(item => (typeof digit === 'function' ? digit(item) : digit[item])).join('');
+  const encDigits = (text, digit) => mapDigits(text, digit).split('').map(char => encodeURIComponent(char)).join('');
+  const nest = text => text.replace(/%/g, '%25');
+  const superPort = mapDigits('7890', superDigit);
+  const subPort = mapDigits('8080', subDigit);
+  const encSubPort = encDigits('8080', subDigit);
+  const encSuperHost = [encDigits('127', superDigit), encDigits('0', superDigit), encDigits('0', superDigit), encDigits('1', superDigit)].join('%2E');
+  const literalHost = [mapDigits('127', superDigit), mapDigits('0', superDigit), mapDigits('0', superDigit), mapDigits('1', superDigit)].join('.');
+  const cases = [
+    [`user:${password}@my-proxy:${superPort}`, `my-proxy:${superPort}`],
+    [`(user:${password}@router:${subPort})`, `(router:${subPort})`],
+    [`user:${password}@10.1:${encSubPort}`, `10.1:${encSubPort}`],
+    [`user:${password}@10.1:${nest(encSubPort)}`, `10.1:${nest(encSubPort)}`],
+    [`user:${password}@my-proxy:${encSubPort.toLowerCase()}`, `my-proxy:${encSubPort.toLowerCase()}`],
+    [`user:${password}@${literalHost}:7890`, `${literalHost}:7890`],
+    [`user:${password}@${encSuperHost}:${superPort}`, `${encSuperHost}:${superPort}`],
+    [`user:${password}@my-proxy%3A${superPort}`, `my-proxy%3A${superPort}`],
+    [`via user:${password} proxy@router:${subPort} failed`, `via router:${subPort} failed`],
+    [`http://example.com/?x=user:${password}@my-proxy:${superPort}`, `http://example.com/?x=my-proxy:${superPort}`],
+    [`http://user:${password}@${literalHost}:${subPort}/x`, `http://${literalHost}:${subPort}/x`],
+    [`socks5://alice:hunter2@10.1:${encSubPort}`, `socks5://10.1:${encSubPort}`],
+    [`user:${password}/token@my-proxy:${superPort}`, `my-proxy:${superPort}`],
+    [`user\uFF1A${password}@router:${subPort}`, `router:${subPort}`],
+    [`//user:${password}@${encSuperHost}:7890`, `//${encSuperHost}:7890`],
+    [`two user:${password}@my-proxy:${superPort}) and user:other-secret@10.1:${subPort}.`, `two my-proxy:${superPort}) and 10.1:${subPort}.`],
+    [`invalid proxy url "http://user:s3cret/token@my-proxy:${superPort}": invalid port ":s3cret" after host`, `invalid proxy url "http://my-proxy:${superPort}": invalid port ":[凭据已隐藏]" after host`]
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  assert.equal(redactPublic(`user:${password}@my-proxy:${superDigit[7]}`), `user:${password}@my-proxy:${superDigit[7]}`);
+  assert.equal(redactPublic(`user:${password}@10.1:${subDigit(8)}`), `user:${password}@10.1:${subDigit(8)}`);
+  assert.equal(redactPublic(`user:${password}@my-proxy:${mapDigits('789012', superDigit)}`), `user:${password}@my-proxy:${mapDigits('789012', superDigit)}`);
+  assert.equal(redactPublic(`user:${password}@${mapDigits('127', superDigit)}`), `user:${password}@${mapDigits('127', superDigit)}`);
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic(`user:${password}@internal`), `user:${password}@internal`);
+  assert.equal(redactPublic('score 1:2@10.5'), 'score 1:2@10.5');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic(`note 100${encodeURIComponent(superDigit[2])} off`), `note 100${encodeURIComponent(superDigit[2])} off`);
+  assert.equal(redactPublic(`http://user@my-proxy:${superPort}`), `http://user@my-proxy:${superPort}`);
+  assert.equal(redactPublic(`user:${password}@127.0.0.1:7890`), '127.0.0.1:7890');
+  const proxy = `http://user:${password}@127.0.0.1:${superPort}`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@${literalHost}:7890`, email: 'a@example.test', last_error: `dial user:${password}@router:${subPort} failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, `note ${literalHost}:7890`);
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, `dial router:${subPort} failed`);
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
