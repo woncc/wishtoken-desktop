@@ -4603,11 +4603,14 @@ func TestSanitizeFailureStripsTagPunctuation(t *testing.T) {
 	rev := "code\U000E005Cver1x"
 	encoded := "code%F3%A0%80%AFver1"
 	inserted := "tokenValue1\U000E002FtokenValue1"
-	text := "rejected " + solidus + " " + dot + " " + hyphen + " " + colon + " " + rev + " " + encoded + " " + inserted + " later"
-	got := SanitizeFailure(text, secret, dotSecret, hyphenSecret, colonSecret, slashSecret, "tokenValue1tokenValue1")
+	spaceSecret := "rt_Zz9q ab7f3a"
+	spaceMark := strings.ReplaceAll(spaceSecret, " ", "\U000E0020")
+	insertedSpace := "tokenValue1\U000E0020tokenValue1"
+	text := "rejected " + solidus + " " + dot + " " + hyphen + " " + colon + " " + rev + " " + encoded + " " + inserted + " " + spaceMark + " " + insertedSpace + " later"
+	got := SanitizeFailure(text, secret, dotSecret, hyphenSecret, colonSecret, slashSecret, "tokenValue1tokenValue1", spaceSecret)
 	for _, leaked := range []string{
 		secret, solidus, dotSecret, dot, hyphenSecret, hyphen, colonSecret, colon, slashSecret, rev,
-		encoded, inserted, "ver1", "verifier12", "tokenValue1",
+		encoded, inserted, spaceSecret, spaceMark, insertedSpace, "ver1", "verifier12", "tokenValue1", "Zz9q", "ab7f3a",
 	} {
 		if strings.Contains(got, leaked) {
 			t.Fatalf("leaked %q in %q", leaked, got)
@@ -4623,6 +4626,13 @@ func TestSanitizeFailureStripsTagPunctuation(t *testing.T) {
 			t.Fatalf("stored tag leaked %q in %q", leaked, got)
 		}
 	}
+	storedSpace := strings.ReplaceAll(spaceSecret, " ", "\U000E0020")
+	got = SanitizeFailure("rejected "+spaceSecret+" later", storedSpace)
+	for _, leaked := range []string{spaceSecret, storedSpace, "Zz9q", "ab7f3a"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag space leaked %q in %q", leaked, got)
+		}
+	}
 	for _, prose := range []string{
 		"see \U000E002F later",
 		"see \U000E005C later",
@@ -4631,6 +4641,7 @@ func TestSanitizeFailureStripsTagPunctuation(t *testing.T) {
 		"see \U000E003A later",
 		"see \U000E0001 later",
 		"see \U000E007F later",
+		"see \U000E0020 later",
 	} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("tag prose changed: %q -> %q", prose, got)
@@ -4644,6 +4655,7 @@ func TestTagPunctuationASCIIFoldsOnlyThose(t *testing.T) {
 		want byte
 		ok   bool
 	}{
+		{0xE0020, ' ', true},
 		{0xE002D, '-', true},
 		{0xE002E, '.', true},
 		{0xE002F, '/', true},
@@ -4671,7 +4683,7 @@ func TestTagPunctuationASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 5 {
+	if n != 6 {
 		t.Fatalf("tag punctuation fold count %d", n)
 	}
 }

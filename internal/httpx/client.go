@@ -383,11 +383,11 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	if soft, ok := foldSoftHyphenPieces(folded); ok {
 		spans = append(spans, exactSecretSpans(soft, foldSoftHyphenString(needle))...)
 	}
-	// Tag hyphen, full stop, solidus, colon, and reverse solidus are format
-	// characters, so the drop pass below removes them. That joins a token and
-	// misses the stored byte. Folding those five is a separate reading; the
-	// drop reading still runs, so an inserted tag cannot hide a token that
-	// has no such mark. Language tag and cancel tag are not ASCII copies.
+	// Tag space, hyphen, full stop, solidus, colon, and reverse solidus are
+	// format characters, so the drop pass below removes them. That joins a
+	// token and misses the stored byte. Folding those six is a separate
+	// reading; the drop reading still runs, so an inserted tag cannot hide a
+	// token that has no such mark. Language tag and cancel tag are not ASCII copies.
 	needleTag := foldTagPunctuationString(needle)
 	if tagged, ok := foldTagPunctuationPieces(folded); ok {
 		spans = append(spans, exactSecretSpans(tagged, needleTag)...)
@@ -529,13 +529,13 @@ func foldSoftHyphenString(s string) string {
 	return renderPieces(folded)
 }
 
-// foldTagPunctuationPieces maps the five Unicode tag punctuation characters
-// to the ASCII marks they copy. None of them NFKC-fold. This pass does not
-// run NFKC, and dropMarkPieces removes format characters, so a stored slash,
-// dot, hyphen, colon, or backslash written with a tag would stay visible.
-// One output piece covers the original rune. The drop reading still runs on
-// the unfolded pieces. Other tag characters, including letters and the
-// language and cancel tags, stay out.
+// foldTagPunctuationPieces maps Unicode tag space and the five tag
+// punctuation characters to the ASCII marks they copy. None of them
+// NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes format
+// characters, so a stored space, slash, dot, hyphen, colon, or backslash
+// written with a tag would stay visible. One output piece covers the
+// original rune. The drop reading still runs on the unfolded pieces. Other
+// tag characters, including letters and the language and cancel tags, stay out.
 func foldTagPunctuationPieces(in []secretPiece) ([]secretPiece, bool) {
 	if len(in) == 0 {
 		return in, false
@@ -582,6 +582,8 @@ func tagPunctuationFolded(s string) bool {
 
 func tagPunctuationASCII(r rune) (byte, bool) {
 	switch r {
+	case 0xE0020:
+		return ' ', true
 	case 0xE002D:
 		return '-', true
 	case 0xE002E:

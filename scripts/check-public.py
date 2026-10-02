@@ -536,14 +536,15 @@ def component_private(part):
                 return True
     return False
 
-# Unicode tag punctuation does not NFKC-fold. It is a format character, so
-# the component reading strips it. That still blocks a tag sitting inside
-# auth.json, but it also glues auth.json to the next component and deletes
-# the dot, colon, or hyphen the private name needs. The punctuation reading
-# is tried only after that strip reading fails. Language tag and cancel tag
-# are not ASCII copies and stay out.
-TAG_PUNCT_CHARS = frozenset('\U000E002D\U000E002E\U000E002F\U000E003A\U000E005C')
+# Unicode tag space and tag punctuation do not NFKC-fold. They are format
+# characters, so the component reading strips them. That still blocks a tag
+# sitting inside auth.json, but it also glues auth.json to the next component,
+# joins "Copy of" into one word, and deletes the dot, colon, or hyphen the
+# private name needs. The punctuation reading is tried only after that strip
+# reading fails. Language tag and cancel tag are not ASCII copies and stay out.
+TAG_PUNCT_CHARS = frozenset('\U000E0020\U000E002D\U000E002E\U000E002F\U000E003A\U000E005C')
 TAG_PUNCT = str.maketrans({
+    0xE0020: ' ',
     0xE002D: '-',
     0xE002E: '.',
     0xE002F: '/',
@@ -786,6 +787,8 @@ def self_test():
         'readme\U000E003Aauth.json', 'Copy of auth\U000E002Ejson',
         'nested/tokens\U000E002Ejson/extra.txt', 'au\U000E002Fth.json', 'a\U000E002Euth.json',
         'auth.json\U000E0001',
+        'Copy\U000E0020of auth.json', 'Copy of\U000E0020auth.json',
+        'Copy of auth\U000E0020.json',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -886,6 +889,8 @@ def self_test():
         'notes\U000E002Etxt', 'script\U000E002Ego', 'id_rsa\U000E002Epub',
         'notes\U000E003Areadme.txt', 'script.go\U000E002Dextra',
         'au\U000E002Fth.txt', 'notes\U000E0001readme.txt',
+        'Copy\U000E0020of README.md', 'notes\U000E0020readme.txt',
+        'script\U000E0020.go', 'id_rsa\U000E0020.pub',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
