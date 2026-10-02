@@ -1,6 +1,8 @@
 package httpx
 
 import (
+	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -97,4 +99,50 @@ func TestPreserveProxyKeepsSecretWhenEditorReturnsRedaction(t *testing.T) {
 	if PreserveProxy(current, "  ") != "" {
 		t.Fatal("clear did not remove the proxy")
 	}
+}
+
+func TestRedactHidesPercentEncodedProxyPassword(t *testing.T) {
+	const password = "s3cret-proxy"
+	encoded := encodeEveryByte(password)
+	nested := encodeEveryByte(encoded)
+	spaced := "s3cret proxy"
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + strings.ToLower(encoded),
+		"http://user:" + password + "@127.0.0.1:7890#" + encoded,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + nested,
+		"http://user:" + password + "@127.0.0.1:7890?q=s3cret-" + encodeEveryByte("proxy"),
+		"http://user:" + password + "%zz@127.0.0.1:7890?q=" + encodeEveryByte(password+"%zz"),
+		"http://user:" + url.PathEscape(spaced) + "@127.0.0.1:7890?q=" + url.QueryEscape(spaced),
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, encoded, nested, spaced, url.QueryEscape(spaced), url.PathEscape(spaced)} {
+			if leaked != "" && strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if again := Redact(got); strings.Contains(again, password) || strings.Contains(again, encoded) {
+			t.Fatalf("second redact leaked: %q", again)
+		}
+		if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+			t.Fatalf("preserve %q -> %q", in, kept)
+		}
+	}
+	untouched := "http://user@127.0.0.1:7890?keep=%31%32&q=" + encoded
+	if Redact(untouched) != untouched {
+		t.Fatalf("username-only query changed: %q", Redact(untouched))
+	}
+	withQuery := "http://user:" + password + "@127.0.0.1:7890?keep=%31%32&q=" + encoded
+	if got := Redact(withQuery); !strings.Contains(got, "keep=%31%32") || strings.Contains(got, encoded) {
+		t.Fatalf("query context lost: %q", got)
+	}
+}
+
+func encodeEveryByte(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		fmt.Fprintf(&b, "%%%02X", s[i])
+	}
+	return b.String()
 }

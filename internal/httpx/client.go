@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -177,14 +178,117 @@ func maskProxyPassword(redacted, password string) string {
 	if len(password) < 8 {
 		return redacted
 	}
-	redacted = strings.ReplaceAll(redacted, password, "xxxxx")
-	if esc := url.PathEscape(password); esc != password {
-		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
-	}
+	// url.URL.Redacted keeps RawQuery and RawFragment. A password hidden there
+	// by one or more layers of percent-encoding must not survive either.
+	redacted = maskEncodedSecret(redacted, password)
 	if esc := url.QueryEscape(password); esc != password {
 		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
 	}
 	return redacted
+}
+
+// maskEncodedSecret replaces secret even when some or all of its bytes are
+// percent-encoded, including nested escapes such as %2573 for 's'.
+func maskEncodedSecret(s, secret string) string {
+	if secret == "" || s == "" {
+		return s
+	}
+	pieces := rawPieces(s)
+	var spans [][2]int
+	for layer := 0; layer < 5; layer++ {
+		spans = append(spans, findSecretSpans(pieces, secret)...)
+		next := decodePieces(pieces)
+		if len(next) == len(pieces) {
+			break
+		}
+		pieces = next
+	}
+	return applySecretSpans(s, spans)
+}
+
+type secretPiece struct {
+	b     byte
+	start int
+	end   int
+}
+
+func rawPieces(s string) []secretPiece {
+	out := make([]secretPiece, len(s))
+	for i := 0; i < len(s); i++ {
+		out[i] = secretPiece{b: s[i], start: i, end: i + 1}
+	}
+	return out
+}
+
+func decodePieces(in []secretPiece) []secretPiece {
+	out := make([]secretPiece, 0, len(in))
+	for i := 0; i < len(in); {
+		if in[i].b == '%' && i+2 < len(in) && isHex(in[i+1].b) && isHex(in[i+2].b) {
+			v, err := strconv.ParseUint(string([]byte{in[i+1].b, in[i+2].b}), 16, 8)
+			if err == nil {
+				out = append(out, secretPiece{b: byte(v), start: in[i].start, end: in[i+2].end})
+				i += 3
+				continue
+			}
+		}
+		out = append(out, in[i])
+		i++
+	}
+	return out
+}
+
+func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
+	if len(secret) == 0 || len(pieces) < len(secret) {
+		return nil
+	}
+	var text strings.Builder
+	text.Grow(len(pieces))
+	for _, piece := range pieces {
+		text.WriteByte(piece.b)
+	}
+	rendered := text.String()
+	var spans [][2]int
+	from := 0
+	for {
+		i := strings.Index(rendered[from:], secret)
+		if i < 0 {
+			return spans
+		}
+		i += from
+		spans = append(spans, [2]int{pieces[i].start, pieces[i+len(secret)-1].end})
+		from = i + len(secret)
+	}
+}
+
+func applySecretSpans(s string, spans [][2]int) string {
+	if len(spans) == 0 {
+		return s
+	}
+	sort.Slice(spans, func(i, j int) bool {
+		if spans[i][0] == spans[j][0] {
+			return spans[i][1] > spans[j][1]
+		}
+		return spans[i][0] < spans[j][0]
+	})
+	merged := [][2]int{spans[0]}
+	for _, span := range spans[1:] {
+		last := &merged[len(merged)-1]
+		if span[0] >= last[1] {
+			merged = append(merged, span)
+			continue
+		}
+		if span[1] > last[1] {
+			last[1] = span[1]
+		}
+	}
+	for i := len(merged) - 1; i >= 0; i-- {
+		start, end := merged[i][0], merged[i][1]
+		if start < 0 || end > len(s) || start >= end {
+			continue
+		}
+		s = s[:start] + "xxxxx" + s[end:]
+	}
+	return s
 }
 
 // scrubProxyUserinfo replaces a password in user:password@host when url.Parse
