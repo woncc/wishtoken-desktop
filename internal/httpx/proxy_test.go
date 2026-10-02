@@ -182,3 +182,44 @@ func TestRedactHidesCompatibilityColon(t *testing.T) {
 		t.Fatalf("short secret kept a compatibility colon: %q", short)
 	}
 }
+
+func TestRedactHidesColonLookalikes(t *testing.T) {
+	const password = "s3cret-proxy"
+	// UTF-8 for U+2236 RATIO, then that sequence percent-encoded again.
+	encodedColon := "%E2%88%B6"
+	nestedColon := "%25E2%2588%25B6"
+	cases := []string{
+		"http://user" + "\u2236" + password + "@127.0.0.1:7890",
+		"http://user" + "\u02d0" + password + "@127.0.0.1:7890",
+		"http://user" + "\ua789" + password + "@127.0.0.1:7890",
+		"http://user" + "\u02f8" + password + "@127.0.0.1:7890",
+		"http://user" + "\u0703" + password + "@127.0.0.1:7890",
+		"http://user" + "\u0704" + password + "@127.0.0.1:7890",
+		"http://user" + "\u0589" + password + "@127.0.0.1:7890",
+		"user" + "\u2236" + password + "@127.0.0.1:7890",
+		"http://user" + encodedColon + password + "@127.0.0.1:7890",
+		"http://user" + nestedColon + password + "@127.0.0.1:7890",
+		"http://user" + "\ua789" + password + "%zz@127.0.0.1:7890",
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, encodedColon + password, nestedColon + password} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "xxxxx") {
+			t.Fatalf("redact %q did not mask password: %q", in, got)
+		}
+		if again := Redact(got); strings.Contains(again, password) {
+			t.Fatalf("second redact leaked: %q", again)
+		}
+		if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+			t.Fatalf("preserve %q -> %q", in, kept)
+		}
+	}
+	short := Redact("http://user\u2236name@127.0.0.1:7890")
+	if strings.Contains(short, "\u2236") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a colon lookalike: %q", short)
+	}
+}
