@@ -16,7 +16,9 @@ var (
 // SanitizeFailure removes credential-shaped material from an operator-facing
 // failure string. Ordinary sentences and error codes stay. Known secrets are
 // removed even when they are too short for the generic patterns, including
-// their query-escaped form.
+// their query-escaped and percent-encoded forms. Generic token shapes are
+// checked again after percent-decoding, so a double-encoded callback value
+// does not survive query parsing.
 func SanitizeFailure(detail string, secrets ...string) string {
 	detail = strings.TrimSpace(detail)
 	if detail == "" {
@@ -27,20 +29,12 @@ func SanitizeFailure(detail string, secrets ...string) string {
 		if len(secret) < 8 {
 			continue
 		}
-		detail = strings.ReplaceAll(detail, secret, "[redacted]")
+		detail = maskEncodedSecret(detail, secret, "[redacted]")
 		if esc := url.QueryEscape(secret); esc != secret {
 			detail = strings.ReplaceAll(detail, esc, "[redacted]")
 		}
 	}
-	detail = jwtPattern.ReplaceAllString(detail, "[redacted]")
-	detail = bearerPattern.ReplaceAllString(detail, "[redacted]")
-	detail = prefixedPattern.ReplaceAllString(detail, "[redacted]")
-	detail = opaquePattern.ReplaceAllStringFunc(detail, func(run string) string {
-		if opaqueCredential(run) {
-			return "[redacted]"
-		}
-		return run
-	})
+	detail = maskCredentialPatterns(detail)
 	detail = strings.Join(strings.Fields(detail), " ")
 	for strings.Contains(detail, "[redacted] [redacted]") {
 		detail = strings.ReplaceAll(detail, "[redacted] [redacted]", "[redacted]")
@@ -77,4 +71,42 @@ func failureTextRemains(detail string) bool {
 	stripped := strings.ReplaceAll(detail, "[redacted]", "")
 	stripped = strings.Trim(stripped, " \t()[]{}:;,./*-_\"'")
 	return stripped != ""
+}
+
+func maskCredentialPatterns(detail string) string {
+	pieces := rawPieces(detail)
+	var spans [][2]int
+	for layer := 0; layer < 5; layer++ {
+		spans = append(spans, credentialPatternSpans(renderPieces(pieces), pieces)...)
+		next := decodePieces(pieces)
+		if len(next) == len(pieces) {
+			break
+		}
+		pieces = next
+	}
+	return applySecretSpans(detail, spans, "[redacted]")
+}
+
+func credentialPatternSpans(rendered string, pieces []secretPiece) [][2]int {
+	if rendered == "" || len(pieces) != len(rendered) {
+		return nil
+	}
+	var spans [][2]int
+	add := func(start, end int) {
+		if start < 0 || end > len(pieces) || start >= end {
+			return
+		}
+		spans = append(spans, [2]int{pieces[start].start, pieces[end-1].end})
+	}
+	for _, pattern := range []*regexp.Regexp{jwtPattern, bearerPattern, prefixedPattern} {
+		for _, loc := range pattern.FindAllStringIndex(rendered, -1) {
+			add(loc[0], loc[1])
+		}
+	}
+	for _, loc := range opaquePattern.FindAllStringIndex(rendered, -1) {
+		if opaqueCredential(rendered[loc[0]:loc[1]]) {
+			add(loc[0], loc[1])
+		}
+	}
+	return spans
 }

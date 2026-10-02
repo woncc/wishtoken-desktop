@@ -180,7 +180,7 @@ func maskProxyPassword(redacted, password string) string {
 	}
 	// url.URL.Redacted keeps RawQuery and RawFragment. A password hidden there
 	// by one or more layers of percent-encoding must not survive either.
-	redacted = maskEncodedSecret(redacted, password)
+	redacted = maskEncodedSecret(redacted, password, "xxxxx")
 	if esc := url.QueryEscape(password); esc != password {
 		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
 	}
@@ -189,8 +189,8 @@ func maskProxyPassword(redacted, password string) string {
 
 // maskEncodedSecret replaces secret even when some or all of its bytes are
 // percent-encoded, including nested escapes such as %2573 for 's'.
-func maskEncodedSecret(s, secret string) string {
-	if secret == "" || s == "" {
+func maskEncodedSecret(s, secret, repl string) string {
+	if secret == "" || s == "" || repl == "" {
 		return s
 	}
 	pieces := rawPieces(s)
@@ -203,7 +203,16 @@ func maskEncodedSecret(s, secret string) string {
 		}
 		pieces = next
 	}
-	return applySecretSpans(s, spans)
+	return applySecretSpans(s, spans, repl)
+}
+
+func renderPieces(pieces []secretPiece) string {
+	var text strings.Builder
+	text.Grow(len(pieces))
+	for _, piece := range pieces {
+		text.WriteByte(piece.b)
+	}
+	return text.String()
 }
 
 type secretPiece struct {
@@ -241,12 +250,7 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	if len(secret) == 0 || len(pieces) < len(secret) {
 		return nil
 	}
-	var text strings.Builder
-	text.Grow(len(pieces))
-	for _, piece := range pieces {
-		text.WriteByte(piece.b)
-	}
-	rendered := text.String()
+	rendered := renderPieces(pieces)
 	var spans [][2]int
 	from := 0
 	for {
@@ -260,7 +264,7 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	}
 }
 
-func applySecretSpans(s string, spans [][2]int) string {
+func applySecretSpans(s string, spans [][2]int, repl string) string {
 	if len(spans) == 0 {
 		return s
 	}
@@ -286,7 +290,7 @@ func applySecretSpans(s string, spans [][2]int) string {
 		if start < 0 || end > len(s) || start >= end {
 			continue
 		}
-		s = s[:start] + "xxxxx" + s[end:]
+		s = s[:start] + repl + s[end:]
 	}
 	return s
 }
