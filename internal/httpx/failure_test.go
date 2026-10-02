@@ -1277,3 +1277,147 @@ func TestRomanASCIIFoldsOnlySingleLetters(t *testing.T) {
 		t.Fatalf("roman fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsLongS(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.signature12"
+	marked := strings.ReplaceAll(jwt, "s", "\u017f")
+	encoded := strings.Replace(jwt, "s", "%C5%BF", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "signature12", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "sessionToken12"
+	markedSecret := strings.ReplaceAll(secret, "s", "\u017f")
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "ession", "Token12"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	opaque := "sessionToken12sessionToken12abcd"
+	markedOpaque := strings.ReplaceAll(opaque, "s", "\u017f")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "sessionToken12", "abcd"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"long \u017f word",
+		"see \ufb05 later",
+		"see \u1e9b later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("long s prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestLongSASCIIFoldsOnlyLongS(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x017F, 's', true},
+		{'s', 0, false},
+		{0xFB05, 0, false},
+		{0x1E9B, 0, false},
+		{0x1E9C, 0, false},
+		{0x1E9D, 0, false},
+		{0x209B, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := longSASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := longSASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("long s fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsPlusEqualsSigns(t *testing.T) {
+	opaque := "tokenValue1tokenValue1tokenVal+="
+	marked := strings.NewReplacer("+", "\u207a", "=", "\uff1d").Replace(opaque)
+	encoded := strings.NewReplacer("+", "%E2%81%BA", "=", "%E2%81%BC").Replace(opaque)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{opaque, marked, encoded, "tokenValue", "ValueToken"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "code+verif="
+	markedSecret := strings.NewReplacer("+", "\ufb29", "=", "\ufe66").Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "code", "verif"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"a\u207a b",
+		"see \u00b1 later",
+		"see \u2260 later",
+		"see \u207b later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("plus prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestPlusEqualsASCIIFoldsOnlySigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x207A, '+', true},
+		{0x208A, '+', true},
+		{0xFB29, '+', true},
+		{0xFE62, '+', true},
+		{0xFF0B, '+', true},
+		{0x207C, '=', true},
+		{0x208C, '=', true},
+		{0xFE66, '=', true},
+		{0xFF1D, '=', true},
+		{'+', 0, false},
+		{'=', 0, false},
+		{0x00B1, 0, false},
+		{0x207B, 0, false},
+		{0x208B, 0, false},
+		{0x2260, 0, false},
+		{0xFF0D, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := plusEqualsASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := plusEqualsASCII(r); ok {
+			n++
+		}
+	}
+	if n != 9 {
+		t.Fatalf("plus fold count %d", n)
+	}
+}
