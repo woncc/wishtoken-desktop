@@ -195,7 +195,7 @@ func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
 		if until, reason, ok := s.Pool.Cooldown(acc.ID); ok {
 			entry.Status = "cooldown"
 			entry.CooldownUntil = until.UTC().Format(time.RFC3339)
-			entry.CooldownReason = account.ScrubDisplay(reason)
+			entry.CooldownReason = account.ScrubDisplay(reason, acc.AccessToken, acc.RefreshToken, acc.IDToken)
 		}
 		out = append(out, entry)
 	}

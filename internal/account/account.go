@@ -110,10 +110,11 @@ func (a *Account) Identity() string {
 
 // Label is a short display name.
 func (a *Account) Label() string {
-	if name := scrubDisplay(a.Name); name != "" {
+	secrets := a.secretValues()
+	if name := scrubDisplay(a.Name, secrets...); name != "" {
 		return name
 	}
-	if email := scrubDisplay(a.Email); email != "" {
+	if email := scrubDisplay(a.Email, secrets...); email != "" {
 		return email
 	}
 	if a.AccountID != "" {
@@ -205,11 +206,12 @@ type View struct {
 
 // View returns the redacted representation.
 func (a *Account) View() View {
+	secrets := a.secretValues()
 	v := View{
-		ID: a.ID, Name: scrubDisplay(a.Name), Email: scrubDisplay(a.Email), AccountID: MaskID(a.AccountID), PlanType: scrubDisplay(a.PlanType),
+		ID: a.ID, Name: scrubDisplay(a.Name, secrets...), Email: scrubDisplay(a.Email, secrets...), AccountID: MaskID(a.AccountID), PlanType: scrubDisplay(a.PlanType, secrets...),
 		Disabled: a.Disabled, HasRefreshToken: a.RefreshToken != "", HasAccessToken: a.AccessToken != "",
-		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: scrubDisplay(a.Source), Tags: scrubDisplayList(a.Tags),
-		LastError: scrubDisplay(a.LastError), Usage: a.Usage, Stats: a.Stats, CreatedAt: a.CreatedAt,
+		Expired: a.Expired(), ProxyURL: redactProxy(a.ProxyURL), Source: scrubDisplay(a.Source, secrets...), Tags: scrubDisplayList(a.Tags, secrets...),
+		LastError: scrubDisplay(a.LastError, secrets...), Usage: a.Usage, Stats: a.Stats, CreatedAt: a.CreatedAt,
 	}
 	v.ExpiresAt = formatTime(a.ExpiresAt)
 	v.LastRefresh = formatTime(a.LastRefresh)
@@ -255,25 +257,37 @@ func redactProxy(u string) string {
 // ScrubDisplay masks proxy passwords and credential-shaped text for management
 // responses. The stored proxy URL itself is redacted separately. A token
 // embedded in a name, tag, or error is removed even when the field also
-// contains ordinary text.
-func ScrubDisplay(value string) string { return scrubDisplay(value) }
+// contains ordinary text. Known secrets are removed before generic token
+// shapes run, so a quote or backslash inside a real token cannot leave a tail.
+func ScrubDisplay(value string, secrets ...string) string { return scrubDisplay(value, secrets...) }
 
-func scrubDisplay(value string) string {
+func (a Account) secretValues() []string {
+	var out []string
+	for _, value := range []string{a.AccessToken, a.RefreshToken, a.IDToken} {
+		value = strings.TrimSpace(value)
+		if len(value) >= 8 {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func scrubDisplay(value string, secrets ...string) string {
 	value = displayName(value)
 	if value == "" {
 		return ""
 	}
 	value = httpx.Redact(value)
-	return httpx.SanitizeFailure(value)
+	return httpx.SanitizeFailure(value, secrets...)
 }
 
-func scrubDisplayList(values []string) []string {
+func scrubDisplayList(values []string, secrets ...string) []string {
 	if len(values) == 0 {
 		return nil
 	}
 	out := make([]string, 0, len(values))
 	for _, value := range values {
-		if shown := scrubDisplay(value); shown != "" {
+		if shown := scrubDisplay(value, secrets...); shown != "" {
 			out = append(out, shown)
 		}
 	}

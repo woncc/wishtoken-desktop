@@ -173,11 +173,11 @@ func parseTextLines(text, source string, res *ImportResult) {
 			continue
 		}
 		// A proxy password or token stuffed into email must not block the JWT claim.
-		if email := strings.TrimSpace(acc.Email); scrubDisplay(email) != email {
+		if email := strings.TrimSpace(acc.Email); scrubDisplay(email, acc.secretValues()...) != email {
 			acc.Email = ""
 		}
 		acc.FillFromTokens()
-		acc.Email = scrubDisplay(acc.Email)
+		acc.Email = scrubDisplay(acc.Email, acc.secretValues()...)
 		res.Accounts = append(res.Accounts, acc)
 	}
 }
@@ -304,7 +304,7 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 		UserID:       getString(m, "user_id", "chatgpt_user_id", "userId"),
 		ProxyURL:     getString(m, "proxy_url", "proxyUrl", "proxy"),
 	}
-	acc.Name = scrubDisplay(acc.Name)
+	acc.Name = scrubDisplay(acc.Name, acc.secretValues()...)
 	if user, ok := m["user"].(map[string]any); ok {
 		if acc.Email == "" {
 			acc.Email = getString(user, "email")
@@ -354,22 +354,22 @@ func addEntry(m map[string]any, source string, res *ImportResult) {
 	if tags, ok := m["tags"].([]any); ok {
 		for _, t := range tags {
 			if s, ok := t.(string); ok {
-				if s = scrubDisplay(s); s != "" {
+				if s = scrubDisplay(s, acc.secretValues()...); s != "" {
 					acc.Tags = append(acc.Tags, s)
 				}
 			}
 		}
 	}
 	// A proxy password or token stuffed into email must not block the JWT claim.
-	if email := strings.TrimSpace(acc.Email); scrubDisplay(email) != email {
+	if email := strings.TrimSpace(acc.Email); scrubDisplay(email, acc.secretValues()...) != email {
 		acc.Email = ""
 	}
-	if plan := strings.TrimSpace(acc.PlanType); scrubDisplay(plan) != plan {
+	if plan := strings.TrimSpace(acc.PlanType); scrubDisplay(plan, acc.secretValues()...) != plan {
 		acc.PlanType = ""
 	}
 	acc.FillFromTokens()
-	acc.Email = scrubDisplay(acc.Email)
-	acc.PlanType = scrubDisplay(acc.PlanType)
+	acc.Email = scrubDisplay(acc.Email, acc.secretValues()...)
+	acc.PlanType = scrubDisplay(acc.PlanType, acc.secretValues()...)
 	if acc.AccountID == "" && acc.RefreshToken == "" {
 		res.Warnings = append(res.Warnings, fmt.Sprintf("%s: no account id and no refresh token; the access token alone cannot be renewed", acc.Label()))
 	}

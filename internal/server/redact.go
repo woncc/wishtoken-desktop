@@ -63,7 +63,9 @@ func (s *Server) oauthSecrets() []string {
 	var secrets []string
 	add := func(v string) {
 		v = strings.TrimSpace(v)
-		if len(v) < 12 || strings.ContainsAny(v, "\\\"\n\r") {
+		// Quotes, backslashes, and newlines still identify a stored token.
+		// Management JSON encodes them; jsonStringBody masks that form.
+		if len(v) < 12 {
 			return
 		}
 		secrets = append(secrets, v)
@@ -92,13 +94,31 @@ func replaceSecrets(raw []byte, secrets []string) []byte {
 		// Exact bytes miss a token copied with a spacing mark or percent
 		// encoding. Mask the known secret without reformatting the JSON.
 		text = httpx.MaskEncodedSecret(text, secret, "[redacted]")
-		quoted, err := json.Marshal(secret)
-		if err != nil || len(quoted) < 2 {
+		escaped, ok := jsonStringBody(secret)
+		if !ok || escaped == secret {
 			continue
 		}
-		text = httpx.MaskEncodedSecret(text, string(quoted[1:len(quoted)-1]), "[redacted]")
+		text = httpx.MaskEncodedSecret(text, escaped, "[redacted]")
 	}
 	return []byte(text)
+}
+
+// jsonStringBody is the inside of a JSON string encoded the same way as
+// api.WriteJSON. encoding/json's default HTML escaping would hide '<' as
+// \u003c, which management responses do not do, so a token containing both
+// a quote and '<' would survive.
+func jsonStringBody(secret string) (string, bool) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(secret); err != nil {
+		return "", false
+	}
+	encoded := bytes.TrimRight(buf.Bytes(), "\n")
+	if len(encoded) < 2 || encoded[0] != '"' || encoded[len(encoded)-1] != '"' {
+		return "", false
+	}
+	return string(encoded[1 : len(encoded)-1]), true
 }
 
 func blankCredentialFields(raw []byte) ([]byte, bool) {

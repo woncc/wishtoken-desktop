@@ -460,3 +460,51 @@ func TestViewHidesCredentialsSplitBySpacingMarks(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsThatNeedJSONEscapes(t *testing.T) {
+	refresh := "rt_quote\"x<secret\\value\nzzTAIL99"
+	marked := refresh[:8] + "\u093e" + refresh[8:]
+	encoded := "rt_quote%22x%3Csecret%5Cvalue%0AzzTAIL99"
+	acc := Account{
+		Name: "note " + refresh + " " + encoded, Email: "kept@example.com", PlanType: "plus",
+		RefreshToken: refresh, Source: "from " + marked, Tags: []string{"team", "see " + marked},
+		LastError: "rejected " + marked, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, marked, encoded, "zzTAIL99", "x<secret", "secret\\value"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 2 || view.Tags[0] != "team" || !strings.Contains(view.Tags[1], "see") {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}
+
+func TestImportHidesCredentialsThatNeedJSONEscapes(t *testing.T) {
+	refresh := "rt_quote\"x<secret\\value\nzzTAIL99"
+	marked := "see " + refresh[:8] + "\u093e" + refresh[8:]
+	token := sampleJWT("kept@example.com", "acct_keep")
+	raw, err := json.Marshal(map[string]any{
+		"access_token": token, "refresh_token": refresh, "email": "kept@example.com",
+		"name": "note " + refresh, "tags": []string{"team", marked},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Parse(raw, "fixture")
+	if err != nil || len(res.Accounts) != 1 {
+		t.Fatalf("import: %v %+v", err, res)
+	}
+	acc := res.Accounts[0]
+	shown := acc.Name + "\n" + acc.Email + "\n" + strings.Join(acc.Tags, "\n") + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, "zzTAIL99", "x<secret", "secret\\value"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if acc.Email != "kept@example.com" || !strings.Contains(acc.Name, "note") || len(acc.Tags) != 2 || acc.Tags[0] != "team" || !strings.Contains(acc.Tags[1], "see") || acc.RefreshToken != refresh {
+		t.Fatalf("import changed the stored credential or context: %+v", acc)
+	}
+}
