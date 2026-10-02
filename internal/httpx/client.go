@@ -587,6 +587,392 @@ func fullwidthASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldRupeePieces maps the rupee sign to the ASCII "Rs" NFKC produces.
+// This pass does not run NFKC, so a stored secret written with that sign
+// would stay visible. Each output byte keeps the original rune's range.
+// Other currency signs do not fold to "Rs", so they stay out.
+func foldRupeePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := rupeeASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldRupeeString(s string) string {
+	if !rupeeFolded(s) {
+		return s
+	}
+	return renderPieces(foldRupeePieces(rawPieces(s)))
+}
+
+func rupeeFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := rupeeASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func rupeeASCII(r rune) (string, bool) {
+	if r == 0x20A8 {
+		return "Rs", true
+	}
+	return "", false
+}
+
+// foldSquarePieces maps CJK square symbols to the ASCII sequences NFKC
+// produces. This pass does not run NFKC, so a stored secret written with
+// those forms would stay visible. Each output byte keeps the original
+// rune's range. Squares whose compatibility decomposition is not ASCII
+// stay out. The rupee sign is folded separately. Double colon equal and
+// the vertical two-dot leader stay out; the leader is read as a colon
+// when a proxy password is split.
+func foldSquarePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := squareASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldSquareString(s string) string {
+	if !squareFolded(s) {
+		return s
+	}
+	return renderPieces(foldSquarePieces(rawPieces(s)))
+}
+
+func squareFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := squareASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func squareASCII(r rune) (string, bool) {
+	switch r {
+	case 0x3250:
+		return "PTE", true
+	case 0x32CC:
+		return "Hg", true
+	case 0x32CD:
+		return "erg", true
+	case 0x32CE:
+		return "eV", true
+	case 0x32CF:
+		return "LTD", true
+	case 0x3371:
+		return "hPa", true
+	case 0x3372:
+		return "da", true
+	case 0x3373:
+		return "AU", true
+	case 0x3374:
+		return "bar", true
+	case 0x3375:
+		return "oV", true
+	case 0x3376:
+		return "pc", true
+	case 0x3377:
+		return "dm", true
+	case 0x3378:
+		return "dm2", true
+	case 0x3379:
+		return "dm3", true
+	case 0x337A:
+		return "IU", true
+	case 0x3380:
+		return "pA", true
+	case 0x3381:
+		return "nA", true
+	case 0x3383:
+		return "mA", true
+	case 0x3384:
+		return "kA", true
+	case 0x3385:
+		return "KB", true
+	case 0x3386:
+		return "MB", true
+	case 0x3387:
+		return "GB", true
+	case 0x3388:
+		return "cal", true
+	case 0x3389:
+		return "kcal", true
+	case 0x338A:
+		return "pF", true
+	case 0x338B:
+		return "nF", true
+	case 0x338E:
+		return "mg", true
+	case 0x338F:
+		return "kg", true
+	case 0x3390:
+		return "Hz", true
+	case 0x3391:
+		return "kHz", true
+	case 0x3392:
+		return "MHz", true
+	case 0x3393:
+		return "GHz", true
+	case 0x3394:
+		return "THz", true
+	case 0x3396:
+		return "ml", true
+	case 0x3397:
+		return "dl", true
+	case 0x3398:
+		return "kl", true
+	case 0x3399:
+		return "fm", true
+	case 0x339A:
+		return "nm", true
+	case 0x339C:
+		return "mm", true
+	case 0x339D:
+		return "cm", true
+	case 0x339E:
+		return "km", true
+	case 0x339F:
+		return "mm2", true
+	case 0x33A0:
+		return "cm2", true
+	case 0x33A1:
+		return "m2", true
+	case 0x33A2:
+		return "km2", true
+	case 0x33A3:
+		return "mm3", true
+	case 0x33A4:
+		return "cm3", true
+	case 0x33A5:
+		return "m3", true
+	case 0x33A6:
+		return "km3", true
+	case 0x33A9:
+		return "Pa", true
+	case 0x33AA:
+		return "kPa", true
+	case 0x33AB:
+		return "MPa", true
+	case 0x33AC:
+		return "GPa", true
+	case 0x33AD:
+		return "rad", true
+	case 0x33B0:
+		return "ps", true
+	case 0x33B1:
+		return "ns", true
+	case 0x33B3:
+		return "ms", true
+	case 0x33B4:
+		return "pV", true
+	case 0x33B5:
+		return "nV", true
+	case 0x33B7:
+		return "mV", true
+	case 0x33B8:
+		return "kV", true
+	case 0x33B9:
+		return "MV", true
+	case 0x33BA:
+		return "pW", true
+	case 0x33BB:
+		return "nW", true
+	case 0x33BD:
+		return "mW", true
+	case 0x33BE:
+		return "kW", true
+	case 0x33BF:
+		return "MW", true
+	case 0x33C2:
+		return "a.m.", true
+	case 0x33C3:
+		return "Bq", true
+	case 0x33C4:
+		return "cc", true
+	case 0x33C5:
+		return "cd", true
+	case 0x33C7:
+		return "Co.", true
+	case 0x33C8:
+		return "dB", true
+	case 0x33C9:
+		return "Gy", true
+	case 0x33CA:
+		return "ha", true
+	case 0x33CB:
+		return "HP", true
+	case 0x33CC:
+		return "in", true
+	case 0x33CD:
+		return "KK", true
+	case 0x33CE:
+		return "KM", true
+	case 0x33CF:
+		return "kt", true
+	case 0x33D0:
+		return "lm", true
+	case 0x33D1:
+		return "ln", true
+	case 0x33D2:
+		return "log", true
+	case 0x33D3:
+		return "lx", true
+	case 0x33D4:
+		return "mb", true
+	case 0x33D5:
+		return "mil", true
+	case 0x33D6:
+		return "mol", true
+	case 0x33D7:
+		return "PH", true
+	case 0x33D8:
+		return "p.m.", true
+	case 0x33D9:
+		return "PPM", true
+	case 0x33DA:
+		return "PR", true
+	case 0x33DB:
+		return "sr", true
+	case 0x33DC:
+		return "Sv", true
+	case 0x33DD:
+		return "Wb", true
+	case 0x33FF:
+		return "gal", true
+	default:
+		return "", false
+	}
+}
+
+// foldLetterlikePieces maps letterlike signs to the ASCII sequences NFKC
+// produces. This pass does not run NFKC, so a stored secret written with
+// those forms would stay visible. Each output byte keeps the original
+// rune's range. Single-letter forms in this block are folded with the
+// mathematical letters. The rupee sign and CJK square units stay out.
+func foldLetterlikePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := letterlikeASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldLetterlikeString(s string) string {
+	if !letterlikeFolded(s) {
+		return s
+	}
+	return renderPieces(foldLetterlikePieces(rawPieces(s)))
+}
+
+func letterlikeFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := letterlikeASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func letterlikeASCII(r rune) (string, bool) {
+	switch r {
+	case 0x2100:
+		return "a/c", true
+	case 0x2101:
+		return "a/s", true
+	case 0x2105:
+		return "c/o", true
+	case 0x2106:
+		return "c/u", true
+	case 0x2116:
+		return "No", true
+	case 0x2120:
+		return "SM", true
+	case 0x2121:
+		return "TEL", true
+	case 0x2122:
+		return "TM", true
+	case 0x213B:
+		return "FAX", true
+	default:
+		return "", false
+	}
+}
+
 // foldMathPieces maps mathematical alphanumeric symbols to ASCII.
 // NFKC folds them, and this pass does not run NFKC, so a stored token or a
 // JWT written with those forms would stay visible. Greek mathematical
@@ -595,7 +981,8 @@ func fullwidthASCII(r rune) (byte, bool) {
 // Planck's constant for italic h. Those holes, and the few double-struck
 // italic letters, are listed here. Kelvin sign and information source also
 // fold to one ASCII letter, but they are not mathematical letters, so the
-// modifier fold lists them. One output piece covers the original rune.
+// modifier fold lists them. Letterlike signs that expand to more than one
+// character are folded separately. One output piece covers the original rune.
 func foldMathPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -938,7 +1325,7 @@ func escapeASCII(r rune) (byte, bool) {
 }
 
 // foldCredentialPieces maps compatibility letters, digits, latin
-// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, and token punctuation, including the percent sign, exclamation
+// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, letterlike signs, square symbols, the rupee sign, and token punctuation, including the percent sign, exclamation
 // mark, consecutive equals signs, dot leaders, reverse solidus, number sign, dollar sign,
 // ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
@@ -949,11 +1336,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldSquarePieces(foldRupeePieces(foldLetterlikePieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldSquareString(foldRupeeString(foldLetterlikeString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -3322,8 +3709,9 @@ func digitCommaASCII(r rune) (string, bool) {
 // foldParenNumberPieces maps parenthesized numbers from one through twenty
 // to the ASCII parentheses and digits NFKC produces. This pass does not run
 // NFKC, so a stored secret written with those forms would stay visible. Each
-// output byte keeps the original rune's range. Parenthesized letters and
-// parenthesized hangul do not fold to ASCII digits, so they stay out.
+// output byte keeps the original rune's range. Parenthesized letters are
+// folded separately. Parenthesized hangul do not fold to ASCII digits, so
+// they stay out.
 func foldParenNumberPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -3384,15 +3772,164 @@ func parenNumberASCII(r rune) (string, bool) {
 	}
 }
 
+// foldParenLetterPieces maps parenthesized Latin letters to the ASCII
+// parentheses and letter NFKC produces. This pass does not run NFKC, so a
+// stored secret written with those forms would stay visible. Each output
+// byte keeps the original rune's range. Parenthesized numbers and
+// parenthesized hangul do not fold to ASCII letters, so they stay out.
+func foldParenLetterPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := parenLetterASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldParenLetterString(s string) string {
+	if !parenLetterFolded(s) {
+		return s
+	}
+	return renderPieces(foldParenLetterPieces(rawPieces(s)))
+}
+
+func parenLetterFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := parenLetterASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func parenLetterASCII(r rune) (string, bool) {
+	switch {
+	case r >= 0x249C && r <= 0x24B5:
+		return string([]byte{'(', byte('a' + (r - 0x249C)), ')'}), true
+	case r >= 0x1F110 && r <= 0x1F129:
+		return string([]byte{'(', byte('A' + (r - 0x1F110)), ')'}), true
+	default:
+		return "", false
+	}
+}
+
+// foldEnclosedAbbrevPieces maps circled, squared, and raised Latin
+// abbreviations to the ASCII letters NFKC produces. This pass does not run
+// NFKC, so a stored secret written with those forms would stay visible.
+// Each output byte keeps the original rune's range. Single enclosed letters
+// are folded separately. CJK square units, letterlike signs, and negative
+// circled letters do not fold here.
+func foldEnclosedAbbrevPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := enclosedAbbrevASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldEnclosedAbbrevString(s string) string {
+	if !enclosedAbbrevFolded(s) {
+		return s
+	}
+	return renderPieces(foldEnclosedAbbrevPieces(rawPieces(s)))
+}
+
+func enclosedAbbrevFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := enclosedAbbrevASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func enclosedAbbrevASCII(r rune) (string, bool) {
+	switch r {
+	case 0x1F12D:
+		return "CD", true
+	case 0x1F12E:
+		return "WZ", true
+	case 0x1F14A:
+		return "HV", true
+	case 0x1F14B:
+		return "MV", true
+	case 0x1F14C:
+		return "SD", true
+	case 0x1F14D:
+		return "SS", true
+	case 0x1F14E:
+		return "PPV", true
+	case 0x1F14F:
+		return "WC", true
+	case 0x1F16A:
+		return "MC", true
+	case 0x1F16B:
+		return "MD", true
+	case 0x1F16C:
+		return "MR", true
+	case 0x1F190:
+		return "DJ", true
+	default:
+		return "", false
+	}
+}
+
 // foldEnclosedPieces maps circled and squared Latin letters and digits to
 // ASCII. NFKC folds them, and this pass does not run NFKC, so a stored
 // token or a JWT written with those forms would stay visible. Circled
 // italic C and R are the only circled italic letters. Circled numbers
 // from ten through fifty expand to two digits and are folded separately.
-// Parenthesized letters, negative circled letters, and squared digraphs
-// such as HV expand to more than one character or do not fold, so they stay
-// out. Digit full stops expand to a number and a full stop and are folded
-// separately. One output piece covers the original rune.
+// Parenthesized letters expand to parentheses plus a letter and are folded
+// separately. Squared and circled abbreviations such as HV expand to more
+// than one letter and are folded separately. Negative circled letters do
+// not fold to ASCII, so they stay out. Digit full stops expand to a number
+// and a full stop and are folded separately. One output piece covers the
+// original rune.
 func foldEnclosedPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

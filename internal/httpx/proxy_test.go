@@ -1545,3 +1545,165 @@ func TestRedactHidesParenNumberInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesParenLetterInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9q(a)7f3a"
+	small := strings.ReplaceAll(password, "(a)", "\u249C")
+	capital := strings.ReplaceAll("rt_Zz9q(Z)7f", "(Z)", "\U0001F129")
+	encoded := strings.ReplaceAll(password, "(a)", "%E2%92%9C")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, small, encoded, "Zz9q", "(a)", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9q(Z)7f"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + capital)
+	for _, leaked := range []string{other, capital, "(Z)"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("capital leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\u249Cexample.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
+
+func TestRedactHidesEnclosedAbbrevInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9qHV7f3a"
+	mark := strings.ReplaceAll(password, "HV", "\U0001F14A")
+	otherMark := strings.ReplaceAll("rt_Zz9qPPV7f", "PPV", "\U0001F14E")
+	encoded := strings.ReplaceAll(password, "HV", "%F0%9F%85%8A")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + mark,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "HV", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9qPPV7f"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + otherMark)
+	for _, leaked := range []string{other, otherMark, "PPV"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("ppv leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\U0001F14Aexample.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
+
+func TestRedactHidesLetterlikeInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9qc/o7f3a"
+	mark := strings.ReplaceAll(password, "c/o", "\u2105")
+	otherMark := strings.ReplaceAll("rt_Zz9qFAX7f", "FAX", "\u213B")
+	encoded := strings.ReplaceAll(password, "c/o", "%E2%84%85")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + mark,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "c/o", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9qFAX7f"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + otherMark)
+	for _, leaked := range []string{other, otherMark, "FAX"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("fax leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\u2105example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
+
+func TestRedactHidesSquareSymbolInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9qkg7f3a"
+	mark := strings.ReplaceAll(password, "kg", "\u338F")
+	otherMark := strings.ReplaceAll("rt_Zz9qgal7f", "gal", "\u33FF")
+	encoded := strings.ReplaceAll(password, "kg", "%E3%8E%8F")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + mark,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "kg", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9qgal7f"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + otherMark)
+	for _, leaked := range []string{other, otherMark, "gal"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("gal leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\u338Fexample.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
+
+func TestRedactHidesRupeeSignInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9qRs7f3a"
+	mark := strings.ReplaceAll(password, "Rs", "\u20A8")
+	encoded := strings.ReplaceAll(password, "Rs", "%E2%82%A8")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + mark,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "Rs", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	plain := "member\u20A8example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
