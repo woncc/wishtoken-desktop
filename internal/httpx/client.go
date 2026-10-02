@@ -263,18 +263,22 @@ func foldUserinfoColons(s string) string {
 }
 
 func lenientUnescape(s string) string {
+	// Fold only percent signs and hex digits. A full credential fold would
+	// turn a Mongolian full stop into '.', and the colon split below would
+	// miss the password. The result is only used to find a hidden colon.
+	folded := foldEscapeString(s)
 	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); {
-		if s[i] == '%' && i+2 < len(s) && isHex(s[i+1]) && isHex(s[i+2]) {
-			v, err := strconv.ParseUint(s[i+1:i+3], 16, 8)
+	b.Grow(len(folded))
+	for i := 0; i < len(folded); {
+		if folded[i] == '%' && i+2 < len(folded) && isHex(folded[i+1]) && isHex(folded[i+2]) {
+			v, err := strconv.ParseUint(folded[i+1:i+3], 16, 8)
 			if err == nil {
 				b.WriteByte(byte(v))
 				i += 3
 				continue
 			}
 		}
-		b.WriteByte(s[i])
+		b.WriteByte(folded[i])
 		i++
 	}
 	return b.String()
@@ -309,8 +313,13 @@ func MaskEncodedSecret(s, secret, repl string) string {
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
 		spans = append(spans, findSecretSpans(pieces, secret)...)
-		next := decodePieces(pieces)
-		if len(next) == len(pieces) {
+		// Decode the folded bytes. A small or fullwidth percent, and hex
+		// digits written with compatibility characters, still open the next
+		// layer. Spans keep the original indexes, so the surrounding text
+		// is not rewritten.
+		folded := foldCredentialPieces(pieces)
+		next := decodePieces(folded)
+		if len(next) == len(folded) {
 			break
 		}
 		pieces = next
@@ -360,15 +369,11 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Parentheses, fullwidth
-	// solidus and tilde, low lines, plus and equals signs, long s, roman
-	// numerals,
-	// segmented digits, modifier letters, superscripts and subscripts,
-	// enclosed letters and digits, mathematical alphanumeric symbols, and
-	// fullwidth letters and digits are folded first. Then drop marks.
-	// Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(secret))))))))))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(pieces))))))))))))))
+	// token together and miss the stored ASCII byte. Fold the credential
+	// alphabet, including a compatibility percent sign, before matching.
+	// Then drop marks. Spacing marks shaped like full stops keep both readings.
+	needle := foldCredentialString(secret)
+	folded := foldCredentialPieces(pieces)
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -788,6 +793,154 @@ func mathASCII(r rune) (byte, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// foldPercentPieces maps small and fullwidth percent signs to ASCII '%'.
+// NFKC folds them, and this pass does not run NFKC, so an escape written
+// with those signs would never be decoded. Arabic percent, per mille, and
+// the commercial minus sign do not fold to '%', so they stay out. One
+// output piece covers the original rune.
+func foldPercentPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := percentASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldPercentString(s string) string {
+	if !percentFolded(s) {
+		return s
+	}
+	return renderPieces(foldPercentPieces(rawPieces(s)))
+}
+
+func percentFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := percentASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func percentASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE6A, 0xFF05:
+		return '%', true
+	default:
+		return 0, false
+	}
+}
+
+// foldEscapePieces maps a compatibility percent sign, and compatibility
+// hex digits, to ASCII. Other credential folds stay out: a Mongolian full
+// stop is a colon to the proxy splitter and a dot to path checks, so this
+// pass must not turn it into '.'. One output piece covers the original rune.
+func foldEscapePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := escapeASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldEscapeString(s string) string {
+	if !escapeFolded(s) {
+		return s
+	}
+	return renderPieces(foldEscapePieces(rawPieces(s)))
+}
+
+func escapeFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := escapeASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func escapeASCII(r rune) (byte, bool) {
+	if b, ok := percentASCII(r); ok {
+		return b, true
+	}
+	if b, ok := fullwidthASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := mathASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := longSASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := romanASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := segmentedASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := modifierASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := superSubASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	if b, ok := enclosedASCII(r); ok && isHex(b) {
+		return b, true
+	}
+	return 0, false
+}
+
+// foldCredentialPieces maps compatibility letters, digits, and token
+// punctuation, including the percent sign, to ASCII. Credential redaction
+// does not run NFKC. The percent fold is part of this result because the
+// decode loop consumes it: a compatibility percent or hex digit still starts
+// the next escape layer. Marks are not dropped here.
+func foldCredentialPieces(in []secretPiece) []secretPiece {
+	return foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))
+}
+
+func foldCredentialString(s string) string {
+	return foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))
 }
 
 // foldParenPieces maps parentheses to ASCII. NFKC folds them, and this

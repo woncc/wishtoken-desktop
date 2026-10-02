@@ -957,3 +957,51 @@ func TestManagementHidesSecretsSplitByParentheses(t *testing.T) {
 		t.Fatalf("note was rewritten: %s", out)
 	}
 }
+
+func TestManagementHidesCompatibilityPercentSecrets(t *testing.T) {
+	refresh := "rt_submitted_123456"
+	encoded := strings.ReplaceAll(encodeEveryByte(refresh), "%", "\uFF05")
+	small := strings.ReplaceAll(encodeEveryByte(refresh), "%", "\uFE6A")
+	hexed := fullwidthHexEscapes(encodeEveryByte(refresh))
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = refresh
+	acc.Name = "note " + encoded
+	acc.LastError = "rejected " + small
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	for _, leaked := range []string{refresh, encoded, small, hexed, acc.AccessToken, "submitted", "123456"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	raw := `{"note":"see ` + hexed + `","access_token":"` + acc.AccessToken + `"}`
+	out := string(f.srv.redactManagementBody([]byte(raw)))
+	for _, leaked := range []string{refresh, hexed, acc.AccessToken, "submitted", "123456"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}
+
+func fullwidthHexEscapes(encoded string) string {
+	var b strings.Builder
+	for _, r := range encoded {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(0xFF10 + (r - '0'))
+		case r >= 'A' && r <= 'F':
+			b.WriteRune(0xFF21 + (r - 'A'))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}

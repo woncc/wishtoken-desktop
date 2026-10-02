@@ -1654,3 +1654,86 @@ func TestParenASCIIFoldsOnlyParentheses(t *testing.T) {
 		t.Fatalf("paren fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCompatibilityPercent(t *testing.T) {
+	secret := "code+verifier12"
+	refresh := "rt_submitted_123456"
+	opaque := "AbCdEf0123456789xyzTOKENVALUEEXTRA"
+	withPercent := func(s, percent string) string {
+		return strings.ReplaceAll(encodeEveryByte(s), "%", percent)
+	}
+	full := withPercent(secret, "\uFF05")
+	small := withPercent(refresh, "\uFE6A")
+	hexed := fullwidthHexEscapes(encodeEveryByte(opaque))
+	nested := withPercent(encodeEveryByte(secret), "\uFF05")
+	text := "rejected " + full + " " + small + " " + hexed + " " + nested + " later"
+	got := SanitizeFailure(text, secret)
+	for _, leaked := range []string{secret, refresh, opaque, full, small, hexed, nested, "verifier", "submitted", "TOKEN"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"about \uFF05 later",
+		"about \uFE6A later",
+		"about \u066A later",
+		"about \u2030 later",
+		"score \uFF05ZZ later",
+		"score \uFF0541 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("percent prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestPercentASCIIFoldsOnlyPercentSigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE6A, '%', true},
+		{0xFF05, '%', true},
+		{'%', 0, false},
+		{0x066A, 0, false},
+		{0x2030, 0, false},
+		{0x2031, 0, false},
+		{0x0609, 0, false},
+		{0x2052, 0, false},
+		{0xFF06, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := percentASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := percentASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("percent fold count %d", n)
+	}
+}
+
+func fullwidthHexEscapes(encoded string) string {
+	var b strings.Builder
+	for _, r := range encoded {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(0xFF10 + (r - '0'))
+		case r >= 'A' && r <= 'F':
+			b.WriteRune(0xFF21 + (r - 'A'))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
