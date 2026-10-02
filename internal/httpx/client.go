@@ -573,6 +573,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleCaret != needleBar {
 		spans = append(spans, exactSecretSpans(caretBase, needleCaret)...)
 	}
+	// Tag grave accent copies '`' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored grave accent. Folding it is a separate reading. It
+	// runs on the tag-circumflex reading so one secret can use both. The
+	// drop reading still runs, so an inserted tag grave accent cannot hide
+	// a token that has no grave accent.
+	graveBase := caretBase
+	if careted, ok := foldTagCircumflexPieces(caretBase); ok {
+		graveBase = careted
+	}
+	needleGrave := foldTagGraveString(needleCaret)
+	if graved, ok := foldTagGravePieces(graveBase); ok {
+		spans = append(spans, exactSecretSpans(graved, needleGrave)...)
+	} else if needleGrave != needleCaret {
+		spans = append(spans, exactSecretSpans(graveBase, needleGrave)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1260,6 +1276,46 @@ func foldTagCircumflexString(s string) string {
 		return s
 	}
 	folded, _ := foldTagCircumflexPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagGravePieces maps the Unicode tag grave accent to ASCII '`'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored grave accent written with a tag would
+// stay visible. One output piece covers the original rune. The drop reading
+// still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagGravePieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0060 {
+			out = append(out, secretPiece{b: '`', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagGraveString(s string) string {
+	if !strings.ContainsRune(s, 0xE0060) {
+		return s
+	}
+	folded, _ := foldTagGravePieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
