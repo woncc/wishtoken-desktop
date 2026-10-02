@@ -1737,3 +1737,74 @@ func fullwidthHexEscapes(encoded string) string {
 	}
 	return b.String()
 }
+
+func TestSanitizeFailureStripsExclamationMarks(t *testing.T) {
+	secret := "code!ver1"
+	marked := strings.ReplaceAll(secret, "!", "\uFE57")
+	encoded := strings.ReplaceAll(secret, "!", "%EF%BC%81")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.ReplaceAll(secret, "!", "\uFE15")
+	full := strings.ReplaceAll(secret, "!", "\uFF01")
+	got = SanitizeFailure("rejected "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, vertical, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u00a1 later",
+		"see \u01c3 later",
+		"see \u203c later",
+		"see \u2049 later",
+		"see \u2757 later",
+		"see \u2762 later",
+		"path \uff01 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("exclamation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestExclamationASCIIFoldsOnlyExclamationMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE15, '!', true},
+		{0xFE57, '!', true},
+		{0xFF01, '!', true},
+		{'!', 0, false},
+		{0x00A1, 0, false},
+		{0x01C3, 0, false},
+		{0x203C, 0, false},
+		{0x2049, 0, false},
+		{0x2757, 0, false},
+		{0x2762, 0, false},
+		{0xFF1F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := exclamationASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := exclamationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("exclamation fold count %d", n)
+	}
+}

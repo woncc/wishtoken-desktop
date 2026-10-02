@@ -781,3 +781,25 @@ func TestRedactHidesAtSignLookalikes(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesExclamationInProxyPassword(t *testing.T) {
+	const password = "s3cret!proxy"
+	marked := strings.ReplaceAll(password, "!", "\uFF01")
+	small := strings.ReplaceAll(password, "!", "\uFE57")
+	vertical := strings.ReplaceAll(password, "!", "\uFE15")
+	encoded := strings.ReplaceAll(password, "!", "%EF%BC%81")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + vertical,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, vertical, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+	}
+}
