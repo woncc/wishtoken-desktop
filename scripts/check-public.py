@@ -52,6 +52,11 @@ DOT_LIKE = {
     ord('\U00016e98'): '.',
     ord('\U0001bc9f'): '.',
     ord('\U0001da88'): '.',
+    # These do not NFKC-fold to '.'. Lisu mya ti, the Kharoshthi punctuation
+    # dot, and Meetei Mayek lum iyek still hide auth.json and .netrc.
+    ord('\ua4f8'): '.',
+    ord('\U00010a50'): '.',
+    ord('\uabec'): '.',
 }
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
 # Mongolian colon and Bamum colon are the same kind of separator.
@@ -445,6 +450,9 @@ def self_test():
         'auth..json', 'accounts...json', 'credentials....json', '..netrc', '...netrc',
         'auth\u2025json', 'accounts\u2026json', '\u2026netrc', 'id_rsa\u2025txt',
         'nested/tokens..json/extra.txt', 'Copy of auth...json',
+        'auth\ua4f8json', 'accounts\U00010a50json', 'credentials\uabecjson',
+        '\U00010a50netrc', 'id_rsa\ua4f8txt', 'Copy of auth\uabecjson',
+        'nested/tokens\ua4f8json/extra.txt', 'auth\ua4f8\ua4f8json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -482,6 +490,7 @@ def self_test():
         'notes\U00011C3Ereadme.txt', 'script.go\u0903Zone.Identifier', 'id_rsa.pub\u0983extra',
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
+        'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
         'models.json\u0589readme',
     )
     for rel in blocked:
