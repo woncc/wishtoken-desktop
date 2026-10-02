@@ -33,6 +33,7 @@ PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
 DOT_LIKE = {ord('\u3002'): '.'}
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
+# Mongolian colon and Bamum colon are the same kind of separator.
 COLON_LIKE = {
     ord('\u2236'): ':',
     ord('\u02d0'): ':',
@@ -52,6 +53,8 @@ COLON_LIKE = {
     ord('\u1365'): ':',
     ord('\u1366'): ':',
     ord('\u205a'): ':',
+    ord('\u1804'): ':',
+    ord('\ua6f4'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -323,6 +326,8 @@ def self_test():
         'nested/file:accounts.json', 'readme:Copy of auth.json', 'notes:auth.json:$DATA',
         'file:id_rsa.txt', 'readme:accounts.json.bak', 'script:tokens.json.gz', 'readme\u0705auth.json',
         'notes:ID_RSA', 'file:.netrc', 'readme:auth.json.txt',
+        'readme\u1804auth.json', 'notes\ua6f4id_rsa', 'auth.json\u1804secret',
+        'docs\ua6f4credentials.json', 'nested/file\u1804accounts.json', 'ID_RSA\ua6f4x',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -342,6 +347,7 @@ def self_test():
         'readme\u2216notes.txt', 'script.go\u29f5extra.txt', 'models.json\u29f9readme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
         'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
+        'notes\u1804readme.txt', 'script.go\ua6f4Zone.Identifier', 'models.json\u1804readme.txt',
         'models.json\u0589readme',
     )
     for rel in blocked:

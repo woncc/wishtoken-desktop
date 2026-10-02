@@ -168,9 +168,9 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // and url.Parse rejects them as invalid userinfo, so an unlisted lookalike would
 // otherwise be returned with its password intact. The Go core has no Unicode
 // normalization dependency, so each one is listed: ratio, modifier, Syriac,
-// Armenian, Hebrew, Ethiopic, and two-dot punctuation.
+// Armenian, Hebrew, Ethiopic, two-dot punctuation, Mongolian colon, and Bamum colon.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u1804\ua6f4"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -196,6 +196,8 @@ func foldUserinfoColons(s string) string {
 		"\u1365", ":",
 		"\u1366", ":",
 		"\u205a", ":",
+		"\u1804", ":",
+		"\ua6f4", ":",
 	).Replace(s)
 }
 
