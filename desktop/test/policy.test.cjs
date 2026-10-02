@@ -699,3 +699,83 @@ test('renderer text drops proxy passwords hidden by an at-sign lookalike', () =>
   assert.equal(delivered.accounts[0].last_error, 'dial 127.0.0.1:7890 failed');
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords when a host dot is encoded or a lookalike', () => {
+  const marks = ['\uFF0E', '\uFE52', '\u2024'];
+  const password = 's3cret-token';
+  const nest = (value, layers) => {
+    let out = value;
+    for (let layer = 0; layer < layers; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const fw = value => value.replace(/[0-9]/g, digit => String.fromCodePoint(digit.charCodeAt(0) + 0xFEE0));
+  const cases = [];
+  for (const mark of marks) {
+    const encoded = encodeURIComponent(mark);
+    cases.push([`user:${password}@127${mark}0${mark}0${mark}1:7890`, `127${mark}0${mark}0${mark}1:7890`]);
+    cases.push([`user:${password}@my${mark}proxy:7890`, `my${mark}proxy:7890`]);
+    cases.push([`(user:${password}@example${mark}com)`, `(example${mark}com)`]);
+    cases.push([`user:${password}@10${encoded}0${encoded}0${encoded}8:1080`, `10${encoded}0${encoded}0${encoded}8:1080`]);
+    cases.push([`user:${password}@my${nest(encoded, 1).toLowerCase()}proxy:7890`, `my${nest(encoded, 1).toLowerCase()}proxy:7890`]);
+    cases.push([`//user:${password}@router${nest(encoded, 3)}example:8080`, `//router${nest(encoded, 3)}example:8080`]);
+  }
+  const fwHost = `${fw('127')}\uFF0E${fw('0')}\uFF0E${fw('0')}\uFF0E${fw('1')}:7890`;
+  cases.push(
+    [`user:${password}@127%2E0%2E0%2E1:7890`, '127%2E0%2E0%2E1:7890'],
+    [`user:${password}@127%2e0%2e0%2e1:7890`, '127%2e0%2e0%2e1:7890'],
+    [`(user:${password}@127%252E0%252E0%252E1:7890)`, '(127%252E0%252E0%252E1:7890)'],
+    [`user:${password}@my%2Eproxy:7890`, 'my%2Eproxy:7890'],
+    [`user:${password}@example%2Ecom`, 'example%2Ecom'],
+    [`user:${password}@0x7f%2E0%2E0%2E1:7890`, '0x7f%2E0%2E0%2E1:7890'],
+    [`user:${password}@127.0%2E0.1:7890`, '127.0%2E0.1:7890'],
+    [`user:${password}@10%2E1:8080`, '10%2E1:8080'],
+    [`via user:${password} proxy@127%2E0%2E0%2E1:7890 failed`, 'via 127%2E0%2E0%2E1:7890 failed'],
+    [`http://example.com/?x=user:${password}@10%2E0%2E0%2E8:1080`, 'http://example.com/?x=10%2E0%2E0%2E8:1080'],
+    [`http://user:${password}@127%2E0%2E0%2E1:7890/x`, 'http://127%2E0%2E0%2E1:7890/x'],
+    [`socks5://alice:hunter2@10%2E0%2E0%2E8:1080`, 'socks5://10%2E0%2E0%2E8:1080'],
+    [`user:${password}/token@example%2Ecom`, 'example%2Ecom'],
+    [`http://user:${password}/token@127%2E0%2E0%2E1:7890`, 'http://127%2E0%2E0%2E1:7890'],
+    [`user\uFF1A${password}@127%2E0%2E0%2E1:7890`, '127%2E0%2E0%2E1:7890'],
+    [`user:${password}\uFF20127%2E0%2E0%2E1:7890`, '127%2E0%2E0%2E1:7890'],
+    [`user:${password}@${fwHost}`, fwHost],
+    [`user:${password}@${fw('2130706433')}:7890`, `${fw('2130706433')}:7890`],
+    [`two user:${password}@127%2E0%2E0%2E1:7890) and user:other-secret@my\uFF0Eproxy:7890.`, 'two 127%2E0%2E0%2E1:7890) and my\uFF0Eproxy:7890.'],
+    ['invalid proxy url "http://user:s3cret/token@127%2E0%2E0%2E1:7890": invalid port ":s3cret" after host', 'invalid proxy url "http://127%2E0%2E0%2E1:7890": invalid port ":[凭据已隐藏]" after host']
+  );
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic('Build v1:2@beta.'), 'Build v1:2@beta.');
+  assert.equal(redactPublic('user:s3cret@internal'), 'user:s3cret@internal');
+  assert.equal(redactPublic('user:s3cret@internal\uFF0E'), 'user:s3cret@internal\uFF0E');
+  assert.equal(redactPublic('user:s3cret@127%2E1'), 'user:s3cret@127%2E1');
+  assert.equal(redactPublic('user:s3cret@10%2E1'), 'user:s3cret@10%2E1');
+  assert.equal(redactPublic('score 1:2@10%2E5'), 'score 1:2@10%2E5');
+  assert.equal(redactPublic('ratio:1@v1%2E2'), 'ratio:1@v1%2E2');
+  assert.equal(redactPublic('ratio:1@v1\uFF0E2'), 'ratio:1@v1\uFF0E2');
+  assert.equal(redactPublic('member@example%2Etest'), 'member@example%2Etest');
+  assert.equal(redactPublic('member@example\uFF0Etest'), 'member@example\uFF0Etest');
+  assert.equal(redactPublic('note 100%2E0 sale'), 'note 100%2E0 sale');
+  assert.equal(redactPublic('http://user@127%2E0%2E0%2E1:7890'), 'http://user@127%2E0%2E0%2E1:7890');
+  assert.equal(redactPublic('http://example.com/foo:bar@baz'), 'http://example.com/foo:bar@baz');
+  assert.equal(redactPublic('http://example.com/foo:bar@baz%2E'), 'http://example.com/foo:bar@baz%2E');
+  assert.equal(redactPublic('a..com stays user:s3cret@a..com'), 'a..com stays a..com');
+  const proxy = 'http://user:s3cret-token@127%2E0%2E0%2E1:7890';
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@my%2Eproxy:7890`, email: 'a@example.test', last_error: `dial user:${password}@127\uFF0E0\uFF0E0\uFF0E1:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my%2Eproxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial 127\uFF0E0\uFF0E0\uFF0E1:7890 failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
