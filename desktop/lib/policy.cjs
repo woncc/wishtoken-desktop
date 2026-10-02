@@ -47,6 +47,17 @@ const SECRET_TEXT = [
 // A literal-digit check leaves the password in
 // "user:secret@127.0.0.1%3A%37%38%39%30". One digit still does not make a
 // single-label host count.
+// Fullwidth digits can be percent-encoded too. U+FF10..U+FF19 are the bytes
+// EF BC 90..EF BC 99, and each byte can carry the same extra %25 layers.
+// A literal fullwidth check leaves the password in
+// "user:secret@my-proxy:%EF%BC%97%EF%BC%98%EF%BC%99%EF%BC%90" and in a numeric
+// host such as
+// "user:secret@%EF%BC%91%EF%BC%92%EF%BC%97%2E%EF%BC%90%2E%EF%BC%90%2E%EF%BC%91:7890".
+// Superscript and subscript digits do not fold to 0-9. They still count as
+// port and numeric-host digits. Their UTF-8 bytes can be percent-encoded,
+// including a nested %25 layer on each byte: C2 B2/B3/B9, E2 81 B0/B4-B9,
+// and E2 82 80-89. Otherwise "user:secret@my-proxy:\u2077\u2078\u2079\u2070"
+// and "user:secret@10.1:%E2%82%88%E2%82%80%E2%82%88%E2%82%80" keep the password.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
 // A backtick, pipe, or backslash after the port is a boundary too, including
@@ -179,14 +190,19 @@ function dotSeparator() {
 const DOT_SEP = dotSeparator();
 const SCHEME_USER = '[^\\s/?#:@' + COLON_CHARS.join('') + ']+';
 const proxyPort = COLON_SEP;
-const DIGIT = '(?:\\d|[\\uFF10-\\uFF19])';
+// Encoded U+FF10..U+FF19. {0,3} extra "25"s is the same 1..4 encoding depth
+// already accepted for an ASCII port digit.
+const FULLWIDTH_DIGIT = '%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb][Cc]%(?:25){0,3}9\\d';
+const ALT_DIGIT = '[\\u00B2\\u00B3\\u00B9\\u2070\\u2074-\\u2079\\u2080-\\u2089]';
+const ALT_DIGIT_ENC = '(?:%(?:25){0,3}[Cc]2%(?:25){0,3}[Bb][239]|%(?:25){0,3}[Ee]2%(?:25){0,3}81%(?:25){0,3}[Bb][04-9]|%(?:25){0,3}[Ee]2%(?:25){0,3}82%(?:25){0,3}8\\d)';
+const DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
 const numericLabel = `(?:${DIGIT}{1,4}|0[xX][0-9A-Fa-f]{1,8})`;
 const domainLabel = '[A-Za-z0-9-]+';
 const literalDomain = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
 const encodedDomain = `${domainLabel}(?:${DOT_SEP}${domainLabel})*${DOT_SEP}[A-Za-z]{2,}`;
 const fourNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){3}`;
 const shortNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){0,2}`;
-const PORT_DIGIT = '(?:\\d|[\\uFF10-\\uFF19]|%3\\d|%25(?:25){0,2}3\\d)';
+const PORT_DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|%3\\d|%25(?:25){0,2}3\\d|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
 // U+FF06 U+FE60 fold to "&". U+FF1D U+FE66 U+207C U+208C fold to "=".
 const QUERY_CHARS = ['\uFF06', '\uFE60', '\uFF1D', '\uFE66', '\u207C', '\u208C'];
 function queryJoinTail() {
