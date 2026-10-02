@@ -765,8 +765,9 @@ def math_ascii(cp):
 
 
 def enclosed_ascii(cp):
-    # Circled and squared letters and digits fold to one ASCII character.
-    # Circled numbers above nine are not single digits and stay out.
+    # Circled digits one through nine, circled zero, and circled or squared
+    # letters fold to one ASCII character. Numbers above nine expand to two
+    # digits in circled_number.
     if 0x2460 <= cp <= 0x2468:
         return chr(cp - 0x2460 + ord('1'))
     if 0x24B6 <= cp <= 0x24CF:
@@ -781,6 +782,18 @@ def enclosed_ascii(cp):
         return 'R'
     if 0x1F130 <= cp <= 0x1F149:
         return chr(cp - 0x1F130 + ord('A'))
+    return None
+
+
+def circled_number(cp):
+    # NFKC expands these to two ASCII digits. Negative circled numbers and
+    # numbers on black squares do not, so they stay out.
+    if 0x2469 <= cp <= 0x2473:
+        return str((cp - 0x2469) + 10)
+    if 0x3251 <= cp <= 0x325F:
+        return str((cp - 0x3251) + 21)
+    if 0x32B1 <= cp <= 0x32BF:
+        return str((cp - 0x32B1) + 36)
     return None
 
 def fold_content(data):
@@ -819,11 +832,16 @@ def fold_content(data):
             changed = True
             continue
         # Circled and squared alphanumerics NFKC-fold to one ASCII letter or
-        # digit. This pass does not run NFKC. Numbers above nine stay out so
-        # a list marker cannot invent an extra digit.
+        # digit. This pass does not run NFKC. Numbers above nine expand to
+        # two digits; a list marker still cannot spell a token by itself.
         mapped = enclosed_ascii(cp)
         if mapped is not None:
             out.append(mapped)
+            changed = True
+            continue
+        expanded = circled_number(cp)
+        if expanded is not None:
+            out.append(expanded)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1287,8 +1305,15 @@ def self_test():
         raise SystemExit('self-test failed: an enclosed key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(enc_path):
         raise SystemExit('self-test failed: an enclosed personal path was not detected')
-    if content_reasons(enc_ten) or content_reasons('step \u2460'.encode()) or content_reasons(('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' PUBLIC KEY-----').encode()):
+    if content_reasons('step \u2460'.encode()) or content_reasons(('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' PUBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary enclosed text was blocked')
+    if circled_number(0x2469) != '10' or circled_number(0x2473) != '20' or circled_number(0x3251) != '21' or circled_number(0x325F) != '35' or circled_number(0x32B1) != '36' or circled_number(0x32BF) != '50' or circled_number(0x24EB) is not None or circled_number(0x2460) is not None:
+        raise SystemExit('self-test failed: circled number fold is wrong')
+    enc_twenty = ('rt_' + '\u3251' * 13).encode()
+    if content_reasons(enc_ten) != ['secret token literal'] or content_reasons(enc_twenty) != ['secret token literal']:
+        raise SystemExit('self-test failed: a multi-digit circled number was not detected')
+    if content_reasons('step \u2469'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2469').encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: an ordinary circled number was blocked')
 
 def main():
     self_test()
