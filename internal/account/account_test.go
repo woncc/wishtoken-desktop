@@ -508,3 +508,28 @@ func TestImportHidesCredentialsThatNeedJSONEscapes(t *testing.T) {
 		t.Fatalf("import changed the stored credential or context: %+v", acc)
 	}
 }
+
+func TestViewHidesCredentialsSplitByHyphens(t *testing.T) {
+	refresh := "rt_display-123456789"
+	hyphen := "rt_display\u2010" + "123456789"
+	minus := "rt_\u2212display-123456789"
+	tone := "rt_display\u1bf3123456789"
+	encoded := "rt_display%E2%80%91123456789"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyLTEi.c2ln-bmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyLTEi.c2ln\u2013bmF0dXJl"
+	acc := Account{
+		Name: "note " + hyphen + " " + encoded, Email: "kept@example.com", PlanType: "plus",
+		RefreshToken: refresh, Source: "from " + markedJWT, Tags: []string{"team", minus},
+		LastError: "rejected " + tone, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, hyphen, minus, tone, encoded, jwt, markedJWT, "eyJ", "display-123456789", "123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}

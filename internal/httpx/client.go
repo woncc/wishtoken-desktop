@@ -359,10 +359,20 @@ func decodePieces(in []secretPiece) []secretPiece {
 }
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
-	spans := exactSecretSpans(pieces, secret)
-	dropped := dropMarkPieces(pieces)
-	if len(dropped) != len(pieces) {
-		spans = append(spans, exactSecretSpans(dropped, secret)...)
+	// A hyphen lookalike is not ignorable: dropping it would glue the token
+	// together and miss the stored ASCII hyphen. Fold first, then drop marks.
+	needle := foldHyphenString(secret)
+	folded := foldHyphenPieces(pieces)
+	spans := exactSecretSpans(folded, needle)
+	// Soft hyphen is a format character, so the drop pass below removes it.
+	// That joins a hyphenated token and misses the stored '-'. Folding it to
+	// '-' is a separate reading; the drop reading still runs.
+	if soft, ok := foldSoftHyphenPieces(folded); ok {
+		spans = append(spans, exactSecretSpans(soft, foldSoftHyphenString(needle))...)
+	}
+	dropped := dropMarkPieces(folded)
+	if len(dropped) != len(folded) {
+		spans = append(spans, exactSecretSpans(dropped, needle)...)
 	}
 	return spans
 }
@@ -382,6 +392,103 @@ func exactSecretSpans(pieces []secretPiece, secret string) [][2]int {
 		i += from
 		spans = append(spans, [2]int{pieces[i].start, pieces[i+len(secret)-1].end})
 		from = i + len(secret)
+	}
+}
+
+// foldHyphenPieces maps hyphen confusables to ASCII '-'. None of these
+// NFKC-fold to hyphen-minus. Non-breaking hyphen folds to U+2010, and small
+// em dash folds to an em dash, so both have to be listed. Arabic full stop
+// stays a dot elsewhere in this codebase and is not a hyphen here. Spacing
+// marks that skeleton to a hyphen are folded before dropMarkPieces, or the
+// stored hyphen would disappear and the token would no longer match. One
+// output piece covers the original rune so the redaction span stays on the
+// caller's bytes.
+func foldHyphenPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if hyphenLike(r) {
+			out = append(out, secretPiece{b: '-', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldHyphenString(s string) string {
+	if !hyphenFolded(s) {
+		return s
+	}
+	return renderPieces(foldHyphenPieces(rawPieces(s)))
+}
+
+func hyphenFolded(s string) bool {
+	for _, r := range s {
+		if hyphenLike(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func foldSoftHyphenPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == '\u00ad' {
+			out = append(out, secretPiece{b: '-', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldSoftHyphenString(s string) string {
+	if !strings.ContainsRune(s, '\u00ad') {
+		return s
+	}
+	folded, _ := foldSoftHyphenPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func hyphenLike(r rune) bool {
+	switch r {
+	case '\u2010', '\u2011', '\u2012', '\u2013', '\ufe58',
+		'\u2043', '\u02d7', '\u2212', '\u2796', '\U00010191',
+		'\u2cba', '\u2cbb', '\u174d', '\u1bf3', '\uaa7d':
+		return true
+	default:
+		return false
 	}
 }
 
