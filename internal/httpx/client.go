@@ -4378,7 +4378,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // backslash. The upper right block diagonal from upper left to lower
 // middle right is that same falling stroke as a wider block and does
 // not NFKC-fold to a backslash either. It stays one backslash. The
-// other wider upper-right block diagonals stay out.
+// upper right block diagonal from upper middle left to lower middle
+// right is that falling stroke across the middle and does not NFKC-fold
+// to a backslash either. It stays one backslash. The other wider
+// upper-right block diagonals stay out.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4426,7 +4429,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FB65, 0x1FB66:
+	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FB65, 0x1FB66, 0x1FB67:
 		return '\\', true
 	default:
 		return 0, false
