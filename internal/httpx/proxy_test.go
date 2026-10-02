@@ -1341,3 +1341,37 @@ func TestRedactHidesDoublePunctuationInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesConsecutiveEqualsInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9q==7f3a"
+	two := strings.NewReplacer("==", "\u2A75").Replace(password)
+	three := strings.NewReplacer("===", "\u2A76").Replace("rt_Zz9q===7f3a")
+	encoded := strings.NewReplacer("==", "%E2%A9%B5").Replace(password)
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + two,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, two, encoded, "Zz9q", "==", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	other := "rt_Zz9q===7f3a"
+	got := Redact("http://user:" + url.PathEscape(other) + "@127.0.0.1:7890?q=" + three)
+	for _, leaked := range []string{other, three, "==="} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("triple leaked %q in %q", leaked, got)
+		}
+	}
+	plain := "member\u2A75example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}

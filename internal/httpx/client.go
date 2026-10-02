@@ -939,8 +939,8 @@ func escapeASCII(r rune) (byte, bool) {
 
 // foldCredentialPieces maps compatibility letters, digits, latin
 // ligatures, and token punctuation, including the percent sign, exclamation
-// mark, reverse solidus, number sign, dollar sign, ampersand, asterisk,
-// question mark,
+// mark, consecutive equals signs, reverse solidus, number sign, dollar sign,
+// ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
 // greater-than signs, the grave accent, the circumflex accent, the vertical
 // line, the apostrophe, the quotation mark, the colon, and the commercial
@@ -949,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -2053,12 +2053,77 @@ func reverseSolidusASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldEqualsRunPieces maps two and three consecutive equals signs to the
+// ASCII runs NFKC produces. This pass does not run NFKC, so a stored secret
+// written with those forms would stay visible. Each output byte keeps the
+// original rune's range. A single equals sign is folded with the plus signs.
+// Double colon equal expands to "::=" and is a colon lookalike, so it stays
+// out. Not-equal and identical-to do not fold to ASCII equals signs.
+func foldEqualsRunPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := equalsRunASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldEqualsRunString(s string) string {
+	if !equalsRunFolded(s) {
+		return s
+	}
+	return renderPieces(foldEqualsRunPieces(rawPieces(s)))
+}
+
+func equalsRunFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := equalsRunASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func equalsRunASCII(r rune) (string, bool) {
+	switch r {
+	case 0x2A75:
+		return "==", true
+	case 0x2A76:
+		return "===", true
+	default:
+		return "", false
+	}
+}
+
 // foldDoublePunctuationPieces maps the doubled question and exclamation
 // marks to the ASCII pairs NFKC produces. This pass does not run NFKC, so a
 // stored secret written with those marks would stay visible. Each output
-// byte keeps the original rune's range. The interrobang, inverted marks,
-// two-dot leaders, ellipses, and consecutive equals signs are not these
-// four marks, so they stay out.
+// byte keeps the original rune's range. Consecutive equals signs expand
+// to "==" or "===" and are folded separately. The interrobang, inverted
+// marks, two-dot leaders, and ellipses are not these four marks, so they
+// stay out.
 func foldDoublePunctuationPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2362,7 +2427,9 @@ func lowLineASCII(r rune) (byte, bool) {
 // NFKC folds them, and this pass does not run NFKC, so an opaque token
 // written with those forms would stay visible. Plus-minus, superscript
 // minus, and not-equal do not become one ASCII plus or equals, so they
-// stay out. One output piece covers the original rune.
+// stay out. Two and three consecutive equals signs expand to more than one
+// character and are folded separately. One output piece covers the original
+// rune.
 func foldPlusEqualsPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

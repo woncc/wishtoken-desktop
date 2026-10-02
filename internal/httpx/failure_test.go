@@ -3386,3 +3386,97 @@ func TestDoublePunctuationASCIIFoldsOnlyDoubledMarks(t *testing.T) {
 		t.Fatalf("double punctuation fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsConsecutiveEquals(t *testing.T) {
+	pairs := []struct {
+		secret string
+		mark   string
+	}{
+		{"rt_Zz9q==7f3a", "\u2A75"},
+		{"rt_Zz9q===7f3a", "\u2A76"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		run := strings.TrimPrefix(pair.secret, "rt_Zz9q")
+		run = run[:len(run)-len("7f3a")]
+		marked := strings.ReplaceAll(pair.secret, run, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, run)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "==", "%E2%A9%B5")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	opaque := "tokenValue1tokenValue1tokenVal=="
+	opaqueMarked := strings.ReplaceAll(opaque, "==", "\u2A75")
+	parts = append(parts, opaqueMarked)
+	leaked = append(leaked, opaque, opaqueMarked, "tokenValue")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[0].secret, "==", "\u2A75")
+	got = SanitizeFailure("rejected "+pairs[0].secret+" later", stored)
+	for _, item := range []string{pairs[0].secret, stored, "Zz9q", "==", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	triple := "tokenValue1tokenValue1tokenVal==="
+	tripleMarked := strings.ReplaceAll(triple, "===", "\u2A76")
+	got = SanitizeFailure("rejected " + tripleMarked + " later")
+	for _, item := range []string{triple, tripleMarked, "tokenValue"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("triple leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2A75 later",
+		"see \u2A76 later",
+		"see \u2A74 later",
+		"see \u2260 later",
+		"see \uFF1D later",
+		"a = b",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("equals prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestEqualsRunASCIIFoldsOnlyConsecutiveEquals(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2A75, "=="},
+		{0x2A76, "==="},
+	}
+	for _, check := range checks {
+		got, ok := equalsRunASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'=', 0x2A74, 0x207C, 0x208C, 0x2260, 0x2261, 0xFE66, 0xFF1D} {
+		if _, ok := equalsRunASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := equalsRunASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("equals run fold count %d", n)
+	}
+}
