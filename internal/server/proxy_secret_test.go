@@ -169,3 +169,37 @@ func TestManagementHidesCompatibilityProxyColon(t *testing.T) {
 		}
 	}
 }
+
+func TestManagementHidesRemainingProxyColonLookalikes(t *testing.T) {
+	const password = "s3cret-proxy"
+	proxyURL := "http://user\u0705" + password + "@127.0.0.1:7890"
+	encodedColon := encodeEveryByte("\u1365")
+	encoded := "http://user" + encodedColon + password + "@127.0.0.1:7890"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	cfg.ProxyURL = proxyURL
+	acc := testAccount("acct_one", "one@example.test")
+	acc.ProxyURL = encoded
+	acc.Name = "note " + proxyURL
+	acc.LastError = "dial " + encoded
+	f := newFixture(t, cfg, acc)
+	for _, route := range []string{"/api/status", "/api/accounts", "/api/settings"} {
+		status, body := getRaw(t, f, route)
+		if status != http.StatusOK || strings.Contains(body, password) || strings.Contains(body, encodedColon+password) || strings.Contains(body, "\u0705"+password) {
+			t.Fatalf("%s leaked colon lookalike: %d %s", route, status, body)
+		}
+	}
+	redacted := httpx.Redact(cfg.ProxyURL)
+	status, body := putJSON(t, f, "/api/settings", `{"proxy_url":"`+redacted+`"}`)
+	if status != http.StatusOK || strings.Contains(body, password) || f.srv.Config().ProxyURL != cfg.ProxyURL {
+		t.Fatalf("redacted save: %d %s stored %q", status, body, f.srv.Config().ProxyURL)
+	}
+}
+
+func encodeEveryByte(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		fmt.Fprintf(&b, "%%%02X", s[i])
+	}
+	return b.String()
+}

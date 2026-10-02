@@ -24,6 +24,9 @@ func SanitizeFailure(detail string, secrets ...string) string {
 	if detail == "" {
 		return ""
 	}
+	// Proxy userinfo is not a token shape. Mask it before the generic patterns,
+	// including colon lookalikes that url.Parse otherwise rejects.
+	detail = Redact(detail)
 	for _, secret := range secrets {
 		secret = strings.TrimSpace(secret)
 		if len(secret) < 8 {
