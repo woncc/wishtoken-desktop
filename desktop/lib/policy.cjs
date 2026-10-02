@@ -172,6 +172,12 @@ const SECRET_TEXT = [
 // and keep the password. A mark counts inside a label only when another host
 // character follows; otherwise the existing tail check still sees it.
 // Supplementary format characters fold to U+200B first. U+200B is in this set.
+// Percent-encoding hides the same mark. Each UTF-8 byte can carry the extra
+// %25 layers already accepted for a port digit. Otherwise
+// "user:secret@my%E2%80%8Bproxy:7890" keeps the password. The same encoding
+// before a port digit hides it on a single-label host, or
+// "user:secret@my-proxy:%E2%80%8B7890" keeps the password. A supplementary
+// encoding folds to U+200B too. Text that is not a proxy stays as written.
 const PROXY_MARK = '\u00AD\u034F\u0600\u0601\u0602\u0603\u0604\u0605\u061C\u06DD\u070F\u0890\u0891\u08E2\u115F\u1160\u180E\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206A\u206B\u206C\u206D\u206E\u206F\u3164\uFE00\uFE01\uFE02\uFE03\uFE04\uFE05\uFE06\uFE07\uFE08\uFE09\uFE0A\uFE0B\uFE0C\uFE0D\uFE0E\uFE0F\uFEFF\uFFA0\uFFF9\uFFFA\uFFFB';
 const MARK = `[${PROXY_MARK}]`;
 const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD\u2254\u2255\u29F4\u2A74' + PROXY_MARK + ']';
@@ -288,6 +294,11 @@ const fourNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numeric
 const shortNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numericLabel}){0,2}`;
 const LOCAL_HOST = 'localhost'.split('').map((ch, index, chars) => ch + (index < chars.length - 1 ? `(?:${MARK}(?=${chars[index + 1]}))?` : '')).join('');
 const PORT_DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|%3\\d|%25(?:25){0,2}3\\d|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
+// A mark between the colon and a port digit still belongs to the port when a
+// digit follows. A single-label host requires that port, or the password stays.
+const PORT_MARK = `(?:${MARK}(?=${PORT_DIGIT}))`;
+const PORT_SOME = `${PORT_MARK}*${PORT_DIGIT}(?:${PORT_MARK}*${PORT_DIGIT})*`;
+const PORT_REQUIRED = `${PORT_MARK}*${PORT_DIGIT}(?:${PORT_MARK}*${PORT_DIGIT}){1,4}`;
 // U+FF06 U+FE60 fold to "&". U+FF1D U+FE66 U+207C U+208C fold to "=".
 const QUERY_CHARS = ['\uFF06', '\uFE60', '\uFF1D', '\uFE66', '\u207C', '\u208C'];
 function queryJoinTail() {
@@ -437,7 +448,7 @@ function stopTail() {
   return `(?:${parts.join('|')})`;
 }
 const STOP_JOIN = stopTail();
-const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_HOST}|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${MARK}*${proxyPort}${PORT_DIGIT}+)?|(?:${MARK})*(?:${shortNumeric}|(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){4,10}|[A-Za-z](?:[A-Za-z0-9_-]|${MARK}(?=[A-Za-z0-9_-]))*)${MARK}*${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
+const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_HOST}|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${MARK}*${proxyPort}${PORT_SOME})?|(?:${MARK})*(?:${shortNumeric}|(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){4,10}|[A-Za-z](?:[A-Za-z0-9_-]|${MARK}(?=[A-Za-z0-9_-]))*)${MARK}*${proxyPort}${PORT_REQUIRED})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
 // "&#58;", "&#x3A;", and "&colon;" are a colon. "&#64;" and "&commat;" are "@".
 // The same references hide a digit or a host dot, and a numeric reference may
 // omit its semicolon. Nested "&amp;#58;" is still a colon. Decode those marks
@@ -525,6 +536,74 @@ function isProxyMark(char) {
 }
 function foldProxyInvisibles(text) {
   return text.replace(SUPP_INVISIBLE, '\u200B');
+}
+function isSupplementaryInvisible(cp) {
+  if (cp < 0x110BD || cp > 0xE01EF) return false;
+  SUPP_INVISIBLE.lastIndex = 0;
+  const found = SUPP_INVISIBLE.test(String.fromCodePoint(cp));
+  SUPP_INVISIBLE.lastIndex = 0;
+  return found;
+}
+function readEncodedByte(text, index) {
+  const encoded = /^%(?:25){0,3}([0-9A-Fa-f]{2})/.exec(text.slice(index));
+  if (!encoded) return null;
+  return { value: Number.parseInt(encoded[1], 16), next: index + encoded[0].length };
+}
+function decodeUtf8Scalar(bytes) {
+  const b0 = bytes[0];
+  if (bytes.length === 2) {
+    const cp = ((b0 & 0x1F) << 6) | (bytes[1] & 0x3F);
+    return cp >= 0x80 ? cp : null;
+  }
+  if (bytes.length === 3) {
+    if (b0 === 0xE0 && bytes[1] < 0xA0) return null;
+    if (b0 === 0xED && bytes[1] >= 0xA0) return null;
+    const cp = ((b0 & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F);
+    if (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF)) return null;
+    return cp;
+  }
+  if (bytes.length !== 4) return null;
+  if (b0 === 0xF0 && bytes[1] < 0x90) return null;
+  if (b0 === 0xF4 && bytes[1] > 0x8F) return null;
+  const cp = ((b0 & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) | ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
+  if (cp < 0x10000 || cp > 0x10FFFF) return null;
+  return cp;
+}
+function readEncodedProxyMark(text, index) {
+  if (text[index] !== '%') return null;
+  const first = readEncodedByte(text, index);
+  if (!first) return null;
+  const b0 = first.value;
+  let needed = 0;
+  if (b0 >= 0xC2 && b0 <= 0xDF) needed = 2;
+  else if (b0 >= 0xE0 && b0 <= 0xEF) needed = 3;
+  else if (b0 >= 0xF0 && b0 <= 0xF4) needed = 4;
+  if (!needed) return null;
+  const bytes = [b0];
+  let cursor = first.next;
+  for (let count = 1; count < needed; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next || next.value < 0x80 || next.value > 0xBF) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || (!PROXY_MARK_CODES.has(cp) && !isSupplementaryInvisible(cp))) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedProxyMarks(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const mark = readEncodedProxyMark(text, index);
+    if (mark) {
+      out += mark.char;
+      index = mark.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
 }
 function readHtmlAtom(text, index) {
   while (index < text.length && isProxyMark(text[index])) index += 1;
@@ -629,7 +708,7 @@ function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
 function redactProxyCredentials(text) {
-  const decoded = decodeProxyHtml(foldProxyInvisibles(String(text)));
+  const decoded = decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(String(text))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
