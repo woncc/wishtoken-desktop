@@ -901,6 +901,16 @@ def latin_ligature(cp):
         0xFB05: 'st', 0xFB06: 'st',
     }.get(cp)
 
+
+def low_line_ascii(cp):
+    # Presentation forms and the fullwidth low line NFKC-fold to ASCII '_'.
+    # A double low line expands to a space plus a mark, and a low macron
+    # does not fold to '_'. Fullwidth low line is also inside the fullwidth
+    # ASCII block, so either pass produces the same byte.
+    if cp in {0xFE33, 0xFE34, 0xFE4D, 0xFE4E, 0xFE4F, 0xFF3F}:
+        return '_'
+    return None
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -1003,6 +1013,14 @@ def fold_content(data):
         expanded = latin_ligature(cp)
         if expanded is not None:
             out.append(expanded)
+            changed = True
+            continue
+        # Low lines NFKC-fold to ASCII '_'. This pass does not run NFKC, so
+        # a token or JWT written with a presentation form stayed split. A
+        # double low line and a low macron are not '_', so they stay out.
+        mapped = low_line_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1575,6 +1593,21 @@ def self_test():
         raise SystemExit('self-test failed: a ligature JWT was not detected')
     if content_reasons('see \ufb05 later'.encode()) or content_reasons('the \ufb01le stays'.encode()) or content_reasons('see \u2122 later'.encode()) or content_reasons('see \u2116 later'.encode()) or content_reasons('see \u3373 later'.encode()) or content_reasons(('sk-' + '\ufb01' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u01f1' + 'a' * 12).encode()) or content_reasons('see \ufb07 later'.encode()):
         raise SystemExit('self-test failed: ordinary ligature text was blocked')
+    if low_line_ascii(0xFE33) != '_' or low_line_ascii(0xFE34) != '_' or low_line_ascii(0xFE4D) != '_' or low_line_ascii(0xFE4E) != '_' or low_line_ascii(0xFE4F) != '_' or low_line_ascii(0xFF3F) != '_' or low_line_ascii(ord('_')) is not None or low_line_ascii(0x2017) is not None or low_line_ascii(0x02CD) is not None or low_line_ascii(0xFF0D) is not None or low_line_ascii(0x0332) is not None:
+        raise SystemExit('self-test failed: low line fold is wrong')
+    if sum(low_line_ascii(cp) is not None for cp in range(0x30000)) != 6:
+        raise SystemExit('self-test failed: low line fold count is wrong')
+    low_mix = ('sk-' + 'a' * 10 + '\ufe4d' + 'a' * 20).encode()
+    low_wavy = ('rt_' + 'a' * 10 + '\ufe34' + 'a' * 14).encode()
+    low_pat = ('github' + '\ufe4f' + 'pat_' + 'a' * 25).encode()
+    low_jwt = ('eyJ' + 'a' * 24 + '\ufe33' + '.' + 'b' * 30 + '.' + 'c' * 15).encode()
+    low_wide = ('ghp_' + 'a' * 12 + '\uff3f' + 'a' * 12).encode()
+    if content_reasons(low_mix) != ['secret token literal'] or content_reasons(low_wavy) != ['secret token literal'] or content_reasons(low_pat) != ['secret token literal'] or content_reasons(low_wide) != ['secret token literal']:
+        raise SystemExit('self-test failed: a low line token was not detected')
+    if content_reasons(low_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a low line JWT was not detected')
+    if content_reasons('see \u2017 later'.encode()) or content_reasons('see \u02cd later'.encode()) or content_reasons('low \uff3f line'.encode()) or content_reasons(('sk-' + '\ufe4d' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2017' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u02cd' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary low line text was blocked')
 
 def main():
     self_test()
