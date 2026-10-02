@@ -437,6 +437,15 @@ SEPARATOR_LIKE = {
     ord('\u2cc7'): '/',
     ord('\u4e36'): '/',
     ord('\u2f02'): '/',
+    # Account of, addressed to the subject, care of, and cada una expand to a
+    # letter, an ASCII solidus, and a letter. That glues both neighboring
+    # components, so a private name on either side stays hidden. They do not
+    # NFKC-fold to a slash by themselves. The other letterlike signs have no
+    # slash and stay out.
+    ord('\u2100'): '/',
+    ord('\u2101'): '/',
+    ord('\u2105'): '/',
+    ord('\u2106'): '/',
 }
 
 def normalized_rel(rel):
@@ -689,6 +698,9 @@ def self_test():
         'readme\u2cc7auth.json', 'file\u2cc7.netrc', 'ID_RSA\u2cc7x',
         'notes\uff89id_rsa', 'accounts.json\u4e3fnotes.txt', 'readme\u30ceauth.json',
         'file\u2cc6.netrc', 'ID_RSA\u4e36x', 'credentials\uff89token.txt',
+        'auth.json\u2100secret.txt', 'credentials\u2101token.txt', 'notes\u2105id_rsa',
+        'nested/id_rsa\u2106x', 'Diagnostics\u2100capture.png', 'tokens.json\u2101extra.txt',
+        'readme\u2105auth.json', 'file\u2106.netrc', 'ID_RSA\u2100x',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -774,6 +786,8 @@ def self_test():
         'notes\u2cc7readme.txt', 'script.go\u2cc7Zone.Identifier', 'id_rsa.pub\u2cc7foo.txt',
         'models.json\u2cc7readme.txt', 'readme\u2cc7md',
         'id_rsa.pub\uff89foo.txt', 'readme\u30cemd',
+        'notes\u2100readme.txt', 'script.go\u2101Zone.Identifier', 'id_rsa.pub\u2105foo.txt',
+        'models.json\u2106readme.txt', 'readme\u2100md',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
