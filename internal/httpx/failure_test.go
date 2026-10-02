@@ -522,3 +522,66 @@ func TestSanitizeFailureStripsCompatibilityFullStops(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsOtherFullStops(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	stops := []rune{
+		'\u3002', '\u06d4', '\u0701', '\u0702', '\u1362', '\u166e',
+		'\u1803', '\u1809', '\u2cf9', '\u2cfe', '\u2e3c', '\ua4ff', '\ua60e', '\ua6f3',
+		'\U00016af5', '\U00016e98', '\U0001bc9f', '\U0001da88',
+		'\ua4f8', '\U00010a50', '\ua4fa',
+		'\u0660', '\u06f0', '\U0001ecae',
+	}
+	var parts []string
+	var leaked []string
+	for _, r := range stops {
+		marked := strings.ReplaceAll(jwt, ".", string(r))
+		parts = append(parts, marked)
+		leaked = append(leaked, marked)
+	}
+	encoded := strings.ReplaceAll(jwt, ".", "%E3%80%82")
+	meetei := strings.ReplaceAll(jwt, ".", "\uabec")
+	musical := strings.ReplaceAll(jwt, ".", "\U0001d16d")
+	combined := "eyJhbGciOiJub25lIn0\U0001d16deyJzdWIi\u093eOiJ1c2VyIn0.c2lnbmF0dXJl"
+	// No stored secret: the JWT pattern has to see the folded stops.
+	got := SanitizeFailure("rejected " + strings.Join(parts, " ") + " " + encoded + " " + meetei + " " + musical + " " + combined + " later")
+	for _, item := range append([]string{jwt, encoded, meetei, musical, combined, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"}, leaked...) {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "code.verifier12"
+	markedSecret := "code\u3002verifier12"
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	if strings.Contains(got, secret) || strings.Contains(got, markedSecret) || strings.Contains(got, "verifier12") {
+		t.Fatalf("short secret leaked: %q", got)
+	}
+	insertedSecret := "code+verifier12"
+	inserted := "code+\U0001d16dverifier12"
+	meeteiInserted := "code+\uabecverifier12"
+	got = SanitizeFailure("rejected "+inserted+" "+meeteiInserted+" later", insertedSecret)
+	for _, item := range []string{insertedSecret, inserted, meeteiInserted, "verifier12"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("inserted stop leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("inserted stop context lost: %q", got)
+	}
+	for _, prose := range []string{
+		"failed\u3002 later",
+		"end\u06d4 next",
+		"wait\u1362 please",
+		"code \u0660 stays",
+		"see \u1803 later",
+		"slow\uabecdow",
+		"slow\U0001d16ddown",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("full stop prose changed: %q -> %q", prose, got)
+		}
+	}
+}
