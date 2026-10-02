@@ -475,3 +475,44 @@ test('renderer text drops schemeless proxy passwords on an encoded port or an al
   assert.equal(delivered.accounts[0].last_error, 'dial 127.0.0.1%3A7890 failed');
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords embedded in a query, path, or fragment', () => {
+  const cases = [
+    ['http://example.com/?x=user:s3cret-token@10.0.0.8:1080', 'http://example.com/?x=10.0.0.8:1080'],
+    ['http://example.com/?user:s3cret-token@10.0.0.8:1080', 'http://example.com/?10.0.0.8:1080'],
+    ['http://example.com/user:s3cret-token@10.0.0.8:1080', 'http://example.com/10.0.0.8:1080'],
+    ['http://127.0.0.1:7890#user:s3cret-token@10.0.0.8:1080', 'http://127.0.0.1:7890#10.0.0.8:1080'],
+    ['a=1&user:s3cret-token@my-proxy:7890', 'a=1&my-proxy:7890'],
+    ['proxy=user:s3cret-token@127.0.0.1:7890', 'proxy=127.0.0.1:7890'],
+    ['see proxy=user:s3cret-token@127.0.0.1%3A7890', 'see proxy=127.0.0.1%3A7890'],
+    ['http://example.com/?x=user:s3cret%40my-proxy%3A7890', 'http://example.com/?x=my-proxy%3A7890'],
+    ['path/user:p@ss@127.0.0.1:7890', 'path/127.0.0.1:7890'],
+    ['note (http://example.com/?user:s3cret-token@127.1:7890).', 'note (http://example.com/?127.1:7890).'],
+    ['http://example.com/foo:bar@baz.com', 'http://example.com/baz.com']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('p@ss'), false);
+  }
+  assert.equal(redactPublic('http://example.com/foo:bar@baz'), 'http://example.com/foo:bar@baz');
+  assert.equal(redactPublic('http://example.com/foo:bar%40baz'), 'http://example.com/foo:bar%40baz');
+  assert.equal(redactPublic('http://user@127.0.0.1:7890'), 'http://user@127.0.0.1:7890');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic('note 100%40off sale'), 'note 100%40off sale');
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic('user:s3cret@internal'), 'user:s3cret@internal');
+  const proxy = 'http://user:s3cret-token@127.0.0.1:7890';
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: true, usage_probe: false },
+    accounts: [{ id: 'acc-1', name: 'via http://example.com/?x=user:s3cret-token@10.0.0.8:1080', email: 'a@example.test', last_error: 'dial a=1&user:s3cret-token@my-proxy:7890' }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'via http://example.com/?x=10.0.0.8:1080');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial a=1&my-proxy:7890');
+  assert.equal(snap.settings.proxy_url, proxy);
+});

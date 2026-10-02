@@ -41,8 +41,11 @@ const SECRET_TEXT = [
 // same way a dotted IPv4 address already can.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}「」『』【】（）《》〈〉]';
-const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@「」『』【】（）《》〈〉]';
+// A query, path, or fragment marker is a boundary too. Otherwise
+// "http://example.com/?x=user:secret@10.0.0.8:1080" keeps the password.
+// "=" and "&" are not part of the username, so a query key stays in place.
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉]';
+const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
 const proxyPort = '(?::|%3[Aa])';
 const numericLabel = '(?:\\d{1,4}|0[xX][0-9A-Fa-f]{1,8})';
