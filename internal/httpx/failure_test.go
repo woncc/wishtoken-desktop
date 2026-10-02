@@ -5414,3 +5414,51 @@ func TestTagGreaterThanFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag less-than sign was treated as a greater-than sign")
 	}
 }
+
+func TestSanitizeFailureStripsTagLeftSquareBracket(t *testing.T) {
+	secret := "code[verifier12"
+	mark := "code\U000E005Bverifier12"
+	encoded := "code%F3%A0%81%9Bverifier12"
+	inserted := "code[\U000E005Bverifier12"
+	mixedSecret := "rt>Zz9q[ab7f"
+	mixed := "rt\U000E003EZz9q\U000E005Bab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code[verifier12code[verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E005Bverifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag left square bracket leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E005B later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag left square bracket prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagLeftSquareBracketFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagLeftSquareBracketPieces(rawPieces("code\U000E005Bverifier12"))
+	if !ok || renderPieces(folded) != "code[verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagLeftSquareBracketPieces(rawPieces("code[verifier12")); ok {
+		t.Fatalf("ascii left square bracket was folded")
+	}
+	if foldTagLeftSquareBracketString("code\U000E003Everifier12") != "code\U000E003Everifier12" {
+		t.Fatalf("tag greater-than sign was treated as a left square bracket")
+	}
+}
