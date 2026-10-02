@@ -310,6 +310,12 @@ SEPARATOR_LIKE = {
     ord('\u31d2'): '/',
     ord('\u31d3'): '/',
     ord('\u31d4'): '/',
+    # Greek notation slashes and the vertical kana repeat mark do not
+    # NFKC-fold to a slash, but each one still splits the next component.
+    ord('\u3033'): '/',
+    ord('\U0001d23a'): '/',
+    ord('\U0001d20f'): '/',
+    ord('\U0001d23b'): '/',
 }
 
 def normalized_rel(rel):
@@ -509,6 +515,8 @@ def self_test():
         'nested/id_rsa\u2afdx', 'Diagnostics\u2afbcapture.png', 'tokens.json\u244aextra.txt',
         'auth.json\u31d2secret.txt', 'credentials\u31d3token.txt', 'notes\u31d4id_rsa',
         'nested/id_rsa\u31d2x', 'Diagnostics\u31d3capture.png', 'tokens.json\u31d4extra.txt',
+        'auth.json\u3033secret.txt', 'credentials\U0001d23atoken.txt', 'notes\U0001d20fid_rsa',
+        'nested/id_rsa\U0001d23bx', 'Diagnostics\u3033capture.png', 'tokens.json\U0001d23aextra.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -563,6 +571,8 @@ def self_test():
         'notes\u2afdreadme.txt', 'script.go\u2afbextra.txt', 'id_rsa.pub\u244afoo.txt',
         'models.json\u2afdreadme.txt',
         'notes\u31d2readme.txt', 'script.go\u31d3Zone.Identifier', 'id_rsa.pub\u31d4foo.txt',
+        'notes\u3033readme.txt', 'script.go\U0001d23aZone.Identifier', 'id_rsa.pub\U0001d20ffoo.txt',
+        'models.json\U0001d23breadme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
