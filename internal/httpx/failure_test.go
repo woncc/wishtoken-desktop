@@ -6086,3 +6086,51 @@ func TestTagRightParenthesisFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag left parenthesis was treated as a right parenthesis")
 	}
 }
+
+func TestSanitizeFailureStripsTagTilde(t *testing.T) {
+	secret := "code~verifier12"
+	mark := "code\U000E007Everifier12"
+	encoded := "code%F3%A0%81%BEverifier12"
+	inserted := "code~\U000E007Everifier12"
+	mixedSecret := "rt)Zz9q~ab7f"
+	mixed := "rt\U000E0029Zz9q\U000E007Eab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code~verifier12code~verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E007Everifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag tilde leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E007E later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag tilde prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagTildeFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagTildePieces(rawPieces("code\U000E007Everifier12"))
+	if !ok || renderPieces(folded) != "code~verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagTildePieces(rawPieces("code~verifier12")); ok {
+		t.Fatalf("ascii tilde was folded")
+	}
+	if foldTagTildeString("code\U000E0029verifier12") != "code\U000E0029verifier12" {
+		t.Fatalf("tag right parenthesis was treated as a tilde")
+	}
+}
