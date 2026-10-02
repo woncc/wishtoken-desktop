@@ -939,7 +939,7 @@ func escapeASCII(r rune) (byte, bool) {
 
 // foldCredentialPieces maps compatibility letters, digits, latin
 // ligatures, circled numbers, and token punctuation, including the percent sign, exclamation
-// mark, consecutive equals signs, reverse solidus, number sign, dollar sign,
+// mark, consecutive equals signs, dot leaders, reverse solidus, number sign, dollar sign,
 // ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
 // greater-than signs, the grave accent, the circumflex accent, the vertical
@@ -949,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldCircledNumberPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldCircledNumberPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldCircledNumberString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldCircledNumberString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -2121,9 +2121,9 @@ func equalsRunASCII(r rune) (string, bool) {
 // marks to the ASCII pairs NFKC produces. This pass does not run NFKC, so a
 // stored secret written with those marks would stay visible. Each output
 // byte keeps the original rune's range. Consecutive equals signs expand
-// to "==" or "===" and are folded separately. The interrobang, inverted
-// marks, two-dot leaders, and ellipses are not these four marks, so they
-// stay out.
+// to "==" or "===" and are folded separately. Two-dot leaders and ellipses
+// expand to repeated dots and are folded separately. The interrobang and
+// inverted marks are not these four marks, so they stay out.
 func foldDoublePunctuationPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -3257,6 +3257,71 @@ func enclosedASCII(r rune) (byte, bool) {
 		return byte(r - 0x1F130 + 'A'), true
 	default:
 		return 0, false
+	}
+}
+
+// foldDotLeaderPieces maps the two-dot leader and horizontal ellipses to
+// the repeated ASCII dots NFKC produces. This pass does not run NFKC, so a
+// stored secret written with those forms would stay visible. Each output
+// byte keeps the original rune's range. One dot leader is a single full
+// stop and is folded with the other dots. The vertical two-dot leader
+// NFKC-folds to "..", but proxy userinfo reads it as a colon, so it stays
+// out of this pass. Midline ellipsis does not fold to ASCII dots.
+func foldDotLeaderPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := dotLeaderASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldDotLeaderString(s string) string {
+	if !dotLeaderFolded(s) {
+		return s
+	}
+	return renderPieces(foldDotLeaderPieces(rawPieces(s)))
+}
+
+func dotLeaderFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := dotLeaderASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func dotLeaderASCII(r rune) (string, bool) {
+	switch r {
+	case 0x2025:
+		return "..", true
+	case 0x2026, 0xFE19:
+		return "...", true
+	default:
+		return "", false
 	}
 }
 
