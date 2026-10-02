@@ -40,6 +40,8 @@ DOT_LIKE = {
     ord('\u0702'): '.',
     ord('\u1362'): '.',
     ord('\u166e'): '.',
+    # These stay full stops here so auth.json still matches. UTS #39 skeletons
+    # them as colons; the proxy redactor folds that shape separately.
     ord('\u1803'): '.',
     ord('\u1809'): '.',
     ord('\u2cf9'): '.',
@@ -54,9 +56,11 @@ DOT_LIKE = {
     ord('\U0001da88'): '.',
     # These do not NFKC-fold to '.'. Lisu mya ti, the Kharoshthi punctuation
     # dot, and Meetei Mayek lum iyek still hide auth.json and .netrc.
+    # Lisu tone mya cya is confusable with two full stops and does not fold.
     ord('\ua4f8'): '.',
     ord('\U00010a50'): '.',
     ord('\uabec'): '.',
+    ord('\ua4fa'): '.',
     # Unicode confusables map these to FULL STOP, and none of them NFKC-fold
     # to '.'. Arabic-indic zero and the extended zero are the digit forms.
     # The siyaq half maps through that zero, and the musical augmentation
@@ -151,6 +155,10 @@ COLON_LIKE = {
     ord('\u1393'): ':',
     ord('\U0001d108'): ':',
     ord('\U00011dd9'): ':',
+    # Proportion and squared four-dot punctuation are confusable with '::'
+    # and do not NFKC-fold to ':'. A following private name still has to split.
+    ord('\u2237'): ':',
+    ord('\u2e2c'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -294,6 +302,22 @@ SEPARATOR_LIKE = {
     # The caret insertion point does not NFKC-fold to a slash, but it is
     # confusable with one and still splits a private name from the next part.
     ord('\u2041'): '/',
+    # Double and triple solidus operators, and the OCR double backslash, do
+    # not NFKC-fold to a slash. Each one still splits the following component.
+    ord('\u2afd'): '/',
+    ord('\u2afb'): '/',
+    ord('\u244a'): '/',
+    # CJK strokes P and SP are confusable with a solidus, and stroke D with a
+    # reverse solidus. None of them NFKC-fold to a slash.
+    ord('\u31d2'): '/',
+    ord('\u31d3'): '/',
+    ord('\u31d4'): '/',
+    # Greek notation slashes and the vertical kana repeat mark do not
+    # NFKC-fold to a slash, but each one still splits the next component.
+    ord('\u3033'): '/',
+    ord('\U0001d23a'): '/',
+    ord('\U0001d20f'): '/',
+    ord('\U0001d23b'): '/',
 }
 
 def normalized_rel(rel):
@@ -481,16 +505,27 @@ def self_test():
         'auth\ua4f8json', 'accounts\U00010a50json', 'credentials\uabecjson',
         '\U00010a50netrc', 'id_rsa\ua4f8txt', 'Copy of auth\uabecjson',
         'nested/tokens\ua4f8json/extra.txt', 'auth\ua4f8\ua4f8json',
+        'auth\ua4fajson', '\ua4fanetrc', 'id_rsa\ua4fatxt', 'Copy of auth\ua4fajson',
+        'nested/tokens\ua4fajson/extra.txt', 'auth\ua4fa\ua4fajson', 'accounts\ua4fajson.txt',
         'auth\u0660json', 'accounts\u06f0json', 'credentials\U0001ecaejson',
         '\u0660netrc', '\u06f0env', 'id_rsa\U0001d16dtxt', 'secrets\u06f0env',
         'auth\u0660json.txt', 'Copy of auth\u06f0json', 'auth\u0660\u0660json',
         'nested/tokens\U0001ecaejson/extra.txt', 'ID_ED25519\u0660TXT',
         'auth.json\u2041secret.txt', 'credentials\u2041token.txt', 'notes\u2041id_rsa',
         'nested/id_rsa\u2041x', 'Diagnostics\u2041capture.png', 'tokens.json\u2041extra.txt',
+        'auth.json\u2afdsecret.txt', 'credentials\u2afbtoken.txt', 'notes\u244aid_rsa',
+        'nested/id_rsa\u2afdx', 'Diagnostics\u2afbcapture.png', 'tokens.json\u244aextra.txt',
+        'auth.json\u31d2secret.txt', 'credentials\u31d3token.txt', 'notes\u31d4id_rsa',
+        'nested/id_rsa\u31d2x', 'Diagnostics\u31d3capture.png', 'tokens.json\u31d4extra.txt',
+        'auth.json\u3033secret.txt', 'credentials\U0001d23atoken.txt', 'notes\U0001d20fid_rsa',
+        'nested/id_rsa\U0001d23bx', 'Diagnostics\u3033capture.png', 'tokens.json\U0001d23aextra.txt',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
         'readme\u1393auth\u0660json',
+        'readme\u2237auth.json', 'notes\u2e2cid_rsa', 'file\u2237credentials.json',
+        'docs\u2e2caccounts.json', 'nested/file\u2237.netrc', 'ID_RSA\u2e2cx',
+        'auth.json\u2237secret', 'readme\u2e2c.env', 'file\u2237.netrc',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -531,10 +566,18 @@ def self_test():
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
+        'notes\ua4fatxt', 'script\ua4fago', 'models\ua4fajson', 'id_rsa\ua4fapub', 'readme\ua4famd',
         'models.json\u0589readme',
         'notes\u0660txt', 'script\u06f0go', 'models\U0001ecaejson', 'id_rsa\u0660pub', 'readme\U0001d16dmd',
         'notes\u2041readme.txt', 'script.go\u2041Zone.Identifier', 'id_rsa.pub\u2041foo.txt',
+        'notes\u2afdreadme.txt', 'script.go\u2afbextra.txt', 'id_rsa.pub\u244afoo.txt',
+        'models.json\u2afdreadme.txt',
+        'notes\u31d2readme.txt', 'script.go\u31d3Zone.Identifier', 'id_rsa.pub\u31d4foo.txt',
+        'notes\u3033readme.txt', 'script.go\U0001d23aZone.Identifier', 'id_rsa.pub\U0001d20ffoo.txt',
+        'models.json\U0001d23breadme.txt',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
+        'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
+        'script.go\u2e2cZone.Identifier',
     )
     for rel in blocked:
         if not path_reason(rel):

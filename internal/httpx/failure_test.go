@@ -130,6 +130,24 @@ func TestSanitizeFailureStripsSignColons(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsDoubleColonConfusables(t *testing.T) {
+	const password = "s3cret-proxy"
+	text := "dial http://user\u2237" + password + "@127.0.0.1:7890 and http://user\u2e2c" + password + "\uFF2010.0.0.8:1080 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, "\u2237"+password) || strings.Contains(got, "\u2e2c"+password) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("proxy failure: %q", got)
+	}
+}
+
+func TestSanitizeFailureStripsMongolianFullStops(t *testing.T) {
+	const password = "s3cret-proxy"
+	text := "dial http://user\u1803" + password + "@127.0.0.1:7890 and http://user\u1809" + password + "\uFF2010.0.0.8:1080 failed"
+	got := SanitizeFailure(text)
+	if strings.Contains(got, password) || strings.Contains(got, "\u1803"+password) || strings.Contains(got, "\u1809"+password) || !strings.Contains(got, "dial") || !strings.Contains(got, "failed") || !strings.Contains(got, "xxxxx") {
+		t.Fatalf("proxy failure: %q", got)
+	}
+}
+
 func TestSanitizeFailureStripsAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"

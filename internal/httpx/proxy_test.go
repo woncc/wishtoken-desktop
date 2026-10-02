@@ -615,6 +615,94 @@ func TestRedactHidesSignColons(t *testing.T) {
 	}
 }
 
+func TestRedactHidesDoubleColonConfusables(t *testing.T) {
+	const password = "s3cret-proxy"
+	// Proportion and squared four-dot punctuation are confusable with "::"
+	// and do not NFKC-fold to ASCII ':'.
+	runes := []rune{'\u2237', '\u2e2c'}
+	for _, r := range runes {
+		raw := string(r)
+		encoded := encodeEveryByte(raw)
+		nested := encodeEveryByte(encoded)
+		cases := []string{
+			"http://user" + raw + password + "@127.0.0.1:7890",
+			"user" + raw + password + "@127.0.0.1:7890",
+			"http://user" + encoded + password + "@127.0.0.1:7890",
+			"http://user" + nested + password + "@127.0.0.1:7890",
+			"http://user" + raw + password + "%zz@127.0.0.1:7890",
+			"http://user" + raw + password + "\uFF20127.0.0.1:7890",
+		}
+		for _, in := range cases {
+			got := Redact(in)
+			for _, leaked := range []string{password, raw + password, encoded + password, nested + password} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+				}
+			}
+			if !strings.Contains(got, "xxxxx") {
+				t.Fatalf("redact %q did not mask password: %q", in, got)
+			}
+			if again := Redact(got); strings.Contains(again, password) {
+				t.Fatalf("second redact leaked: %q", again)
+			}
+			if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+				t.Fatalf("preserve %q -> %q", in, kept)
+			}
+		}
+	}
+	short := Redact("http://user\u2237name@127.0.0.1:7890")
+	if strings.Contains(short, "\u2237") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a double-colon confusable: %q", short)
+	}
+	if Redact("http://user\u2e2c@127.0.0.1:7890") != "http://user\u2e2c@127.0.0.1:7890" {
+		t.Fatal("double-colon confusable without a password was rewritten")
+	}
+}
+
+func TestRedactHidesMongolianFullStops(t *testing.T) {
+	const password = "s3cret-proxy"
+	// Mongolian full stop and Manchu full stop are confusable with ':' and
+	// do not NFKC-fold to it. The path check keeps both as dots.
+	runes := []rune{'\u1803', '\u1809'}
+	for _, r := range runes {
+		raw := string(r)
+		encoded := encodeEveryByte(raw)
+		nested := encodeEveryByte(encoded)
+		cases := []string{
+			"http://user" + raw + password + "@127.0.0.1:7890",
+			"user" + raw + password + "@127.0.0.1:7890",
+			"http://user" + encoded + password + "@127.0.0.1:7890",
+			"http://user" + nested + password + "@127.0.0.1:7890",
+			"http://user" + raw + password + "%zz@127.0.0.1:7890",
+			"http://user" + raw + password + "\uFF20127.0.0.1:7890",
+		}
+		for _, in := range cases {
+			got := Redact(in)
+			for _, leaked := range []string{password, raw + password, encoded + password, nested + password} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+				}
+			}
+			if !strings.Contains(got, "xxxxx") {
+				t.Fatalf("redact %q did not mask password: %q", in, got)
+			}
+			if again := Redact(got); strings.Contains(again, password) {
+				t.Fatalf("second redact leaked: %q", again)
+			}
+			if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+				t.Fatalf("preserve %q -> %q", in, kept)
+			}
+		}
+	}
+	short := Redact("http://user\u1803name@127.0.0.1:7890")
+	if strings.Contains(short, "\u1803") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a Mongolian full stop: %q", short)
+	}
+	if Redact("http://user\u1809@127.0.0.1:7890") != "http://user\u1809@127.0.0.1:7890" {
+		t.Fatal("Mongolian full stop without a password was rewritten")
+	}
+}
+
 func TestRedactHidesAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"
