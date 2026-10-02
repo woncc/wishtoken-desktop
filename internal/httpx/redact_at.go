@@ -47,7 +47,7 @@ func maskHiddenProxyPasswords(raw string) (string, bool) {
 		if len(secret) < 8 {
 			continue
 		}
-		out = maskEncodedSecret(out, secret, "xxxxx")
+		out = MaskEncodedSecret(out, secret, "xxxxx")
 	}
 	if out == raw {
 		return "", false
