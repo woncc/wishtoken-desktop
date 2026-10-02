@@ -4979,3 +4979,54 @@ func TestTagEqualsFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag plus was treated as an equals")
 	}
 }
+
+func TestSanitizeFailureStripsTagPercent(t *testing.T) {
+	secret := "100%done"
+	mark := "100\U000E0025done"
+	encodedSecret := "code+verifier12"
+	encoded := strings.ReplaceAll(encodeEveryByte(encodedSecret), "%", "\U000E0025")
+	inserted := "100%\U000E0025done"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " later"
+	got := SanitizeFailure(text, secret, encodedSecret)
+	for _, leaked := range []string{secret, mark, encodedSecret, encoded, inserted, "verifier12", "done"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "100\U000E0025done"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "done"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag percent leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0025 later",
+		"score \U000E0025ZZ later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag percent prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagPercentFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagPercentPieces(rawPieces("100\U000E0025done"))
+	if !ok || renderPieces(folded) != "100%done" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagPercentPieces(rawPieces("100%done")); ok {
+		t.Fatalf("ascii percent was folded")
+	}
+	if foldTagPercentString("code\U000E003Dverifier12") != "code\U000E003Dverifier12" {
+		t.Fatalf("tag equals was treated as a percent")
+	}
+	if _, ok := percentASCII(0xE0025); ok {
+		t.Fatalf("tag percent joined the credential fold")
+	}
+}

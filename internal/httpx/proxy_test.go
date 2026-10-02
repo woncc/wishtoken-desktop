@@ -2011,3 +2011,30 @@ func TestRedactHidesTagEqualsInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesTagPercentInProxyPassword(t *testing.T) {
+	const password = "s3cret-proxy"
+	encoded := strings.ReplaceAll(encodeEveryByte(password), "%", "\U000E0025")
+	literal := "100%done"
+	literalMark := strings.ReplaceAll(literal, "%", "\U000E0025")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+		"http://user\U000E00253A" + password + "@127.0.0.1:7890",
+		"http://user:" + url.PathEscape(literal) + "@127.0.0.1:7890?q=" + literalMark,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, encoded, literal, literalMark, "s3cret", "done"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	plain := "member\U000E0025example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
