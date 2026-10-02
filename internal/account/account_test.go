@@ -340,3 +340,51 @@ func TestViewHidesCredentialsSplitByMarks(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsSplitByFormatCharacters(t *testing.T) {
+	refresh := "rt_display_123456789"
+	zwsp := "rt_\u200Bdisplay_123456789"
+	bom := "rt_display_\uFEFF123456789"
+	encoded := "rt_%E2%80%8Bdisplay_123456789"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u200DdXJl"
+	acc := Account{
+		Name: "note " + zwsp + " " + encoded, Email: "kept@example.com", PlanType: "plus",
+		Source: "from " + markedJWT, Tags: []string{"team", bom}, LastError: "rejected " + zwsp,
+		AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, zwsp, bom, encoded, jwt, markedJWT, "eyJ", "display_123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}
+
+func TestViewHidesCredentialsSplitByControls(t *testing.T) {
+	refresh := "rt_display_123456789"
+	nul := "rt_\x00display_123456789"
+	line := "rt_display_\u2028123456789"
+	encoded := "rt_%00display_123456789"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	markedJWT := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0\u2029dXJl"
+	acc := Account{
+		Name: "note " + nul + " " + encoded, Email: "kept@example.com", PlanType: "plus",
+		Source: "from " + markedJWT, Tags: []string{"team", line}, LastError: "rejected " + nul,
+		AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, nul, line, encoded, jwt, markedJWT, "eyJ", "display_123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}
