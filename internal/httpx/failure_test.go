@@ -464,3 +464,34 @@ func TestSanitizeFailureStripsLongAndWaveDashes(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsCompatibilityHyphens(t *testing.T) {
+	secret := "code-verifier12"
+	refresh := "rt_sub-mitted_123456"
+	hyphens := []rune{'\u207b', '\u208b', '\ufe32', '\ufe63', '\uff0d'}
+	encodedSecret := "code%EF%BC%8Dverifier12"
+	encodedRefresh := "rt_sub%EF%BC%8Dmitted_123456"
+	var parts []string
+	var leaked []string
+	for _, r := range hyphens {
+		marked := "code" + string(r) + "verifier12"
+		token := "rt_sub" + string(r) + "mitted_123456"
+		parts = append(parts, marked, token)
+		leaked = append(leaked, marked, token)
+	}
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" "+encodedSecret+" "+encodedRefresh+" later", secret)
+	for _, item := range append([]string{secret, refresh, encodedSecret, encodedRefresh, "verifier12", "mitted_123456"}, leaked...) {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, r := range hyphens {
+		prose := "re" + string(r) + "try later"
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("compatibility hyphen prose changed: %q -> %q", prose, got)
+		}
+	}
+}
