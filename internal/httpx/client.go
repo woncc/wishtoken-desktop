@@ -861,6 +861,16 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleTilde != needleRightParen {
 		spans = append(spans, exactSecretSpans(tildeBase, needleTilde)...)
 	}
+	// Visarga signs are spacing marks shaped like a colon. The drop pass
+	// below removes them, which deletes a stored colon and misses the token.
+	// Folding them to ':' is a separate reading. The drop reading still runs,
+	// so an inserted visarga cannot hide a token that has no colon.
+	needleVisarga := foldVisargaColonString(needle)
+	if visarga, ok := foldVisargaColonPieces(folded); ok {
+		spans = append(spans, exactSecretSpans(visarga, needleVisarga)...)
+	} else if needleVisarga != needle {
+		spans = append(spans, exactSecretSpans(folded, needleVisarga)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -3344,12 +3354,14 @@ func spaceASCII(r rune) (byte, bool) {
 	}
 }
 
-// foldColonPieces maps vertical, small, and fullwidth colons to ASCII ':'.
-// NFKC folds those three, and this pass does not run NFKC, so a stored
-// secret written with those forms would stay visible. Ratio, modifier
-// colons, the vertical two-dot leader, and the other colon lookalikes do
-// not NFKC-fold to ':', so they stay out. One output piece covers the
-// original rune.
+// foldColonPieces maps colon lookalikes to ASCII ':'. Compatibility
+// vertical, small, and fullwidth colons NFKC-fold to ':'. Ratio, modifier
+// colons, and the other non-mark lookalikes do not, but a management
+// response can still hide a stored colon with them. This pass does not run
+// NFKC. Visarga signs are spacing marks and stay on a separate reading so
+// an inserted visarga can still be dropped. Mongolian and Manchu full stops
+// stay dots. Tag colon stays on the tag-punctuation reading. One output
+// piece covers the original rune.
 func foldColonPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -3395,10 +3407,77 @@ func colonFolded(s string) bool {
 
 func colonASCII(r rune) (byte, bool) {
 	switch r {
-	case 0xFE13, 0xFE55, 0xFF1A:
+	case 0xFE13, 0xFE55, 0xFF1A,
+		0x2236, 0x02D0, 0x02D1, 0x10781, 0x10782, 0xA789, 0x02F8,
+		0x0703, 0x0704, 0x0705, 0x0706, 0x0707, 0x0708, 0x0709,
+		0x0589, 0x05C3, 0x1361, 0x1365, 0x1366, 0x205A, 0x205D,
+		0x1804, 0xA6F4, 0x2A74, 0x2254, 0x2255, 0x2982, 0x2AF6,
+		0x12471, 0x12472, 0x12473, 0x12474, 0x1DA8A,
+		0xFE30, 0x16EC, 0x0831, 0x10AF5, 0x1123A, 0xA4FD,
+		0x1393, 0x1D108, 0x11DD9, 0x2237, 0x2E2C:
 		return ':', true
 	default:
 		return 0, false
+	}
+}
+
+// foldVisargaColonPieces maps visarga signs to ASCII ':'. They are spacing
+// marks, so the drop reading still removes an inserted visarga. Folding is
+// separate: dropping the mark would delete a stored colon and the token
+// would no longer match. One output piece covers the original rune.
+func foldVisargaColonPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if visargaColon(r) {
+			out = append(out, secretPiece{b: ':', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldVisargaColonString(s string) string {
+	if !visargaColonFolded(s) {
+		return s
+	}
+	folded, _ := foldVisargaColonPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+func visargaColonFolded(s string) bool {
+	for _, r := range s {
+		if visargaColon(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func visargaColon(r rune) bool {
+	switch r {
+	case 0x0903, 0x0983, 0x0A03, 0x0A83, 0x0C03, 0x0C83, 0x0D03, 0x0D83,
+		0x0F7F, 0x1038, 0x17C7,
+		0x11002, 0x11082, 0x11182, 0x11303, 0x114C1, 0x115BE, 0x116AC,
+		0x11838, 0x119DF, 0x11A39, 0x11C3E:
+		return true
+	default:
+		return false
 	}
 }
 

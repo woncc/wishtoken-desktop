@@ -2918,7 +2918,7 @@ func TestSanitizeFailureStripsCompatibilityColons(t *testing.T) {
 	}
 }
 
-func TestColonASCIIFoldsOnlyCompatibilityColons(t *testing.T) {
+func TestColonASCIIFoldsColonLookalikes(t *testing.T) {
 	checks := []struct {
 		r    rune
 		want byte
@@ -2927,16 +2927,20 @@ func TestColonASCIIFoldsOnlyCompatibilityColons(t *testing.T) {
 		{0xFE13, ':', true},
 		{0xFE55, ':', true},
 		{0xFF1A, ':', true},
+		{0x2236, ':', true},
+		{0x02D0, ':', true},
+		{0x02D1, ':', true},
+		{0xA789, ':', true},
+		{0xFE30, ':', true},
+		{0x1804, ':', true},
+		{0x0589, ':', true},
+		{0x205A, ':', true},
+		{0x2237, ':', true},
 		{':', 0, false},
-		{0x2236, 0, false},
-		{0x02D0, 0, false},
-		{0x02D1, 0, false},
-		{0xA789, 0, false},
-		{0xFE30, 0, false},
-		{0x1804, 0, false},
-		{0x0589, 0, false},
-		{0x205A, 0, false},
 		{0xFF1B, 0, false},
+		{0x0903, 0, false},
+		{0x1803, 0, false},
+		{0xE003A, 0, false},
 	}
 	for _, check := range checks {
 		got, ok := colonASCII(check.r)
@@ -2944,14 +2948,61 @@ func TestColonASCIIFoldsOnlyCompatibilityColons(t *testing.T) {
 			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
 		}
 	}
+	if visargaColon(0x0903) != true || visargaColon(0x17C7) != true || visargaColon(0x2236) || visargaColon(':') {
+		t.Fatal("visarga colon fold is wrong")
+	}
 	n := 0
+	visarga := 0
 	for r := rune(0); r <= 0x2FFFF; r++ {
 		if _, ok := colonASCII(r); ok {
 			n++
 		}
+		if visargaColon(r) {
+			visarga++
+		}
 	}
-	if n != 3 {
-		t.Fatalf("colon fold count %d", n)
+	if n != 47 || visarga != 22 {
+		t.Fatalf("colon fold count %d visarga %d", n, visarga)
+	}
+}
+
+func TestSanitizeFailureStripsColonLookalikesInKnownSecrets(t *testing.T) {
+	secret := "code:ver:1"
+	ratio := strings.NewReplacer(":", "\u2236").Replace(secret)
+	mod := strings.NewReplacer(":", "\u02D0").Replace(secret)
+	arm := strings.NewReplacer(":", "\u0589").Replace(secret)
+	encoded := strings.NewReplacer(":", "%E2%88%B6").Replace(secret)
+	visarga := strings.NewReplacer(":", "\u0903").Replace(secret)
+	got := SanitizeFailure("rejected "+ratio+" "+encoded+" later", secret)
+	for _, item := range []string{secret, ratio, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+mod+" "+arm+" "+visarga+" later", secret)
+	for _, item := range []string{secret, mod, arm, visarga, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("lookalike leaked %q in %q", item, got)
+		}
+	}
+	refresh := "rt_submitted_123456"
+	marked := "rt_sub\u0903mitted_123456"
+	got = SanitizeFailure("rejected "+marked+" later", refresh)
+	for _, item := range []string{refresh, marked, "submitted_123456"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("inserted visarga leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("inserted visarga lost context: %q", got)
+	}
+	for _, prose := range []string{"see \u2236 later", "see \u0903 later", "see \u1803 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("colon prose changed: %q -> %q", prose, got)
+		}
 	}
 }
 

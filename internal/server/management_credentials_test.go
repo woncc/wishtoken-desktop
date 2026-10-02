@@ -2549,3 +2549,60 @@ func TestManagementHidesSecretsSplitByTagTilde(t *testing.T) {
 		t.Fatalf("display context lost: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesSecretsSplitByColonLookalikes(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9q:Refresh:7f3a"
+	ratio := strings.NewReplacer(":", "\u2236").Replace(acc.RefreshToken)
+	mod := strings.NewReplacer(":", "\u02d0").Replace(acc.RefreshToken)
+	mixed := strings.Replace(ratio, "\u2236", "\u0903", 1)
+	acc.Name = "note " + ratio
+	acc.LastError = "rejected " + mod + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, ratio, mod, mixed, payload, "eyJ", "Zz9q", "Refresh", "7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+	encoded := strings.NewReplacer(":", "%E2%88%B6").Replace(acc.RefreshToken)
+	raw := `{"note":"see ` + encoded + `","access_token":"` + acc.AccessToken + `"}`
+	out := string(f.srv.redactManagementBody([]byte(raw)))
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, encoded, payload, "eyJ", "Zz9q", "Refresh"} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}
+
+func TestManagementHidesSecretsSplitByVisarga(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9q:Refresh:7f3a"
+	half := strings.NewReplacer(":", "\u0903").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer(":", "%E0%A4%83").Replace(acc.RefreshToken)
+	inserted := "rt_Zz9q:Ref\u0903resh:7f3a"
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + inserted
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, inserted, payload, "eyJ", "Zz9q", "Refresh", "7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
