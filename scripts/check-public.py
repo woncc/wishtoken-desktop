@@ -659,9 +659,11 @@ def private_filename(name):
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
-    # token. Combining marks do the same. Fold the copies, then drop format
-    # characters and marks. Line breaks stay put so a wrapped sk- line is not
-    # glued to the next line.
+    # token. Combining marks do the same. Fullwidth ASCII is a compatibility
+    # copy of the same byte: this pass does not run NFKC, so leaving it in
+    # place split a token, JWT, private key, or personal path. Fold the
+    # copies, then drop format characters and marks. Line breaks stay put so
+    # a wrapped sk- line is not glued to the next line.
     try:
         text = data.decode('utf-8')
     except UnicodeDecodeError:
@@ -672,6 +674,13 @@ def fold_content(data):
         cp = ord(ch)
         if 0xE0020 <= cp <= 0xE007E:
             out.append(chr(cp - 0xE0000))
+            changed = True
+            continue
+        # U+FF01..U+FF5E is fullwidth ASCII punctuation, digits, and letters.
+        # The offset is the NFKC compatibility mapping. Ideographic space is
+        # not in this block and stays out, so it cannot join two lines.
+        if 0xFF01 <= cp <= 0xFF5E:
+            out.append(chr(cp - 0xFEE0))
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1089,6 +1098,20 @@ def self_test():
         raise SystemExit('self-test failed: a mark-hidden secret was not detected')
     if content_reasons('caf\u0301e'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0301' + 'short').encode()):
         raise SystemExit('self-test failed: an ordinary mark was blocked')
+    wide_token = ('\uff53\uff4b-' + '\uff41' * 30).encode()
+    wide_hyphen = ('sk' + '\uff0d' + 'a' * 30).encode()
+    wide_key = ('\uff0d' * 5 + '\uff22\uff25\uff27\uff29\uff2e OPENSSH PRIVATE KEY' + '\uff0d' * 5).encode()
+    wide_jwt = ('\uff45\uff59\uff2a' + '\uff41' * 25 + '\uff0e' + '\uff42' * 30 + '.' + '\uff43' * 15).encode()
+    wide_path = '\uff23\uff1a/Users/Mayn/project'.encode()
+    if content_reasons(wide_token) != ['secret token literal'] or content_reasons(wide_hyphen) != ['secret token literal']:
+        raise SystemExit('self-test failed: a fullwidth token was not detected')
+    if content_reasons(wide_key) != ['private key'] or content_reasons(wide_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a fullwidth key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(wide_path):
+        raise SystemExit('self-test failed: a fullwidth personal path was not detected')
+    ordinary = '\u8bf4\u660e\uff1a\u4e0d\u8981\u63d0\u4ea4\uff08\u5bc6\u94a5\uff09\uff1b'
+    if content_reasons(ordinary.encode()) or content_reasons(('\uff53\uff4b-' + '\uff41' * 10).encode()) or content_reasons('-----\uff22\uff25\uff27\uff29\uff2e PUBLIC KEY-----'.encode()) or content_reasons(('sk-\n' + '\uff41' * 30).encode()):
+        raise SystemExit('self-test failed: ordinary fullwidth text was blocked')
 
 def main():
     self_test()
