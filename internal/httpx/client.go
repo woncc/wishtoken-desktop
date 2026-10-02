@@ -360,13 +360,13 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Roman numerals,
+	// token together and miss the stored ASCII byte. Long s, roman numerals,
 	// segmented digits, modifier letters, superscripts and subscripts,
 	// enclosed letters and digits, mathematical alphanumeric symbols, and
 	// fullwidth letters and digits are folded first. Then drop marks.
 	// Spacing marks shaped like full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(secret)))))))))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(pieces)))))))))
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(secret))))))))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(pieces))))))))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -786,6 +786,61 @@ func mathASCII(r rune) (byte, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// foldLongSPieces maps latin small letter long s to ASCII s.
+// NFKC folds it, and this pass does not run NFKC, so a stored token or a
+// JWT written with that form would stay visible. Long s with a dot or a
+// stroke stays a phonetic letter, and the long s t ligature expands to two
+// letters, so those stay out. One output piece covers the original rune.
+func foldLongSPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := longSASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldLongSString(s string) string {
+	if !longSFolded(s) {
+		return s
+	}
+	return renderPieces(foldLongSPieces(rawPieces(s)))
+}
+
+func longSFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := longSASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func longSASCII(r rune) (byte, bool) {
+	if r == 0x017F {
+		return 's', true
+	}
+	return 0, false
 }
 
 // foldRomanPieces maps roman numerals to ASCII when NFKC folds them
