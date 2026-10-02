@@ -1681,3 +1681,29 @@ func TestRedactHidesSquareSymbolInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesRupeeSignInProxyPassword(t *testing.T) {
+	const password = "rt_Zz9qRs7f3a"
+	mark := strings.ReplaceAll(password, "Rs", "\u20A8")
+	encoded := strings.ReplaceAll(password, "Rs", "%E2%82%A8")
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + mark,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, mark, encoded, "Zz9q", "Rs", "7f3a"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	plain := "member\u20A8example.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}

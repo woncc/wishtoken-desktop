@@ -4373,3 +4373,55 @@ func TestSquareASCIIFoldsOnlySquareSymbols(t *testing.T) {
 		t.Fatalf("square fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsRupeeSign(t *testing.T) {
+	secret := "rt_Zz9qRs7f3a"
+	marked := strings.ReplaceAll(secret, "Rs", "\u20A8")
+	encoded := strings.ReplaceAll(secret, "Rs", "%E2%82%A8")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "Rs", "Zz9q", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(secret, "Rs", "\u20A8")
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, item := range []string{secret, stored, "Zz9q", "Rs", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u20A8 later",
+		"see \u20A9 later",
+		"see \u338F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("rupee prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestRupeeASCIIFoldsOnlyTheRupeeSign(t *testing.T) {
+	got, ok := rupeeASCII(0x20A8)
+	if !ok || got != "Rs" {
+		t.Fatalf("rupee folded to %q ok=%v", got, ok)
+	}
+	for _, r := range []rune{'R', 's', 0x20A9, 0x20B9, 0x338F, 0x2A74, 0xFE30} {
+		if _, ok := rupeeASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := rupeeASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("rupee fold count %d", n)
+	}
+}

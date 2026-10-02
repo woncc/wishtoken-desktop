@@ -587,12 +587,71 @@ func fullwidthASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldRupeePieces maps the rupee sign to the ASCII "Rs" NFKC produces.
+// This pass does not run NFKC, so a stored secret written with that sign
+// would stay visible. Each output byte keeps the original rune's range.
+// Other currency signs do not fold to "Rs", so they stay out.
+func foldRupeePieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := rupeeASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldRupeeString(s string) string {
+	if !rupeeFolded(s) {
+		return s
+	}
+	return renderPieces(foldRupeePieces(rawPieces(s)))
+}
+
+func rupeeFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := rupeeASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func rupeeASCII(r rune) (string, bool) {
+	if r == 0x20A8 {
+		return "Rs", true
+	}
+	return "", false
+}
+
 // foldSquarePieces maps CJK square symbols to the ASCII sequences NFKC
 // produces. This pass does not run NFKC, so a stored secret written with
 // those forms would stay visible. Each output byte keeps the original
-// rune's range. Squares whose compatibility decomposition is not ASCII,
-// the rupee sign, double colon equal, and the vertical two-dot leader
-// stay out. The leader is read as a colon when a proxy password is split.
+// rune's range. Squares whose compatibility decomposition is not ASCII
+// stay out. The rupee sign is folded separately. Double colon equal and
+// the vertical two-dot leader stay out; the leader is read as a colon
+// when a proxy password is split.
 func foldSquarePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -1266,7 +1325,7 @@ func escapeASCII(r rune) (byte, bool) {
 }
 
 // foldCredentialPieces maps compatibility letters, digits, latin
-// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, letterlike signs, square symbols, and token punctuation, including the percent sign, exclamation
+// ligatures, circled numbers, digit full stops, digit commas, parenthesized numbers, parenthesized letters, enclosed abbreviations, letterlike signs, square symbols, the rupee sign, and token punctuation, including the percent sign, exclamation
 // mark, consecutive equals signs, dot leaders, reverse solidus, number sign, dollar sign,
 // ampersand, asterisk, question mark,
 // semicolon, comma, curly brackets, square brackets, less-than and
@@ -1277,11 +1336,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldSquarePieces(foldLetterlikePieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldEqualsRunPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotLeaderPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldSquarePieces(foldRupeePieces(foldLetterlikePieces(foldMathPieces(foldParenLetterPieces(foldParenNumberPieces(foldDigitCommaPieces(foldDigitStopPieces(foldCircledNumberPieces(foldEnclosedAbbrevPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldSquareString(foldLetterlikeString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldEqualsRunString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotLeaderString(foldDotString(foldHyphenString(foldFullwidthString(foldSquareString(foldRupeeString(foldLetterlikeString(foldMathString(foldParenLetterString(foldParenNumberString(foldDigitCommaString(foldDigitStopString(foldCircledNumberString(foldEnclosedAbbrevString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
