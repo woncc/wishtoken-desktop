@@ -4102,3 +4102,94 @@ func TestEnclosedAbbrevASCIIFoldsOnlyAbbreviations(t *testing.T) {
 		t.Fatalf("enclosed abbrev fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsLetterlikeSigns(t *testing.T) {
+	pairs := []struct {
+		secret string
+		plain  string
+		mark   string
+	}{
+		{"rt_Zz9qc/o7f3a", "c/o", "\u2105"},
+		{"rt_Aa8kNo7f3a", "No", "\u2116"},
+		{"rt_Bb7mTEL7f", "TEL", "\u2121"},
+		{"rt_Cc6nFAX7f", "FAX", "\u213B"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		marked := strings.ReplaceAll(pair.secret, pair.plain, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, pair.plain)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "c/o", "%E2%84%85")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[3].secret, "FAX", "\u213B")
+	got = SanitizeFailure("rejected "+pairs[3].secret+" later", stored)
+	for _, item := range []string{pairs[3].secret, stored, "Cc6n", "FAX", "7f"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2105 later",
+		"see \u2116 later",
+		"see \u2121 later",
+		"see \u213B later",
+		"see \u2100 later",
+		"see \u20A8 later",
+		"see \u338F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("letterlike prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestLetterlikeASCIIFoldsOnlySigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x2100, "a/c"},
+		{0x2101, "a/s"},
+		{0x2105, "c/o"},
+		{0x2106, "c/u"},
+		{0x2116, "No"},
+		{0x2120, "SM"},
+		{0x2121, "TEL"},
+		{0x2122, "TM"},
+		{0x213B, "FAX"},
+	}
+	for _, check := range checks {
+		got, ok := letterlikeASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'c', '/', 'o', 0x2102, 0x2103, 0x20A8, 0x2126, 0x213A, 0x213C, 0x338F, 0x3250} {
+		if _, ok := letterlikeASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := letterlikeASCII(r); ok {
+			n++
+		}
+	}
+	if n != 9 {
+		t.Fatalf("letterlike fold count %d", n)
+	}
+}
