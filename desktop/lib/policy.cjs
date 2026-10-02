@@ -430,10 +430,66 @@ function stopTail() {
 }
 const STOP_JOIN = stopTail();
 const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
+// "&#58;", "&#x3A;", and "&colon;" are a colon. "&#64;" and "&commat;" are "@".
+// The same references hide a digit or a host dot, and a numeric reference may
+// omit its semicolon. Nested "&amp;#58;" is still a colon. Decode those marks
+// on a copy, then use the existing scrubber. Four passes cover the reference
+// itself plus the same extra encoding depth already accepted for %2525253A.
+const HTML_NAMED = new Map([
+  ['amp', '&'],
+  ['colon', ':'],
+  ['Colon', '\u2237'],
+  ['colone', '\u2254'],
+  ['Colone', '\u2A74'],
+  ['eqcolon', '\u2255'],
+  ['ratio', '\u2236'],
+  ['commat', '@'],
+  ['period', '.'],
+  ['middot', '\u00B7']
+]);
+const HTML_REF = /&#(0*[0-9]{1,7})(?![0-9]);?|&#[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]);?|&(Colone|colone|eqcolon|commat|period|middot|Colon|colon|ratio|amp);/g;
+function proxyHtmlChars() {
+  const chars = new Set([':', '@', '&', '.']);
+  for (const list of [COLON_CHARS, SIGN_COLONS, AT_CHARS, DOT_CHARS, MIDDLE_CHARS, STOP_CHARS, MONGOLIAN_STOPS]) {
+    for (const char of list) chars.add(char);
+  }
+  for (let digit = 0; digit <= 9; digit += 1) chars.add(String(digit));
+  for (let cp = 0xFF10; cp <= 0xFF19; cp += 1) chars.add(String.fromCodePoint(cp));
+  for (const cp of [0xB2, 0xB3, 0xB9, 0x2070]) chars.add(String.fromCodePoint(cp));
+  for (let cp = 0x2074; cp <= 0x2079; cp += 1) chars.add(String.fromCodePoint(cp));
+  for (let cp = 0x2080; cp <= 0x2089; cp += 1) chars.add(String.fromCodePoint(cp));
+  return chars;
+}
+const PROXY_HTML_CHARS = proxyHtmlChars();
+function htmlProxyChar(cp) {
+  if (!Number.isInteger(cp) || cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return '';
+  const char = String.fromCodePoint(cp);
+  return PROXY_HTML_CHARS.has(char) ? char : '';
+}
+function decodeProxyHtml(text) {
+  let out = text;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const next = out.replace(HTML_REF, (match, dec, hex, named) => {
+      if (named) return HTML_NAMED.get(named) || match;
+      const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);
+      return htmlProxyChar(cp) || match;
+    });
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
 function redactProxyCredentials(text) {
+  const decoded = decodeProxyHtml(String(text));
+  const redacted = scrubProxyCredentials(decoded);
+  // A non-proxy such as "user&#58;secret@internal" must stay as written.
+  // Decoding it first would only make the secret easier to read.
+  return redacted === decoded ? text : redacted;
+}
+function scrubProxyCredentials(text) {
   // %3A is a colon. user%3Apassword decodes to a password, but a username-only
   // check never sees a separator and would leave the secret in renderer text.
   // The same encoding hides a port in user:password@127.0.0.1%3A7890.
