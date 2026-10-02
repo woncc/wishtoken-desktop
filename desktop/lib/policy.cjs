@@ -153,10 +153,13 @@ function atSeparator() {
 }
 const AT_SEP = atSeparator();
 // U+FF0E U+FE52 U+2024 fold to "." under NFKC. A nested %252E hides the same dot.
+// Middle dots do not fold to ".". They still split a host, or
+// "user:secret@127·0·0·1:7890" keeps the password.
 const DOT_CHARS = ['\uFF0E', '\uFE52', '\u2024'];
+const MIDDLE_CHARS = ['\u00B7', '\u0387', '\u1427', '\u2027', '\u2219', '\u22C5', '\u2E31', '\u30FB', '\uFF65'];
 function dotSeparator() {
   const parts = ['\\.', '%2[Ee]', '%25(?:25){0,2}2[Ee]'];
-  for (const char of DOT_CHARS) {
+  for (const char of DOT_CHARS.concat(MIDDLE_CHARS)) {
     parts.push(char);
     const encoded = percentBytes(char);
     for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
@@ -304,7 +307,6 @@ function periodTail() {
 const PERIOD_JOIN = periodTail();
 // Interpuncts that stay themselves under NFKC. U+0387 folds to U+00B7.
 // U+FF65 folds to U+30FB. A nested %25C2%25B7 hides the same middle dot.
-const MIDDLE_CHARS = ['\u00B7', '\u0387', '\u1427', '\u2027', '\u2219', '\u22C5', '\u2E31', '\u30FB', '\uFF65'];
 function middleTail() {
   const parts = [];
   for (const char of MIDDLE_CHARS) {

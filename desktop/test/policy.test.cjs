@@ -1686,7 +1686,7 @@ test('renderer text drops proxy passwords before a middle dot', () => {
     assert.equal(got.includes('hunter2'), false);
     assert.equal(got.includes('other-secret'), false);
   }
-  assert.equal(redactPublic('Build v1:2@beta\u00B7next'), 'Build v1:2@beta\u00B7next');
+  assert.equal(redactPublic('Build v1:2@beta\u00B7x'), 'Build v1:2@beta\u00B7x');
   assert.equal(redactPublic(`user:${password}@internal\u00B7x`), `user:${password}@internal\u00B7x`);
   assert.equal(redactPublic(`user:${password}@my-proxy:7\u00B7x`), `user:${password}@my-proxy:7\u00B7x`);
   assert.equal(redactPublic(`user:${password}@my-proxy:789012\u00B7next`), `user:${password}@my-proxy:789012\u00B7next`);
@@ -1707,6 +1707,66 @@ test('renderer text drops proxy passwords before a middle dot', () => {
   assert.equal(delivered.accounts[0].name, 'note my-proxy:7890%C2%B7next');
   assert.equal(delivered.accounts[0].email, 'a@example.test');
   assert.equal(delivered.accounts[0].last_error, 'dial router:8080\u30FBnext failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
+
+test('renderer text drops proxy passwords when a middle dot splits the host', () => {
+  const password = 's3cret-token';
+  const marks = ['\u00B7', '\u0387', '\u1427', '\u2027', '\u2219', '\u22C5', '\u2E31', '\u30FB', '\uFF65'];
+  const nest = (value, layers) => {
+    let out = value;
+    for (let layer = 0; layer < layers; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const cases = [];
+  for (const mark of marks) {
+    const encoded = encodeURIComponent(mark);
+    cases.push([`user:${password}@127${mark}0${mark}0${mark}1:7890`, `127${mark}0${mark}0${mark}1:7890`]);
+    cases.push([`user:${password}@my${mark}proxy:7890`, `my${mark}proxy:7890`]);
+    cases.push([`(user:${password}@example${mark}com)`, `(example${mark}com)`]);
+    cases.push([`user:${password}@10${encoded}0${encoded}0${encoded}8:1080`, `10${encoded}0${encoded}0${encoded}8:1080`]);
+    cases.push([`user:${password}@my${nest(encoded, 1).toLowerCase()}proxy:7890`, `my${nest(encoded, 1).toLowerCase()}proxy:7890`]);
+    cases.push([`//user:${password}@router${nest(encoded, 3)}example:8080`, `//router${nest(encoded, 3)}example:8080`]);
+  }
+  cases.push(
+    [`user:${password}@127%C2%B70%C2%B70%C2%B71:7890`, '127%C2%B70%C2%B70%C2%B71:7890'],
+    [`user:${password}@127%c2%b70%c2%b70%c2%b71:7890`, '127%c2%b70%c2%b70%c2%b71:7890'],
+    [`user:${password}@10\u00B71:8080`, '10\u00B71:8080'],
+    [`user:${password}@127.0\u00B70.1:7890`, '127.0\u00B70.1:7890'],
+    [`via user:${password} proxy@127\u00B70\u00B70\u00B71:7890 failed`, 'via 127\u00B70\u00B70\u00B71:7890 failed'],
+    [`http://example.com/?x=user:${password}@10\u30FB0\u30FB0\u30FB8:1080`, 'http://example.com/?x=10\u30FB0\u30FB0\u30FB8:1080'],
+    [`user:${password}/token@example\u00B7com`, 'example\u00B7com'],
+    [`socks5://alice:hunter2@10\u00B70\u00B70\u00B78:1080`, 'socks5://10\u00B70\u00B70\u00B78:1080'],
+    [`two user:${password}@127\u00B70\u00B70\u00B71:7890) and user:other-secret@my\u30FBproxy:7890.`, 'two 127\u00B70\u00B70\u00B71:7890) and my\u30FBproxy:7890.']
+  );
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic(`user:${password}@internal`), `user:${password}@internal`);
+  assert.equal(redactPublic(`user:${password}@internal\u00B7`), `user:${password}@internal\u00B7`);
+  assert.equal(redactPublic(`user:${password}@10\u00B71`), `user:${password}@10\u00B71`);
+  assert.equal(redactPublic('score 1:2@10\u00B75'), 'score 1:2@10\u00B75');
+  assert.equal(redactPublic('ratio:1@v1\u00B72'), 'ratio:1@v1\u00B72');
+  assert.equal(redactPublic('member@example\u00B7test'), 'member@example\u00B7test');
+  assert.equal(redactPublic('note 100%C2%B70 sale'), 'note 100%C2%B70 sale');
+  assert.equal(redactPublic('http://user@127\u00B70\u00B70\u00B71:7890'), 'http://user@127\u00B70\u00B70\u00B71:7890');
+  const proxy = `http://user:${password}@127.0.0.1:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@my\u00B7proxy:7890`, email: 'a@example.test', last_error: `dial user:${password}@127\u00B70\u00B70\u00B71:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my\u00B7proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial 127\u00B70\u00B70\u00B71:7890 failed');
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
