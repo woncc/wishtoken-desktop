@@ -932,16 +932,76 @@ func escapeASCII(r rune) (byte, bool) {
 
 // foldCredentialPieces maps compatibility letters, digits, and token
 // punctuation, including the percent sign, exclamation mark, reverse
-// solidus, number sign, dollar sign, ampersand, and asterisk, to ASCII.
-// Credential redaction does not run NFKC. The percent fold is part of this
-// result because the decode loop consumes it: a compatibility percent or
-// hex digit still starts the next escape layer. Marks are not dropped here.
+// solidus, number sign, dollar sign, ampersand, asterisk, and question
+// mark, to ASCII. Credential redaction does not run NFKC. The percent fold
+// is part of this result because the decode loop consumes it: a
+// compatibility percent or hex digit still starts the next escape layer.
+// Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))
+	return foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))
+	return foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))
+}
+
+// foldQuestionPieces maps vertical, small, and fullwidth question marks to
+// ASCII '?'. NFKC folds them, and this pass does not run NFKC, so a stored
+// secret written with those forms would stay visible. A double question mark
+// expands to "??", and a question exclamation mark expands to "?!". Inverted
+// and Arabic question marks, the interrobang, and question-mark ornaments do
+// not fold to '?'. The Greek question mark folds to ';', so it stays out. One
+// output piece covers the original rune.
+func foldQuestionPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := questionASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldQuestionString(s string) string {
+	if !questionFolded(s) {
+		return s
+	}
+	return renderPieces(foldQuestionPieces(rawPieces(s)))
+}
+
+func questionFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := questionASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func questionASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE16, 0xFE56, 0xFF1F:
+		return '?', true
+	default:
+		return 0, false
+	}
 }
 
 // foldAsteriskPieces maps small and fullwidth asterisks to ASCII '*'.

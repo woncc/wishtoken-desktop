@@ -2134,3 +2134,74 @@ func TestAsteriskASCIIFoldsOnlyAsterisks(t *testing.T) {
 		t.Fatalf("asterisk fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsQuestionMarks(t *testing.T) {
+	secret := "code?ver1"
+	marked := strings.ReplaceAll(secret, "?", "\uFE56")
+	encoded := strings.ReplaceAll(secret, "?", "%EF%BC%9F")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.ReplaceAll(secret, "?", "\uFE16")
+	full := strings.ReplaceAll(secret, "?", "\uFF1F")
+	got = SanitizeFailure("rejected "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, vertical, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u00bf later",
+		"see \u061f later",
+		"see \u037e later",
+		"see \u2047 later",
+		"see \u2048 later",
+		"see \u2753 later",
+		"path \uff1f file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("question prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestQuestionASCIIFoldsOnlyQuestionMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE16, '?', true},
+		{0xFE56, '?', true},
+		{0xFF1F, '?', true},
+		{'?', 0, false},
+		{0x00BF, 0, false},
+		{0x037E, 0, false},
+		{0x061F, 0, false},
+		{0x2047, 0, false},
+		{0x2048, 0, false},
+		{0x2753, 0, false},
+		{0xFF01, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := questionASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := questionASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("question fold count %d", n)
+	}
+}
