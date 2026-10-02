@@ -223,3 +223,46 @@ func TestRedactHidesColonLookalikes(t *testing.T) {
 		t.Fatalf("short secret kept a colon lookalike: %q", short)
 	}
 }
+
+func TestRedactHidesRemainingColonLookalikes(t *testing.T) {
+	const password = "s3cret-proxy"
+	// Half triangular colon, the rest of the Syriac colon block, Hebrew sof
+	// pasuq, Ethiopic wordspace and colons, and two-dot punctuation.
+	runes := []rune{'\u02d1', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709', '\u05c3', '\u1361', '\u1365', '\u1366', '\u205a'}
+	for _, r := range runes {
+		raw := string(r)
+		encoded := encodeEveryByte(raw)
+		nested := encodeEveryByte(encoded)
+		cases := []string{
+			"http://user" + raw + password + "@127.0.0.1:7890",
+			"user" + raw + password + "@127.0.0.1:7890",
+			"http://user" + encoded + password + "@127.0.0.1:7890",
+			"http://user" + nested + password + "@127.0.0.1:7890",
+			"http://user" + raw + password + "%zz@127.0.0.1:7890",
+		}
+		for _, in := range cases {
+			got := Redact(in)
+			for _, leaked := range []string{password, raw + password, encoded + password, nested + password} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+				}
+			}
+			if !strings.Contains(got, "xxxxx") {
+				t.Fatalf("redact %q did not mask password: %q", in, got)
+			}
+			if again := Redact(got); strings.Contains(again, password) {
+				t.Fatalf("second redact leaked: %q", again)
+			}
+			if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+				t.Fatalf("preserve %q -> %q", in, kept)
+			}
+		}
+	}
+	short := Redact("http://user\u0705name@127.0.0.1:7890")
+	if strings.Contains(short, "\u0705") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a colon lookalike: %q", short)
+	}
+	if Redact("http://user\u0705@127.0.0.1:7890") != "http://user\u0705@127.0.0.1:7890" {
+		t.Fatal("lookalike without a password was rewritten")
+	}
+}
