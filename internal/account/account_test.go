@@ -533,3 +533,25 @@ func TestViewHidesCredentialsSplitByHyphens(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsSplitByEmDashes(t *testing.T) {
+	refresh := "rt_display-123456789"
+	em := "rt_display\u2014" + "123456789"
+	bar := "rt_\u2015display-123456789"
+	vertical := "rt_display\ufe31" + "123456789"
+	acc := Account{
+		Name: "note " + em, Email: "kept@example.com", PlanType: "plus",
+		RefreshToken: refresh, Source: "from " + bar, Tags: []string{"team", vertical},
+		LastError: "rejected " + em, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{refresh, em, bar, vertical, "display-123456789", "123456789"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}

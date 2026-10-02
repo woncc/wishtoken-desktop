@@ -167,7 +167,9 @@ COLON_LIKE = {
     ord('\u2e2c'): ':',
 }
 # These do not NFKC-fold to '-'. Non-breaking hyphen folds to U+2010, and
-# small em dash folds to an em dash, so both are listed. Arabic full stop is
+# small em dash folds to an em dash, so both are listed. The em dash and the
+# horizontal bar do not fold either. Vertical em dash NFKC-folds to an em
+# dash, so it is listed beside them. Arabic full stop is
 # already a dot above; skeletoning it as a hyphen would hide auth.json.
 # Batak panongonan and the Tai Laing tone mark are spacing marks, so they
 # have to be folded before those marks are stripped.
@@ -176,6 +178,9 @@ HYPHEN_LIKE = {
     ord('\u2011'): '-',
     ord('\u2012'): '-',
     ord('\u2013'): '-',
+    ord('\u2014'): '-',
+    ord('\u2015'): '-',
+    ord('\uFE31'): '-',
     ord('\uFE58'): '-',
     ord('\u2043'): '-',
     ord('\u02D7'): '-',
@@ -524,6 +529,9 @@ def self_test():
         'codex_instances.json.gptbridge\U00010191backup-1', 'Copy of cache.sqlite\u2cbbwal',
         'launch\u1bf3history.json', 'cockpit\uaa7dprocess.json', 'nested/vault.db\u2cbashm/extra.txt',
         'auth.json.gptbridge\u174dbackup-1',
+        'launch\u2014history.json', 'cache.sqlite\u2014wal', 'vault.db\u2015journal',
+        'nested/cockpit\u2014integration.json', 'bridge\ufe31identity.json',
+        'state.sqlite3\u2015shm', 'Copy of cache.sqlite\ufe31wal',
         'launch\u00adhistory.json', 'cache.sqlite\u00adwal', 'vault.db\u00adjournal',
         'nested/cockpit\u00adintegration.json', 'au\u00adth.json', 'Copy of cache.sqlite\u00adwal',
         'accounts.json.bak3', 'auth.json.backup2', 'credentials.json.1', '._auth.json',
@@ -718,7 +726,8 @@ def self_test():
         'notes\u093e.txt', 'script\u093e.go', 'id_rsa\u093e.pub', 'readme\u302e.md',
         'models\u302f.json', 'notes\u0bbereadme.txt',
         'notes\u2010readme.txt', 'au\u2010th.json', 'script.go\u2212extra',
-        'readme\u2014md', 'auth\u174djson',
+        'readme\u2014md', 'au\u2014th.json', 'script.go\u2015extra', 'notes\ufe31.txt',
+        'auth\u174djson',
         'notes\u00ad.txt', 'script.go\u00adextra',
     )
     for rel in blocked:
