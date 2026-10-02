@@ -565,9 +565,10 @@ function htmlProxyChar(cp) {
   // U+FE63 and U+FF0D fold to "-". U+2010 does not, but "&hyphen;" is that
   // character. U+2011 folds to U+2010. U+2012, U+2013, U+2014, and U+2015 do
   // not fold to "-". "&ndash;" is U+2013, "&mdash;" is U+2014, "&minus;" is
-  // U+2212, and "&horbar;" is U+2015. U+FE58 folds to U+2014. A numeric
-  // reference has to yield the same character so the label fold can see it.
-  if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D) return char;
+  // U+2212, and "&horbar;" is U+2015. U+FE58 and U+FE31 fold to U+2014.
+  // A numeric reference has to yield the same character so the label fold
+  // can see it.
+  if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D) return char;
   return '';
 }
 const PROXY_MARK_CODES = new Set(Array.from(PROXY_MARK, char => char.codePointAt(0)));
@@ -780,8 +781,11 @@ function noteSecret(secrets, secret) {
 // "user:secret@my\u2015proxy:7890" keeps the password.
 // U+FE58 folds to U+2014 under NFKC, and U+2014 is already a hyphen here.
 // Its literal, percent-encoded, and numeric forms kept the password too.
-// Otherwise "user:secret@my\uFE58proxy:7890" keeps the password. A vertical
-// em dash stays as written.
+// Otherwise "user:secret@my\uFE58proxy:7890" keeps the password.
+// U+FE31 folds to U+2014 under NFKC. Its literal, percent-encoded, and
+// numeric forms kept the password too. Otherwise
+// "user:secret@my\uFE31proxy:7890" keeps the password. A vertical en dash
+// stays as written.
 function decodeEncodedLabelPunct(text) {
   return String(text)
     .replace(/%(?:25){0,3}2[Dd]/g, '-')
@@ -789,6 +793,7 @@ function decodeEncodedLabelPunct(text) {
     .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb][Cc]%(?:25){0,3}8[Dd]/g, '-')
     .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb]9%(?:25){0,3}[Aa]3/g, '-')
     .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb]9%(?:25){0,3}98/g, '-')
+    .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb]8%(?:25){0,3}[Bb]1/g, '-')
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}90/g, '-')
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}91/g, '-')
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}92/g, '-')
@@ -798,7 +803,7 @@ function decodeEncodedLabelPunct(text) {
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}88%(?:25){0,3}92/g, '-');
 }
 function foldLabelHyphens(text) {
-  return text.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+  return text.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE31\uFE58\uFE63\uFF0D]/g, '-');
 }
 function redactProxyCredentials(text) {
   const decoded = foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text))))));
