@@ -437,6 +437,53 @@ SEPARATOR_LIKE = {
     ord('\u2cc7'): '/',
     ord('\u4e36'): '/',
     ord('\u2f02'): '/',
+    # Account of, addressed to the subject, care of, and cada una expand to a
+    # letter, an ASCII solidus, and a letter. That glues both neighboring
+    # components, so a private name on either side stays hidden. They do not
+    # NFKC-fold to a slash by themselves. The other letterlike signs have no
+    # slash and stay out.
+    ord('\u2100'): '/',
+    ord('\u2101'): '/',
+    ord('\u2105'): '/',
+    ord('\u2106'): '/',
+    # Vulgar fractions expand to digits around a fraction slash. Those digits
+    # glue onto both neighboring components, so a private name stays hidden.
+    # Fraction numerator one has no trailing digit: a following name is already
+    # exposed, and the name before it is not. None of them NFKC-fold to a
+    # slash. The fraction slash itself is already a separator.
+    ord('\u00bc'): '/',
+    ord('\u00bd'): '/',
+    ord('\u00be'): '/',
+    ord('\u2150'): '/',
+    ord('\u2151'): '/',
+    ord('\u2152'): '/',
+    ord('\u2153'): '/',
+    ord('\u2154'): '/',
+    ord('\u2155'): '/',
+    ord('\u2156'): '/',
+    ord('\u2157'): '/',
+    ord('\u2158'): '/',
+    ord('\u2159'): '/',
+    ord('\u215a'): '/',
+    ord('\u215b'): '/',
+    ord('\u215c'): '/',
+    ord('\u215d'): '/',
+    ord('\u215e'): '/',
+    ord('\u215f'): '/',
+    ord('\u2189'): '/',
+    # These CJK squares expand to letters around a solidus or a division
+    # slash. The extra letters glue a private name to the neighboring
+    # component. They do not NFKC-fold to a slash by themselves. Squares
+    # with no slash stay out.
+    ord('\u3328'): '/',
+    ord('\u3329'): '/',
+    ord('\u33a7'): '/',
+    ord('\u33a8'): '/',
+    ord('\u33ae'): '/',
+    ord('\u33af'): '/',
+    ord('\u33c6'): '/',
+    ord('\u33de'): '/',
+    ord('\u33df'): '/',
 }
 
 def normalized_rel(rel):
@@ -689,6 +736,15 @@ def self_test():
         'readme\u2cc7auth.json', 'file\u2cc7.netrc', 'ID_RSA\u2cc7x',
         'notes\uff89id_rsa', 'accounts.json\u4e3fnotes.txt', 'readme\u30ceauth.json',
         'file\u2cc6.netrc', 'ID_RSA\u4e36x', 'credentials\uff89token.txt',
+        'auth.json\u2100secret.txt', 'credentials\u2101token.txt', 'notes\u2105id_rsa',
+        'nested/id_rsa\u2106x', 'Diagnostics\u2100capture.png', 'tokens.json\u2101extra.txt',
+        'readme\u2105auth.json', 'file\u2106.netrc', 'ID_RSA\u2100x',
+        'auth.json\u00bcsecret.txt', 'credentials\u00bdtoken.txt', 'notes\u00beid_rsa',
+        'nested/id_rsa\u2150x', 'Diagnostics\u2152capture.png', 'tokens.json\u215fextra.txt',
+        'readme\u2153auth.json', 'file\u2189.netrc', 'ID_RSA\u215ex',
+        'auth.json\u3328secret.txt', 'notes\u3329id_rsa', 'credentials\u33a8token.txt',
+        'nested/id_rsa\u33afx', 'Diagnostics\u33aecapture.png', 'tokens.json\u33c6extra.txt',
+        'readme\u33deauth.json', 'file\u33df.netrc', 'ID_RSA\u33a7x',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -774,6 +830,12 @@ def self_test():
         'notes\u2cc7readme.txt', 'script.go\u2cc7Zone.Identifier', 'id_rsa.pub\u2cc7foo.txt',
         'models.json\u2cc7readme.txt', 'readme\u2cc7md',
         'id_rsa.pub\uff89foo.txt', 'readme\u30cemd',
+        'notes\u2100readme.txt', 'script.go\u2101Zone.Identifier', 'id_rsa.pub\u2105foo.txt',
+        'models.json\u2106readme.txt', 'readme\u2100md',
+        'notes\u00bcreadme.txt', 'script.go\u00bdZone.Identifier', 'id_rsa.pub\u00befoo.txt',
+        'models.json\u2150readme.txt', 'readme\u215fmd', 'notes\u2189readme.txt',
+        'notes\u3328readme.txt', 'script.go\u3329Zone.Identifier', 'id_rsa.pub\u33a7foo.txt',
+        'models.json\u33c6readme.txt', 'readme\u33dfmd',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
