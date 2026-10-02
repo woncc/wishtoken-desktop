@@ -435,21 +435,60 @@ const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${enc
 // omit its semicolon. Nested "&amp;#58;" is still a colon. Decode those marks
 // on a copy, then use the existing scrubber. Four passes cover the reference
 // itself plus the same extra encoding depth already accepted for %2525253A.
+// "&Assign;", "&Proportion;", "&bull;", and "&sup2;" are aliases for marks
+// the numeric decoder already accepts. "&percnt;", "&#37;", and "&#x25;" are
+// "%", so a percent-encoded colon can hide behind them. "&amp" and "&AMP"
+// may omit the semicolon, including directly before the next name.
+// encodeURIComponent("&#58;") is "%26%2358%3B". A nested "%2526" layer hides
+// the same reference. Decode those spans on the copy before the scrubber.
 const HTML_NAMED = new Map([
   ['amp', '&'],
+  ['AMP', '&'],
   ['colon', ':'],
   ['Colon', '\u2237'],
+  ['Proportion', '\u2237'],
   ['colone', '\u2254'],
+  ['coloneq', '\u2254'],
+  ['Assign', '\u2254'],
   ['Colone', '\u2A74'],
   ['eqcolon', '\u2255'],
+  ['ecolon', '\u2255'],
   ['ratio', '\u2236'],
+  ['RuleDelayed', '\u29F4'],
   ['commat', '@'],
   ['period', '.'],
-  ['middot', '\u00B7']
+  ['middot', '\u00B7'],
+  ['centerdot', '\u00B7'],
+  ['CenterDot', '\u00B7'],
+  ['bull', '\u2022'],
+  ['bullet', '\u2022'],
+  ['hybull', '\u2043'],
+  ['nldr', '\u2025'],
+  ['ofcir', '\u29BF'],
+  ['sdot', '\u22C5'],
+  ['sup1', '\u00B9'],
+  ['sup2', '\u00B2'],
+  ['sup3', '\u00B3'],
+  ['percnt', '%']
 ]);
-const HTML_REF = /&#(0*[0-9]{1,7})(?![0-9]);?|&#[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]);?|&(Colone|colone|eqcolon|commat|period|middot|Colon|colon|ratio|amp);/g;
+const HTML_LEGACY = ['AMP', 'amp', 'middot', 'sup1', 'sup2', 'sup3'];
+const HTML_STRICT = [...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name));
+function namedAlt(names) {
+  return names.slice().sort((a, b) => b.length - a.length || (a < b ? -1 : 1)).join('|');
+}
+function encByte(hexClass) {
+  return `%(?:25){0,3}${hexClass}`;
+}
+const ENC_AMP = encByte('26');
+const ENC_HASH = encByte('23');
+const ENC_SEMI = encByte('3[Bb]');
+const HTML_REF = new RegExp(`&#(0*[0-9]{1,7})(?![0-9]);?|&#[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]);?|&(?:(${namedAlt(HTML_LEGACY)});?|(${namedAlt(HTML_STRICT)});)`, 'g');
+const ENC_NUMERIC = new RegExp(`${ENC_AMP}(?:${ENC_HASH}|#)(?:(0*[0-9]{1,7})(?![0-9])|[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]))(?:${ENC_SEMI}|;)?`, 'g');
+const ENC_LEGACY = new RegExp(`${ENC_AMP}(${namedAlt(HTML_LEGACY)})(?:${ENC_SEMI}|;)?`, 'g');
+const ENC_STRICT = new RegExp(`${ENC_AMP}(${namedAlt(HTML_STRICT)})(?:${ENC_SEMI}|;)`, 'g');
+const ENC_TAIL = new RegExp(`(&(?:#(?:[0-9]{1,7}|[xX][0-9a-fA-F]{1,6})|${namedAlt([...HTML_NAMED.keys()])}))(?:${ENC_SEMI})`, 'g');
 function proxyHtmlChars() {
-  const chars = new Set([':', '@', '&', '.']);
+  const chars = new Set([':', '@', '&', '.', '%']);
   for (const list of [COLON_CHARS, SIGN_COLONS, AT_CHARS, DOT_CHARS, MIDDLE_CHARS, STOP_CHARS, MONGOLIAN_STOPS]) {
     for (const char of list) chars.add(char);
   }
@@ -466,10 +505,21 @@ function htmlProxyChar(cp) {
   const char = String.fromCodePoint(cp);
   return PROXY_HTML_CHARS.has(char) ? char : '';
 }
+function decodeEncodedHtml(text) {
+  return text
+    .replace(ENC_NUMERIC, (match, dec, hex) => {
+      const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);
+      return htmlProxyChar(cp) || match;
+    })
+    .replace(ENC_LEGACY, (match, name) => HTML_NAMED.get(name) || match)
+    .replace(ENC_STRICT, (match, name) => HTML_NAMED.get(name) || match)
+    .replace(ENC_TAIL, '$1;');
+}
 function decodeProxyHtml(text) {
   let out = text;
   for (let pass = 0; pass < 4; pass += 1) {
-    const next = out.replace(HTML_REF, (match, dec, hex, named) => {
+    const next = decodeEncodedHtml(out).replace(HTML_REF, (match, dec, hex, legacy, strict) => {
+      const named = legacy || strict;
       if (named) return HTML_NAMED.get(named) || match;
       const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);
       return htmlProxyChar(cp) || match;
