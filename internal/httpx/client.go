@@ -360,11 +360,12 @@ func decodePieces(in []secretPiece) []secretPiece {
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	// A hyphen or full stop is not ignorable: dropping it would glue the
-	// token together and miss the stored ASCII byte. Fullwidth letters and
-	// digits are folded first. Then drop marks. Spacing marks shaped like
-	// full stops keep both readings.
-	needle := foldDotString(foldHyphenString(foldFullwidthString(secret)))
-	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(pieces)))
+	// token together and miss the stored ASCII byte. Mathematical
+	// alphanumeric symbols and fullwidth letters and digits are folded
+	// first. Then drop marks. Spacing marks shaped like full stops keep
+	// both readings.
+	needle := foldDotString(foldHyphenString(foldFullwidthString(foldMathString(secret))))
+	folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(pieces))))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -566,6 +567,221 @@ func fullwidthASCII(r rune) (byte, bool) {
 	switch {
 	case r >= '\uff10' && r <= '\uff19', r >= '\uff21' && r <= '\uff3a', r >= '\uff41' && r <= '\uff5a':
 		return byte(r - 0xfee0), true
+	default:
+		return 0, false
+	}
+}
+
+// foldMathPieces maps mathematical alphanumeric symbols to ASCII.
+// NFKC folds them, and this pass does not run NFKC, so a stored token or a
+// JWT written with those forms would stay visible. Greek mathematical
+// letters fold to Greek, not ASCII, and stay out. The same alphabets left
+// holes for letters that already lived in the letterlike block, including
+// Planck's constant for italic h. Those holes, and the few double-struck
+// italic letters, are listed here. Kelvin sign and information source also
+// fold to one ASCII letter, but they are not mathematical letters. One
+// output piece covers the original rune.
+func foldMathPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := mathASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldMathString(s string) string {
+	if !mathFolded(s) {
+		return s
+	}
+	return renderPieces(foldMathPieces(rawPieces(s)))
+}
+
+func mathFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := mathASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func mathASCII(r rune) (byte, bool) {
+	switch {
+	case r >= 0x1D400 && r <= 0x1D419:
+		return byte(r - 0x1D400 + 'A'), true
+	case r >= 0x1D41A && r <= 0x1D433:
+		return byte(r - 0x1D41A + 'a'), true
+	case r >= 0x1D434 && r <= 0x1D44D:
+		return byte(r - 0x1D434 + 'A'), true
+	case r >= 0x1D44E && r <= 0x1D454:
+		return byte(r - 0x1D44E + 'a'), true
+	case r >= 0x1D456 && r <= 0x1D467:
+		return byte(r - 0x1D456 + 'i'), true
+	case r >= 0x1D468 && r <= 0x1D481:
+		return byte(r - 0x1D468 + 'A'), true
+	case r >= 0x1D482 && r <= 0x1D49B:
+		return byte(r - 0x1D482 + 'a'), true
+	case r == 0x1D49C:
+		return 'A', true
+	case r >= 0x1D49E && r <= 0x1D49F:
+		return byte(r - 0x1D49E + 'C'), true
+	case r == 0x1D4A2:
+		return 'G', true
+	case r >= 0x1D4A5 && r <= 0x1D4A6:
+		return byte(r - 0x1D4A5 + 'J'), true
+	case r >= 0x1D4A9 && r <= 0x1D4AC:
+		return byte(r - 0x1D4A9 + 'N'), true
+	case r >= 0x1D4AE && r <= 0x1D4B5:
+		return byte(r - 0x1D4AE + 'S'), true
+	case r >= 0x1D4B6 && r <= 0x1D4B9:
+		return byte(r - 0x1D4B6 + 'a'), true
+	case r == 0x1D4BB:
+		return 'f', true
+	case r >= 0x1D4BD && r <= 0x1D4C3:
+		return byte(r - 0x1D4BD + 'h'), true
+	case r >= 0x1D4C5 && r <= 0x1D4CF:
+		return byte(r - 0x1D4C5 + 'p'), true
+	case r >= 0x1D4D0 && r <= 0x1D4E9:
+		return byte(r - 0x1D4D0 + 'A'), true
+	case r >= 0x1D4EA && r <= 0x1D503:
+		return byte(r - 0x1D4EA + 'a'), true
+	case r >= 0x1D504 && r <= 0x1D505:
+		return byte(r - 0x1D504 + 'A'), true
+	case r >= 0x1D507 && r <= 0x1D50A:
+		return byte(r - 0x1D507 + 'D'), true
+	case r >= 0x1D50D && r <= 0x1D514:
+		return byte(r - 0x1D50D + 'J'), true
+	case r >= 0x1D516 && r <= 0x1D51C:
+		return byte(r - 0x1D516 + 'S'), true
+	case r >= 0x1D51E && r <= 0x1D537:
+		return byte(r - 0x1D51E + 'a'), true
+	case r >= 0x1D538 && r <= 0x1D539:
+		return byte(r - 0x1D538 + 'A'), true
+	case r >= 0x1D53B && r <= 0x1D53E:
+		return byte(r - 0x1D53B + 'D'), true
+	case r >= 0x1D540 && r <= 0x1D544:
+		return byte(r - 0x1D540 + 'I'), true
+	case r == 0x1D546:
+		return 'O', true
+	case r >= 0x1D54A && r <= 0x1D550:
+		return byte(r - 0x1D54A + 'S'), true
+	case r >= 0x1D552 && r <= 0x1D56B:
+		return byte(r - 0x1D552 + 'a'), true
+	case r >= 0x1D56C && r <= 0x1D585:
+		return byte(r - 0x1D56C + 'A'), true
+	case r >= 0x1D586 && r <= 0x1D59F:
+		return byte(r - 0x1D586 + 'a'), true
+	case r >= 0x1D5A0 && r <= 0x1D5B9:
+		return byte(r - 0x1D5A0 + 'A'), true
+	case r >= 0x1D5BA && r <= 0x1D5D3:
+		return byte(r - 0x1D5BA + 'a'), true
+	case r >= 0x1D5D4 && r <= 0x1D5ED:
+		return byte(r - 0x1D5D4 + 'A'), true
+	case r >= 0x1D5EE && r <= 0x1D607:
+		return byte(r - 0x1D5EE + 'a'), true
+	case r >= 0x1D608 && r <= 0x1D621:
+		return byte(r - 0x1D608 + 'A'), true
+	case r >= 0x1D622 && r <= 0x1D63B:
+		return byte(r - 0x1D622 + 'a'), true
+	case r >= 0x1D63C && r <= 0x1D655:
+		return byte(r - 0x1D63C + 'A'), true
+	case r >= 0x1D656 && r <= 0x1D66F:
+		return byte(r - 0x1D656 + 'a'), true
+	case r >= 0x1D670 && r <= 0x1D689:
+		return byte(r - 0x1D670 + 'A'), true
+	case r >= 0x1D68A && r <= 0x1D6A3:
+		return byte(r - 0x1D68A + 'a'), true
+	case r >= 0x1D7CE && r <= 0x1D7D7:
+		return byte(r - 0x1D7CE + '0'), true
+	case r >= 0x1D7D8 && r <= 0x1D7E1:
+		return byte(r - 0x1D7D8 + '0'), true
+	case r >= 0x1D7E2 && r <= 0x1D7EB:
+		return byte(r - 0x1D7E2 + '0'), true
+	case r >= 0x1D7EC && r <= 0x1D7F5:
+		return byte(r - 0x1D7EC + '0'), true
+	case r >= 0x1D7F6 && r <= 0x1D7FF:
+		return byte(r - 0x1D7F6 + '0'), true
+	}
+	switch r {
+	case 0x2102:
+		return 'C', true
+	case 0x210A:
+		return 'g', true
+	case 0x210B:
+		return 'H', true
+	case 0x210C:
+		return 'H', true
+	case 0x210D:
+		return 'H', true
+	case 0x210E:
+		return 'h', true
+	case 0x2110:
+		return 'I', true
+	case 0x2111:
+		return 'I', true
+	case 0x2112:
+		return 'L', true
+	case 0x2113:
+		return 'l', true
+	case 0x2115:
+		return 'N', true
+	case 0x2119:
+		return 'P', true
+	case 0x211A:
+		return 'Q', true
+	case 0x211B:
+		return 'R', true
+	case 0x211C:
+		return 'R', true
+	case 0x211D:
+		return 'R', true
+	case 0x2124:
+		return 'Z', true
+	case 0x2128:
+		return 'Z', true
+	case 0x212C:
+		return 'B', true
+	case 0x212D:
+		return 'C', true
+	case 0x212F:
+		return 'e', true
+	case 0x2130:
+		return 'E', true
+	case 0x2131:
+		return 'F', true
+	case 0x2133:
+		return 'M', true
+	case 0x2134:
+		return 'o', true
+	case 0x2145:
+		return 'D', true
+	case 0x2146:
+		return 'd', true
+	case 0x2147:
+		return 'e', true
+	case 0x2148:
+		return 'i', true
+	case 0x2149:
+		return 'j', true
 	default:
 		return 0, false
 	}
