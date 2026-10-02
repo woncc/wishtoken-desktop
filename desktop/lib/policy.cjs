@@ -589,12 +589,12 @@ function htmlProxyChar(cp) {
   // subscript letters, roman numerals that fold to one letter,
   // mathematical letters, enclosed letters, outlined capitals, outlined
   // digits, circled digits, mathematical digits, segmented digits,
-  // Arabic-Indic digits, NKo digits, Devanagari digits, Bengali digits, and
-  // Gurmukhi digits do too. A numeric reference has to yield the same
-  // character so the label fold can see it.
+  // Arabic-Indic digits, NKo digits, Devanagari digits, Bengali digits,
+  // Gurmukhi digits, and Gujarati digits do too. A numeric reference has to
+  // yield the same character so the label fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp)) return char;
   if (cp === 0x02D7 || cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x207B || cp === 0x208B || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -2022,8 +2022,63 @@ function foldGurmukhiDigits(text) {
   }
   return out;
 }
+// Gujarati digits U+0AE6..U+0AEF do not fold to 0-9 under NFKC. A
+// single-label host, a dotted host, a numeric host, and a port already allow
+// ASCII digits, so these marks kept the password. Their literal,
+// percent-encoded, and numeric forms did too. Otherwise
+// "user:secret@my\u0AE7proxy:7890" and
+// "user:secret@\u0AE7\u0AE8\u0AED.\u0AE6.\u0AE6.\u0AE7:7890" keep the
+// password. The redacted host uses an ASCII digit. U+0AE1, U+0AF0, and other
+// non-digit Gujarati marks stay as written.
+function gujaratiDigitAscii(cp) {
+  if (cp >= 0x0AE6 && cp <= 0x0AEF) return String.fromCharCode(0x30 + (cp - 0x0AE6));
+  return '';
+}
+function isGujaratiDigit(cp) {
+  return gujaratiDigitAscii(cp) !== '';
+}
+function readEncodedGujaratiDigit(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isGujaratiDigit(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedGujaratiDigits(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const digit = readEncodedGujaratiDigit(text, index);
+    if (digit) {
+      out += digit.char;
+      index = digit.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldGujaratiDigits(text) {
+  let out = '';
+  for (const char of text) {
+    out += gujaratiDigitAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
 function redactProxyCredentials(text) {
-  const decoded = foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))));
+  const decoded = foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
