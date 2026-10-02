@@ -949,11 +949,11 @@ func escapeASCII(r rune) (byte, bool) {
 // it: a compatibility percent or hex digit still starts the next escape
 // layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtPieces(foldColonPieces(foldQuotationPieces(foldApostrophePieces(foldVerticalLinePieces(foldCircumflexPieces(foldGravePieces(foldLessGreaterPieces(foldBracketPieces(foldBracePieces(foldCommaPieces(foldSemicolonPieces(foldQuestionPieces(foldAsteriskPieces(foldAmpersandPieces(foldDollarPieces(foldNumberSignPieces(foldReverseSolidusPieces(foldDoublePunctuationPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldAdditiveRomanPieces(foldRomanPieces(foldLigaturePieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))))))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))))))))))))))))))))
+	return foldCommercialAtString(foldColonString(foldQuotationString(foldApostropheString(foldVerticalLineString(foldCircumflexString(foldGraveString(foldLessGreaterString(foldBracketString(foldBraceString(foldCommaString(foldSemicolonString(foldQuestionString(foldAsteriskString(foldAmpersandString(foldDollarString(foldNumberSignString(foldReverseSolidusString(foldDoublePunctuationString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldAdditiveRomanString(foldRomanString(foldLigatureString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))))))))))))))))))))))
 }
 
 // foldCommercialAtPieces maps the small and fullwidth commercial at to
@@ -1711,10 +1711,11 @@ func semicolonASCII(r rune) (byte, bool) {
 // foldQuestionPieces maps vertical, small, and fullwidth question marks to
 // ASCII '?'. NFKC folds them, and this pass does not run NFKC, so a stored
 // secret written with those forms would stay visible. A double question mark
-// expands to "??", and a question exclamation mark expands to "?!". Inverted
-// and Arabic question marks, the interrobang, and question-mark ornaments do
-// not fold to '?'. The Greek question mark folds to ';', so it stays out. One
-// output piece covers the original rune.
+// expands to "??", and a question exclamation mark expands to "?!". Those two
+// are folded with the doubled exclamation marks. Inverted and Arabic question
+// marks, the interrobang, and question-mark ornaments do not fold to '?'.
+// The Greek question mark folds to ';', so it stays out. One output piece
+// covers the original rune.
 func foldQuestionPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -2052,13 +2053,81 @@ func reverseSolidusASCII(r rune) (byte, bool) {
 	}
 }
 
+// foldDoublePunctuationPieces maps the doubled question and exclamation
+// marks to the ASCII pairs NFKC produces. This pass does not run NFKC, so a
+// stored secret written with those marks would stay visible. Each output
+// byte keeps the original rune's range. The interrobang, inverted marks,
+// two-dot leaders, ellipses, and consecutive equals signs are not these
+// four marks, so they stay out.
+func foldDoublePunctuationPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := doublePunctuationASCII(r); ok {
+			start := in[i].start
+			end := in[i+size-1].end
+			for j := 0; j < len(folded); j++ {
+				out = append(out, secretPiece{b: folded[j], start: start, end: end})
+			}
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldDoublePunctuationString(s string) string {
+	if !doublePunctuationFolded(s) {
+		return s
+	}
+	return renderPieces(foldDoublePunctuationPieces(rawPieces(s)))
+}
+
+func doublePunctuationFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := doublePunctuationASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func doublePunctuationASCII(r rune) (string, bool) {
+	switch r {
+	case 0x203C:
+		return "!!", true
+	case 0x2047:
+		return "??", true
+	case 0x2048:
+		return "?!", true
+	case 0x2049:
+		return "!?", true
+	default:
+		return "", false
+	}
+}
+
 // foldExclamationPieces maps exclamation marks to ASCII '!'.
 // NFKC folds them, and this pass does not run NFKC, so a stored secret
 // written with those forms would stay visible. A double exclamation mark
-// expands to "!!", and an exclamation question mark expands to "!?".
-// Inverted exclamation, the retroflex click, and heavy exclamation
-// ornaments do not fold to '!', so they stay out. One output piece covers
-// the original rune.
+// expands to "!!", and an exclamation question mark expands to "!?". Those
+// two are folded with the doubled question marks. Inverted exclamation, the
+// retroflex click, and heavy exclamation ornaments do not fold to '!', so
+// they stay out. One output piece covers the original rune.
 func foldExclamationPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in

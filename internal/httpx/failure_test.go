@@ -3301,3 +3301,88 @@ func TestAdditiveRomanASCIIFoldsOnlyAdditiveNumerals(t *testing.T) {
 		t.Fatalf("additive roman fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsDoublePunctuation(t *testing.T) {
+	pairs := []struct {
+		secret string
+		mark   string
+	}{
+		{"rt_Zz9q!!7f3a", "\u203C"},
+		{"rt_Zz9q??7f3a", "\u2047"},
+		{"rt_Zz9q?!7f3a", "\u2048"},
+		{"rt_Zz9q!?7f3a", "\u2049"},
+	}
+	var parts []string
+	var secrets []string
+	var leaked []string
+	for _, pair := range pairs {
+		asciiPair := pair.secret[len("rt_Zz9q") : len("rt_Zz9q")+2]
+		marked := strings.ReplaceAll(pair.secret, asciiPair, pair.mark)
+		parts = append(parts, marked)
+		secrets = append(secrets, pair.secret)
+		leaked = append(leaked, pair.secret, marked, asciiPair)
+	}
+	encoded := strings.ReplaceAll(pairs[0].secret, "!!", "%E2%80%BC")
+	parts = append(parts, encoded)
+	leaked = append(leaked, encoded, "Zz9q", "7f3a")
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" later", secrets...)
+	for _, item := range leaked {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := strings.ReplaceAll(pairs[0].secret, "!!", "\u203C")
+	got = SanitizeFailure("rejected "+pairs[0].secret+" later", stored)
+	for _, item := range []string{pairs[0].secret, stored, "Zz9q", "!!", "7f3a"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("stored mark leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u203C later",
+		"see \u2047 later",
+		"see \u203D later",
+		"see \u00A1 later",
+		"see \u2026 later",
+		"see \u2A74 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("punctuation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDoublePunctuationASCIIFoldsOnlyDoubledMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want string
+	}{
+		{0x203C, "!!"},
+		{0x2047, "??"},
+		{0x2048, "?!"},
+		{0x2049, "!?"},
+	}
+	for _, check := range checks {
+		got, ok := doublePunctuationASCII(check.r)
+		if !ok || got != check.want {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q", check.r, got, ok, check.want)
+		}
+	}
+	for _, r := range []rune{'!', '?', 0x203D, 0x00A1, 0x00BF, 0x2025, 0x2026, 0x2A74, 0x2A75, 0xFE15, 0xFF01} {
+		if _, ok := doublePunctuationASCII(r); ok {
+			t.Fatalf("U+%04X should stay out", r)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := doublePunctuationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 4 {
+		t.Fatalf("double punctuation fold count %d", n)
+	}
+}
