@@ -47,6 +47,12 @@ const SECRET_TEXT = [
 // A literal-digit check leaves the password in
 // "user:secret@127.0.0.1%3A%37%38%39%30". One digit still does not make a
 // single-label host count.
+// Fullwidth digits can be percent-encoded too. U+FF10..U+FF19 are the bytes
+// EF BC 90..EF BC 99, and each byte can carry the same extra %25 layers.
+// A literal fullwidth check leaves the password in
+// "user:secret@my-proxy:%EF%BC%97%EF%BC%98%EF%BC%99%EF%BC%90" and in a numeric
+// host such as
+// "user:secret@%EF%BC%91%EF%BC%92%EF%BC%97%2E%EF%BC%90%2E%EF%BC%90%2E%EF%BC%91:7890".
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
 // A backtick, pipe, or backslash after the port is a boundary too, including
@@ -179,14 +185,17 @@ function dotSeparator() {
 const DOT_SEP = dotSeparator();
 const SCHEME_USER = '[^\\s/?#:@' + COLON_CHARS.join('') + ']+';
 const proxyPort = COLON_SEP;
-const DIGIT = '(?:\\d|[\\uFF10-\\uFF19])';
+// Encoded U+FF10..U+FF19. {0,3} extra "25"s is the same 1..4 encoding depth
+// already accepted for an ASCII port digit.
+const FULLWIDTH_DIGIT = '%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb][Cc]%(?:25){0,3}9\\d';
+const DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${FULLWIDTH_DIGIT})`;
 const numericLabel = `(?:${DIGIT}{1,4}|0[xX][0-9A-Fa-f]{1,8})`;
 const domainLabel = '[A-Za-z0-9-]+';
 const literalDomain = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
 const encodedDomain = `${domainLabel}(?:${DOT_SEP}${domainLabel})*${DOT_SEP}[A-Za-z]{2,}`;
 const fourNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){3}`;
 const shortNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){0,2}`;
-const PORT_DIGIT = '(?:\\d|[\\uFF10-\\uFF19]|%3\\d|%25(?:25){0,2}3\\d)';
+const PORT_DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|%3\\d|%25(?:25){0,2}3\\d|${FULLWIDTH_DIGIT})`;
 // U+FF06 U+FE60 fold to "&". U+FF1D U+FE66 U+207C U+208C fold to "=".
 const QUERY_CHARS = ['\uFF06', '\uFE60', '\uFF1D', '\uFE66', '\u207C', '\u208C'];
 function queryJoinTail() {
