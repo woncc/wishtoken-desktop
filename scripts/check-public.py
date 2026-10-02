@@ -1041,6 +1041,16 @@ def fold_content(data):
             out.append('-')
             changed = True
             continue
+        # Full stops are the same set the path check uses. This pass does
+        # not run NFKC, so a JWT whose separators were one-dot leaders or
+        # ideographic stops stayed split. Spacing stops are folded here too:
+        # dropping the musical augmentation dot would erase the separator.
+        # A full stop is not a token character, so it still splits sk- text.
+        mapped = DOT_LIKE.get(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
         # visible to the byte patterns. Cc and line separators stay, so a
         # wrapped line is not joined.
@@ -1652,8 +1662,18 @@ def self_test():
         raise SystemExit('self-test failed: a soft-hyphen token was not detected')
     if content_reasons(shy_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a soft-hyphen JWT was not detected')
-    if content_reasons('slow\u00addown'.encode()) or content_reasons(('----BEGIN OPENSSH PRIVATE KEY-----').encode()) or content_reasons(('sk-' + 'a' * 12 + '\u200b' + 'a' * 12).encode()) or content_reasons(('sk' + '\u00ad' + 'a' * 10).encode()):
+    if content_reasons('slow\u00adown'.encode()) or content_reasons(('----BEGIN OPENSSH PRIVATE KEY-----').encode()) or content_reasons(('sk-' + 'a' * 12 + '\u200b' + 'a' * 12).encode()) or content_reasons(('sk' + '\u00ad' + 'a' * 10).encode()):
         raise SystemExit('self-test failed: ordinary soft hyphen text was blocked')
+    if len(DOT_LIKE) != 31 or DOT_LIKE[0x2024] != '.' or DOT_LIKE[0x3002] != '.' or DOT_LIKE[0x0660] != '.' or DOT_LIKE[0x06F0] != '.' or DOT_LIKE[0xFE52] != '.' or DOT_LIKE[0xFF0E] != '.' or DOT_LIKE[0xABEC] != '.' or DOT_LIKE[0x1D16D] != '.' or DOT_LIKE.get(0x2025) is not None or DOT_LIKE.get(0x00B7) is not None or DOT_LIKE.get(ord('.')) is not None:
+        raise SystemExit('self-test failed: full stop table is wrong')
+    dot_leader = ('eyJ' + 'a' * 25 + '\u2024' + 'b' * 30 + '\u2024' + 'c' * 15).encode()
+    dot_ideo = ('eyJ' + 'a' * 25 + '\u3002' + 'b' * 30 + '\u3002' + 'c' * 15).encode()
+    dot_zero = ('eyJ' + 'a' * 25 + '\u0660' + 'b' * 30 + '\u06f0' + 'c' * 15).encode()
+    dot_music = ('eyJ' + 'a' * 25 + '\U0001d16d' + 'b' * 30 + '.' + 'c' * 15).encode()
+    if content_reasons(dot_leader) != ['JWT literal'] or content_reasons(dot_ideo) != ['JWT literal'] or content_reasons(dot_zero) != ['JWT literal'] or content_reasons(dot_music) != ['JWT literal']:
+        raise SystemExit('self-test failed: a full-stop JWT was not detected')
+    if content_reasons('see file\u2024txt later'.encode()) or content_reasons('end\u2025 next'.encode()) or content_reasons(('eyJ' + 'a' * 10 + '\u2024' + 'b' * 10 + '\u2024' + 'c' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2024' + 'a' * 20).encode()) or content_reasons(('eyJ' + 'a' * 25 + '\u00b7' + 'b' * 30 + '.' + 'c' * 15).encode()):
+        raise SystemExit('self-test failed: ordinary full stop text was blocked')
 
 def main():
     self_test()
