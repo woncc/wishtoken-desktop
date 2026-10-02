@@ -4685,7 +4685,7 @@ func parenASCII(r rune) (byte, bool) {
 // either: Philippine punctuation, the caret insertion point, box drawings,
 // the short box drawings from upper centre to middle left and from middle
 // right to lower centre, a rising mathematical diagonal, dotted and heavy
-// solidi, squared rising diagonal, CJK strokes P and SP, the slash radical, the double and
+// solidi, the modifier letter dot slash, squared rising diagonal, CJK strokes P and SP, the slash radical, the double and
 // triple solidus operators, the kana repeat upper halves, the slash
 // radical's ideograph, katakana no, and both Old Coptic esh letters.
 // Halfwidth katakana no and circled katakana no NFKC-fold to katakana no
@@ -4711,7 +4711,10 @@ func parenASCII(r rune) (byte, bool) {
 // stays out. The negative short diagonal, from middle right to lower
 // centre, is that same rising stroke in negative and does not NFKC-fold
 // to a slash. It stays one slash. The diagonal cross, the chevron
-// diagonals, and the negative diamond stay out. Other letters stay out.
+// diagonals, and the negative diamond stay out. The modifier letter dot
+// slash is that dotted stroke in small form and does not NFKC-fold to a
+// slash. It stays one slash. The dot vertical bar and the dot horizontal
+// bar stay out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -4760,7 +4763,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBBE:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBBE:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
