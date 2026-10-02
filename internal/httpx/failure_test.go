@@ -5654,3 +5654,51 @@ func TestTagCommaFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag right curly bracket was treated as a comma")
 	}
 }
+
+func TestSanitizeFailureStripsTagSemicolon(t *testing.T) {
+	secret := "code;verifier12"
+	mark := "code\U000E003Bverifier12"
+	encoded := "code%F3%A0%80%BBverifier12"
+	inserted := "code;\U000E003Bverifier12"
+	mixedSecret := "rt,Zz9q;ab7f"
+	mixed := "rt\U000E002CZz9q\U000E003Bab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code;verifier12code;verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E003Bverifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag semicolon leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E003B later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag semicolon prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagSemicolonFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagSemicolonPieces(rawPieces("code\U000E003Bverifier12"))
+	if !ok || renderPieces(folded) != "code;verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagSemicolonPieces(rawPieces("code;verifier12")); ok {
+		t.Fatalf("ascii semicolon was folded")
+	}
+	if foldTagSemicolonString("code\U000E002Cverifier12") != "code\U000E002Cverifier12" {
+		t.Fatalf("tag comma was treated as a semicolon")
+	}
+}
