@@ -203,6 +203,9 @@ def strip_marks(value):
 def fold_separators(value, separators):
     # Colon and dot lookalikes are translated before marks are removed.
     # The musical augmentation dot is a spacing mark and must stay a dot.
+    # Ogham space is the only space separator that does not NFKC-fold to
+    # ASCII space, so a trailing mark would otherwise hide id_rsa.
+    value = value.replace('\u1680', ' ')
     value = value.translate(COLON_LIKE).translate(DOT_LIKE).translate(separators)
     value = strip_marks(value)
     value = unicodedata.normalize('NFKC', value)
@@ -586,6 +589,9 @@ def self_test():
         '.netrc\u1160', 'tokens.json\u2800', 'ID_RSA\uffa0',
         'nested/auth\u3164.json/extra.txt', 'Copy of auth\u2800.json', 'auth.json\u3164.txt',
         'secrets.env\u115f', 'auth\u115f.json\u2800',
+        'id_rsa\u1680', 'auth.json\u1680', 'auth\u1680.json', 'accounts\u1680.json',
+        '.netrc\u1680', 'ID_RSA\u1680', 'auth.json\u1680.txt', 'nested/auth\u1680.json/extra.txt',
+        'Copy of auth.json\u1680', 'notes\u1680.bak', 'credentials\u1680.json.gz',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -650,6 +656,8 @@ def self_test():
         'script.go\ufe0e', 'id_rsa.pub\ufe0f', 'notes\u0301.txt', 'readme\u20dd.md',
         'models.json\u0332', 'notes\u180b.txt',
         'notes\u3164.txt', 'script.go\u2800', 'readme\u1160.md', 'models.json\uffa0',
+        'notes\u1680.txt', 'script.go\u1680', 'id_rsa.pub\u1680', 'au\u1680th.json',
+        'readme\u1680md',
     )
     for rel in blocked:
         if not path_reason(rel):
