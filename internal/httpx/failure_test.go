@@ -1561,6 +1561,10 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x27C9, '/', true},
 		{0x27C8, 0, false},
 		{0x1450, 0, false},
+		{0x233F, '/', true},
+		{0x2340, 0, false},
+		{0x2341, 0, false},
+		{0x2298, 0, false},
 		{0x27CB, '/', true},
 		{0x2AFD, '/', true},
 		{0x1F67C, '/', true},
@@ -1600,7 +1604,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 29 {
+	if n != 30 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -1848,6 +1852,35 @@ func TestSanitizeFailureStripsSyllabicSlashes(t *testing.T) {
 	for _, prose := range []string{"see \u27c9 later", "see \u27c8 later", "see \u1450 later", "see \u1455 later"} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("syllabic prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsAPLSlashBars(t *testing.T) {
+	secret := "code/ver/1"
+	bar := strings.ReplaceAll(secret, "/", "\u233f")
+	encoded := strings.ReplaceAll(secret, "/", "%E2%8C%BF")
+	got := SanitizeFailure("rejected "+bar+" "+encoded+" later", secret)
+	for _, item := range []string{secret, bar, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	back := "code\\ver\\1"
+	aplBack := strings.ReplaceAll(back, "\\", "\u2340")
+	encodedBack := strings.ReplaceAll(back, "\\", "%E2%8D%80")
+	got = SanitizeFailure("rejected "+aplBack+" "+encodedBack+" later", back)
+	for _, item := range []string{back, aplBack, encodedBack, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("backslash leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{"see \u233f later", "see \u2340 later", "see \u2341 later", "see \u2342 later", "see \u2298 later", "see \u29b8 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("APL prose changed: %q -> %q", prose, got)
 		}
 	}
 }
@@ -2151,6 +2184,10 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x27C8, '\\', true},
 		{0x27C9, 0, false},
 		{0x1455, 0, false},
+		{0x2340, '\\', true},
+		{0x233F, 0, false},
+		{0x2342, 0, false},
+		{0x29B8, 0, false},
 		{0x30CE, 0, false},
 		{0xFF0F, 0, false},
 	}
@@ -2166,7 +2203,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 21 {
+	if n != 22 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
