@@ -98,6 +98,15 @@ COLON_LIKE = {
     ord('\U00012473'): ':',
     ord('\U00012474'): ':',
     ord('\U0001DA8A'): ':',
+    # The vertical two-dot leader NFKC-folds to '..', so a following private
+    # name would survive unless it is folded first. The other two-dot marks
+    # do not NFKC-fold to ':' either.
+    ord('\ufe30'): ':',
+    ord('\u16ec'): ':',
+    ord('\u0831'): ':',
+    ord('\U00010af5'): ':',
+    ord('\U0001123a'): ':',
+    ord('\ua4fd'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -391,6 +400,9 @@ def self_test():
         'docs\u2982accounts.json', 'nested/file\u2af6.netrc', 'ID_RSA\u205dx',
         'readme\U00012471auth.json', 'notes\U00012472id_rsa', 'file\U00012473credentials.json',
         'docs\U00012474accounts.json', 'nested/file\U0001DA8A.netrc', 'ID_RSA\U00012473x',
+        'readme\u16ecauth.json', 'notes\u0831id_rsa', 'file\U00010af5credentials.json',
+        'docs\U0001123aaccounts.json', 'nested/file\ua4fd.netrc', 'ID_RSA\ufe30x',
+        'auth.json\ufe30secret', 'readme\ufe30auth.json',
         'auth\u06d4json', 'accounts\u0701json', 'credentials\u0702json', 'tokens\u1362json',
         'notes\u166ebak', '\u1803netrc', 'secrets\u1809env', 'id_ed25519\u2cf9txt',
         'auth\u2cfejson.txt', 'accounts\u2e3cjson.gz', 'tokens\ua4ffjson', 'credentials\ua60ejson',
@@ -423,6 +435,9 @@ def self_test():
         'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
         'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
         'notes\U00012471readme.txt', 'script.go\U00012472Zone.Identifier', 'models.json\U0001DA8Areadme.txt',
+        'notes\u16ecreadme.txt', 'script.go\u0831Zone.Identifier', 'models.json\U00010af5readme.txt',
+        'notes\U0001123areadme.txt', 'script.go\ua4fdZone.Identifier', 'id_rsa.pub\ufe30extra',
+        'readme\ufe30md',
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'models.json\u0589readme',

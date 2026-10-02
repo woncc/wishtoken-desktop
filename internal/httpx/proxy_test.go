@@ -481,6 +481,51 @@ func TestRedactHidesHistoricColons(t *testing.T) {
 	}
 }
 
+func TestRedactHidesTwoDotColons(t *testing.T) {
+	const password = "s3cret-proxy"
+	// Vertical two-dot leader NFKC-folds to "..". Runic multiple punctuation,
+	// Samaritan afsaaq, Manichaean two dots, the Khojki word separator, and
+	// Lisu mya jeu do not NFKC-fold to ASCII ':'.
+	runes := []rune{'\ufe30', '\u16ec', '\u0831', '\U00010af5', '\U0001123a', '\ua4fd'}
+	for _, r := range runes {
+		raw := string(r)
+		encoded := encodeEveryByte(raw)
+		nested := encodeEveryByte(encoded)
+		cases := []string{
+			"http://user" + raw + password + "@127.0.0.1:7890",
+			"user" + raw + password + "@127.0.0.1:7890",
+			"http://user" + encoded + password + "@127.0.0.1:7890",
+			"http://user" + nested + password + "@127.0.0.1:7890",
+			"http://user" + raw + password + "%zz@127.0.0.1:7890",
+			"http://user" + raw + password + "\uFF20127.0.0.1:7890",
+		}
+		for _, in := range cases {
+			got := Redact(in)
+			for _, leaked := range []string{password, raw + password, encoded + password, nested + password} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+				}
+			}
+			if !strings.Contains(got, "xxxxx") {
+				t.Fatalf("redact %q did not mask password: %q", in, got)
+			}
+			if again := Redact(got); strings.Contains(again, password) {
+				t.Fatalf("second redact leaked: %q", again)
+			}
+			if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+				t.Fatalf("preserve %q -> %q", in, kept)
+			}
+		}
+	}
+	short := Redact("http://user\ufe30name@127.0.0.1:7890")
+	if strings.Contains(short, "\ufe30") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a two-dot colon: %q", short)
+	}
+	if Redact("http://user\u16ec@127.0.0.1:7890") != "http://user\u16ec@127.0.0.1:7890" {
+		t.Fatal("two-dot colon without a password was rewritten")
+	}
+}
+
 func TestRedactHidesAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"
