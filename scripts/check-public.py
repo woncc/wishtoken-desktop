@@ -1051,6 +1051,18 @@ def fold_content(data):
             out.append(mapped)
             changed = True
             continue
+        # Colon lookalikes are the same set the path check uses. This pass
+        # does not run NFKC, so a personal Windows path whose drive separator
+        # was a ratio, modifier colon, or visarga stayed split. Spacing
+        # visargas are folded here too: dropping one would erase the
+        # separator. Double colon equal stays one colon, matching the path
+        # check, instead of expanding to '::='. A colon is not a token
+        # character, so it still splits sk- text.
+        mapped = COLON_LIKE.get(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
         # visible to the byte patterns. Cc and line separators stay, so a
         # wrapped line is not joined.
@@ -1674,6 +1686,17 @@ def self_test():
         raise SystemExit('self-test failed: a full-stop JWT was not detected')
     if content_reasons('see file\u2024txt later'.encode()) or content_reasons('end\u2025 next'.encode()) or content_reasons(('eyJ' + 'a' * 10 + '\u2024' + 'b' * 10 + '\u2024' + 'c' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2024' + 'a' * 20).encode()) or content_reasons(('eyJ' + 'a' * 25 + '\u00b7' + 'b' * 30 + '.' + 'c' * 15).encode()):
         raise SystemExit('self-test failed: ordinary full stop text was blocked')
+    if len(COLON_LIKE) != 66 or COLON_LIKE[0x2236] != ':' or COLON_LIKE[0x0903] != ':' or COLON_LIKE[0x02D0] != ':' or COLON_LIKE[0x0589] != ':' or COLON_LIKE[0x2237] != ':' or COLON_LIKE[0x2A74] != ':' or COLON_LIKE[0x10781] != ':' or COLON_LIKE.get(0x003A) is not None or COLON_LIKE.get(0xFF1A) is not None or COLON_LIKE.get(0x2025) is not None:
+        raise SystemExit('self-test failed: colon lookalike table is wrong')
+    colon_ratio = 'C\u2236/Users/Mayn'.encode()
+    colon_visarga = 'D\u0903/Git_Project/rain'.encode()
+    colon_mod = 'C\u02d0\\Users\\kawang'.encode()
+    colon_eq = 'c\u2a74/users/WishToApp'.encode()
+    colon_super = 'C\U00010781/Users/gptbridge'.encode()
+    if 'personal Windows path' not in content_reasons(colon_ratio) or 'personal Windows path' not in content_reasons(colon_visarga) or 'personal Windows path' not in content_reasons(colon_mod) or 'personal Windows path' not in content_reasons(colon_eq) or 'personal Windows path' not in content_reasons(colon_super):
+        raise SystemExit('self-test failed: a colon-lookalike personal path was not detected')
+    if content_reasons('see \u2236 later'.encode()) or content_reasons('see \u0903 later'.encode()) or content_reasons('C\u2236/Users/other'.encode()) or content_reasons('C\u2025/Users/Mayn'.encode()) or content_reasons(('sk-' + '\u2236' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0903' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary colon text was blocked')
 
 def main():
     self_test()
