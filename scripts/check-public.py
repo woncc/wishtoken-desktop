@@ -123,6 +123,13 @@ def forbidden_name(folded):
     bare = folded[1:] if folded.startswith('.') else folded
     return bare in FOLD_NAMES
 
+def collapse_dots(value):
+    # Two-dot leader and ellipsis normalize to repeated ASCII dots. Those
+    # repeats still hide auth.json and .netrc unless they are folded first.
+    while '..' in value:
+        value = value.replace('..', '.')
+    return value
+
 def normalize_component(name):
     # Compatibility forms such as fullwidth letters and colons fold to ASCII.
     # Colon lookalikes are folded first: double colon equal expands to '::='
@@ -130,7 +137,8 @@ def normalize_component(name):
     # Format, control, and line-separator characters can sit inside a name
     # without changing how a person reads it.
     folded = unicodedata.normalize('NFKC', name.translate(COLON_LIKE)).translate(DOT_LIKE).translate(COLON_LIKE).casefold()
-    return ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
+    cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
+    return collapse_dots(cleaned)
 
 def strip_edges(value):
     while value and (value[0] in ' \t' or value[-1] in ' \t.'):
@@ -388,6 +396,9 @@ def self_test():
         'auth\u2cfejson.txt', 'accounts\u2e3cjson.gz', 'tokens\ua4ffjson', 'credentials\ua60ejson',
         'auth\ua6f3json', 'notes\U00016af5bak', '\U00016e98netrc', 'id_rsa\U0001bc9ftxt',
         'accounts\U0001da88json',
+        'auth..json', 'accounts...json', 'credentials....json', '..netrc', '...netrc',
+        'auth\u2025json', 'accounts\u2026json', '\u2026netrc', 'id_rsa\u2025txt',
+        'nested/tokens..json/extra.txt', 'Copy of auth...json',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -413,6 +424,7 @@ def self_test():
         'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
         'notes\U00012471readme.txt', 'script.go\U00012472Zone.Identifier', 'models.json\U0001DA8Areadme.txt',
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
+        'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'models.json\u0589readme',
     )
     for rel in blocked:
