@@ -571,10 +571,12 @@ function htmlProxyChar(cp) {
   // U+FE32 folds to U+2013. U+FE33, U+FE34, U+FE4D, U+FE4E, U+FE4F, and
   // U+FF3F fold to "_". "&lowbar;" and "&UnderBar;" are U+005F.
   // U+FF21..U+FF3A and U+FF41..U+FF5A fold to ASCII letters. U+24B6..U+24E9
-  // fold to ASCII letters too. A numeric reference has to yield the same
-  // character so the label fold can see it.
+  // fold to ASCII letters too. Letterlike symbols that fold to one ASCII
+  // letter do as well. A numeric reference has to yield the same character
+  // so the label fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
+  if (isLetterlikeLetter(cp)) return char;
   if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -878,8 +880,8 @@ function foldFullwidthLetters(text) {
 // host already allows those letters. Their literal, percent-encoded, and
 // numeric forms kept the password too. Otherwise
 // "user:secret@my\u24DCproxy:7890" and "user:secret@ex\u24D0mple.com:8080"
-// keep the password. Parenthesized letters, circled digits, letterlike
-// symbols, and modifier letters stay as written.
+// keep the password. Parenthesized letters, circled digits, and modifier
+// letters stay as written.
 function readEncodedCircledLetter(text, index) {
   if (text[index] !== '%') return null;
   const bytes = [];
@@ -914,8 +916,83 @@ function foldCircledLetters(text) {
     return String.fromCharCode(cp <= 0x24CF ? cp - 0x24B6 + 0x41 : cp - 0x24D0 + 0x61);
   });
 }
+// These letterlike symbols fold to one ASCII letter under NFKC. A
+// single-label or dotted host already allows that letter. Their literal,
+// percent-encoded, and numeric forms kept the password too. Otherwise
+// "user:secret@my\u212Aproxy:7890" and "user:secret@ex\u2139mple.com:8080"
+// keep the password. Symbols that expand to more than one character, such
+// as U+2121, stay as written. Modifier letters stay as written.
+const LETTERLIKE_ASCII = {
+  '\u2102': 'C',
+  '\u210A': 'g',
+  '\u210B': 'H',
+  '\u210C': 'H',
+  '\u210D': 'H',
+  '\u210E': 'h',
+  '\u2110': 'I',
+  '\u2111': 'I',
+  '\u2112': 'L',
+  '\u2113': 'l',
+  '\u2115': 'N',
+  '\u2119': 'P',
+  '\u211A': 'Q',
+  '\u211B': 'R',
+  '\u211C': 'R',
+  '\u211D': 'R',
+  '\u2124': 'Z',
+  '\u2128': 'Z',
+  '\u212A': 'K',
+  '\u212C': 'B',
+  '\u212D': 'C',
+  '\u212F': 'e',
+  '\u2130': 'E',
+  '\u2131': 'F',
+  '\u2133': 'M',
+  '\u2134': 'o',
+  '\u2139': 'i',
+  '\u2145': 'D',
+  '\u2146': 'd',
+  '\u2147': 'e',
+  '\u2148': 'i',
+  '\u2149': 'j'
+};
+const LETTERLIKE_FOLD = new RegExp(`[${Object.keys(LETTERLIKE_ASCII).join('')}]`, 'g');
+function isLetterlikeLetter(cp) {
+  return Object.prototype.hasOwnProperty.call(LETTERLIKE_ASCII, String.fromCodePoint(cp));
+}
+function readEncodedLetterlikeLetter(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isLetterlikeLetter(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedLetterlikeLetters(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const letter = readEncodedLetterlikeLetter(text, index);
+    if (letter) {
+      out += letter.char;
+      index = letter.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldLetterlikeLetters(text) {
+  return text.replace(LETTERLIKE_FOLD, char => LETTERLIKE_ASCII[char]);
+}
 function redactProxyCredentials(text) {
-  const decoded = foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))));
+  const decoded = foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.

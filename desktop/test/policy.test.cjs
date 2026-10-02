@@ -4653,7 +4653,7 @@ test('renderer text drops proxy passwords hidden by a circled letter', () => {
       `user:${password}@my\u02B0proxy:7890`,
       `user:${password}@my\u24B5proxy:7890`,
       `user:${password}@my\u24EAproxy:7890`,
-      `user:${password}@my\u212Aproxy:7890`,
+      `user:${password}@my\u2121proxy:7890`,
       `user:${password}@my\u017Fproxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
@@ -4671,6 +4671,103 @@ test('renderer text drops proxy passwords hidden by a circled letter', () => {
   assert.equal(delivered.accounts[0].name, 'note example.com:8080');
   assert.equal(delivered.accounts[0].email, 'a@example.test');
   assert.equal(delivered.accounts[0].last_error, 'dial mymproxy:7890 failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
+
+test('renderer text drops proxy passwords hidden by a letterlike symbol', () => {
+  const password = 's3cret-token';
+  const nest = (token, extra) => {
+    let out = token;
+    for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const body = value => value.split('').map(char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`).join('');
+  const letters = [
+    ['\u2102', 'C'], ['\u210A', 'g'], ['\u210B', 'H'], ['\u210C', 'H'], ['\u210D', 'H'], ['\u210E', 'h'],
+    ['\u2110', 'I'], ['\u2111', 'I'], ['\u2112', 'L'], ['\u2113', 'l'], ['\u2115', 'N'],
+    ['\u2119', 'P'], ['\u211A', 'Q'], ['\u211B', 'R'], ['\u211C', 'R'], ['\u211D', 'R'],
+    ['\u2124', 'Z'], ['\u2128', 'Z'], ['\u212A', 'K'], ['\u212C', 'B'], ['\u212D', 'C'],
+    ['\u212F', 'e'], ['\u2130', 'E'], ['\u2131', 'F'], ['\u2133', 'M'], ['\u2134', 'o'], ['\u2139', 'i'],
+    ['\u2145', 'D'], ['\u2146', 'd'], ['\u2147', 'e'], ['\u2148', 'i'], ['\u2149', 'j']
+  ];
+  for (const [mark, ascii] of letters) {
+    const got = redactPublic(`user:${password}@my${mark}proxy:7890`);
+    assert.equal(got, `my${ascii}proxy:7890`);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(mark.normalize('NFKC'), ascii);
+  }
+  const samples = [['\u2102', 'C'], ['\u210E', 'h'], ['\u212A', 'K'], ['\u2139', 'i'], ['\u2149', 'j']];
+  for (const [mark, ascii] of samples) {
+    const encoded = encodeURIComponent(mark);
+    const cp = mark.codePointAt(0);
+    const hex = cp.toString(16).toUpperCase();
+    const dec = String(cp);
+    const cases = [
+      [`user:${password}@my${mark}${mark}proxy:7890`, `my${ascii}${ascii}proxy:7890`],
+      [`http://user:${password}@ex${mark}mple.com:8080/x`, `http://ex${ascii}mple.com:8080/x`],
+      [`http://us${mark}r:${password}@example.com:8080/x`, `http://example.com:8080/x`],
+      [`socks5://alice:${password}@my${mark}proxy:7890`, `socks5://my${ascii}proxy:7890`],
+      [`(user:${password}@my${mark}proxy:7890)`, `(my${ascii}proxy:7890)`],
+      [`user:${password}@my${encoded}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${encoded.toLowerCase()}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${nest(encoded, 1)}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${nest(encoded, 3)}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my&#${dec};proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my&#x${hex};proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my&#x${hex}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my&#x${hex.toLowerCase()};proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my&amp;#${dec};proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my%26%23x${hex}%3Bproxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${nest(`%26%23x${hex}%3B`, 1)}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${body(`&#x${hex};`)}proxy:7890`, `my${ascii}proxy:7890`],
+      [`user:${password}@my${nest(body(`&#${dec};`), 3)}proxy:7890`, `my${ascii}proxy:7890`],
+      [`a=1&user:${password}@my&#${dec};proxy:7890&b=2`, `a=1&my${ascii}proxy:7890&b=2`],
+      [`note &#x${hex}; later user:${password}@10.1:8080`, `note ${ascii} later 10.1:8080`],
+      [`two user:${password}@my${mark}proxy:7890) and user:other-secret@10.1:8080.`, `two my${ascii}proxy:7890) and 10.1:8080.`],
+      [`invalid proxy url "http://user:s3cret/token@my&#${dec};proxy:7890": invalid port ":s3cret" after host`, `invalid proxy url "http://my${ascii}proxy:7890": invalid port ":[凭据已隐藏]" after host`]
+    ];
+    for (const [input, expected] of cases) {
+      const got = redactPublic(input);
+      assert.equal(got, expected, input);
+      assert.equal(redactPublic(got), got);
+      assert.equal(got.toLowerCase().includes('s3cret'), false);
+      assert.equal(got.includes('other-secret'), false);
+    }
+    const unchanged = [
+      `Build v1${mark}2@beta`,
+      `file${mark}name.txt`,
+      `user:${password}@my${mark}proxy`,
+      `user:${password}@10${mark}.0.0.1:7890`,
+      `note ${mark} later`,
+      `user:${password}@my\u02B0proxy:7890`,
+      `user:${password}@my\u017Fproxy:7890`,
+      `user:${password}@my\u2100proxy:7890`,
+      `user:${password}@my\u2103proxy:7890`,
+      `user:${password}@my\u210Fproxy:7890`,
+      `user:${password}@my\u2116proxy:7890`,
+      `user:${password}@my\u2121proxy:7890`,
+      `user:${password}@my\u2126proxy:7890`,
+      `user:${password}@my\u212Bproxy:7890`,
+      `user:${password}@my\u213Bproxy:7890`,
+      `user:${password}@my\u24B5proxy:7890`,
+      `user:${password}@my\u24EAproxy:7890`,
+      'http://user@127.0.0.1:7890'
+    ];
+    for (const input of unchanged) assert.equal(redactPublic(input), input, input);
+  }
+  assert.equal(redactPublic(`user:${password}@\u212A\u212Flvin.example:8080`), 'Kelvin.example:8080');
+  assert.equal(redactPublic(`user:${password}@\uFF45\u24E7\u24D0\u24DC\uFF50\u2113\u212F.com:8080`), 'example.com:8080');
+  const proxy = `http://user:${password}@my\u212Aproxy:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@\u212Fxample.com:8080`, email: 'a@example.test', last_error: `dial user:${password}@my&#8490;proxy:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note example.com:8080');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial myKproxy:7890 failed');
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
