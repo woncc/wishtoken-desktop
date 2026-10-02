@@ -2700,3 +2700,63 @@ func TestCircumflexASCIIFoldsOnlyCircumflex(t *testing.T) {
 		t.Fatalf("circumflex fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsVerticalLines(t *testing.T) {
+	secret := "code|ver|1"
+	marked := strings.NewReplacer("|", "\uFF5C").Replace(secret)
+	encoded := strings.NewReplacer("|", "%EF%BD%9C").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u00A6 later",
+		"see \u2223 later",
+		"see \u01C0 later",
+		"see \u2502 later",
+		"see \uFFE8 later",
+		"path \uFF5C file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("vertical line prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestVerticalLineASCIIFoldsOnlyVerticalLines(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF5C, '|', true},
+		{'|', 0, false},
+		{0x00A6, 0, false},
+		{0x2223, 0, false},
+		{0x01C0, 0, false},
+		{0x2502, 0, false},
+		{0xFFE8, 0, false},
+		{0x2225, 0, false},
+		{0x2758, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := verticalLineASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := verticalLineASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("vertical line fold count %d", n)
+	}
+}
