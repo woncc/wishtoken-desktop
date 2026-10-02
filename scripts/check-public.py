@@ -763,6 +763,26 @@ def math_ascii(cp):
         0x2145: 'D', 0x2146: 'd', 0x2147: 'e', 0x2148: 'i', 0x2149: 'j',
     }.get(cp)
 
+
+def enclosed_ascii(cp):
+    # Circled and squared letters and digits fold to one ASCII character.
+    # Circled numbers above nine are not single digits and stay out.
+    if 0x2460 <= cp <= 0x2468:
+        return chr(cp - 0x2460 + ord('1'))
+    if 0x24B6 <= cp <= 0x24CF:
+        return chr(cp - 0x24B6 + ord('A'))
+    if 0x24D0 <= cp <= 0x24E9:
+        return chr(cp - 0x24D0 + ord('a'))
+    if cp == 0x24EA:
+        return '0'
+    if cp == 0x1F12B:
+        return 'C'
+    if cp == 0x1F12C:
+        return 'R'
+    if 0x1F130 <= cp <= 0x1F149:
+        return chr(cp - 0x1F130 + ord('A'))
+    return None
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -794,6 +814,14 @@ def fold_content(data):
         # not run NFKC, so a token written with them stayed split. Greek
         # mathematical letters are not in math_ascii and stay out.
         mapped = math_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Circled and squared alphanumerics NFKC-fold to one ASCII letter or
+        # digit. This pass does not run NFKC. Numbers above nine stay out so
+        # a list marker cannot invent an extra digit.
+        mapped = enclosed_ascii(cp)
         if mapped is not None:
             out.append(mapped)
             changed = True
@@ -1244,6 +1272,23 @@ def self_test():
         raise SystemExit('self-test failed: a mathematical personal path was not detected')
     if content_reasons(hole) or content_reasons(greek) or content_reasons('\U0001D465 = 1'.encode()) or content_reasons(('-----' + '\U0001D401\U0001D404\U0001D406\U0001D408\U0001D40D' + ' PUBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary mathematical text was blocked')
+    if enclosed_ascii(0x2460) != '1' or enclosed_ascii(0x2468) != '9' or enclosed_ascii(0x24EA) != '0' or enclosed_ascii(0x24B6) != 'A' or enclosed_ascii(0x24D0) != 'a' or enclosed_ascii(0x24E9) != 'z' or enclosed_ascii(0x2469) is not None or enclosed_ascii(0x1F130) != 'A' or enclosed_ascii(0x1F12B) != 'C':
+        raise SystemExit('self-test failed: enclosed ASCII fold is wrong')
+    enc_token = ('sk-' + '\u24d0' * 30).encode()
+    enc_digit = ('rt_' + '\u2460' * 30).encode()
+    enc_key = ('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' OPENSSH PRIVATE KEY-----').encode()
+    enc_jwt = ('\u24d4\u24e8\u24bf' + '\u24d0' * 25 + '.' + '\u24d1' * 30 + '.' + '\u24d2' * 15).encode()
+    enc_path = '\u24b8:/Users/Mayn/project'.encode()
+    enc_square = ('ghp_' + '\U0001F130' * 30).encode()
+    enc_ten = ('sk-' + 'a' * 10 + '\u2469' + 'a' * 20).encode()
+    if content_reasons(enc_token) != ['secret token literal'] or content_reasons(enc_digit) != ['secret token literal'] or content_reasons(enc_square) != ['secret token literal']:
+        raise SystemExit('self-test failed: an enclosed token was not detected')
+    if content_reasons(enc_key) != ['private key'] or content_reasons(enc_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: an enclosed key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(enc_path):
+        raise SystemExit('self-test failed: an enclosed personal path was not detected')
+    if content_reasons(enc_ten) or content_reasons('step \u2460'.encode()) or content_reasons(('-----' + '\u24b7\u24ba\u24bc\u24be\u24c3' + ' PUBLIC KEY-----').encode()):
+        raise SystemExit('self-test failed: ordinary enclosed text was blocked')
 
 def main():
     self_test()
