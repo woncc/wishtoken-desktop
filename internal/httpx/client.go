@@ -4370,7 +4370,8 @@ func numberSignASCII(r rune) (byte, bool) {
 // not NFKC-fold to a backslash either. It stays one backslash so the
 // circle cannot glue the token back together. The circled division sign
 // and the combining enclosing circle backslash stay out. The diagonal
-// cross, the chevron diagonals, and the negative diagonal stay out.
+// cross, the chevron diagonals, and the negative diamond stay out. The
+// negative short diagonal folds to a slash.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4707,8 +4708,10 @@ func parenASCII(r rune) (byte, bool) {
 // slash either. It stays one slash so the circle cannot glue the token
 // back together. APL circle backslash is a backslash inside a circle.
 // It folds to a backslash on its own pass. The circled division sign
-// stays out. The diagonal cross, the chevron diagonals, and the negative
-// diagonal stay out. Other letters stay out.
+// stays out. The negative short diagonal, from middle right to lower
+// centre, is that same rising stroke in negative and does not NFKC-fold
+// to a slash. It stays one slash. The diagonal cross, the chevron
+// diagonals, and the negative diamond stay out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -4757,7 +4760,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x27C9, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBBE:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
