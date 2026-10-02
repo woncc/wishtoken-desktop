@@ -656,10 +656,36 @@ def private_filename(name):
     stem = path.stem.replace('_', '-')
     return stem == 'handoff' or stem == 'auth-snapshot' or stem.startswith('auth-snapshot-')
 
+def fold_content(data):
+    # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
+    # characters, including the language tag and cancel tag, only split a
+    # token. Fold the copies, then drop the remaining format characters.
+    # Line breaks stay put so a wrapped sk- line is not glued to the next line.
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data
+    out = []
+    changed = False
+    for ch in text:
+        cp = ord(ch)
+        if 0xE0020 <= cp <= 0xE007E:
+            out.append(chr(cp - 0xE0000))
+            changed = True
+            continue
+        if unicodedata.category(ch) == 'Cf':
+            changed = True
+            continue
+        out.append(ch)
+    if not changed:
+        return data
+    return ''.join(out).encode('utf-8')
+
 def content_reasons(data):
+    views = (data, fold_content(data))
     found = []
     for label, pattern in RULES.items():
-        if pattern.search(data):
+        if any(pattern.search(view) for view in views):
             found.append(label)
     return found
 
@@ -1039,6 +1065,19 @@ def self_test():
         raise SystemExit('self-test failed: personal path was not detected')
     if content_reasons(unrelated):
         raise SystemExit('self-test failed: unrelated Windows path was blocked')
+    hidden_token = b'sk-' + b'a' * 10 + '\U000E0001'.encode() + b'a' * 20
+    tag_hyphen = 'sk\U000E002D'.encode() + b'a' * 30
+    tag_body = ('sk-' + '\U000E0061' * 30).encode()
+    hidden_key = '-----BEGIN \U000E004FPENSSH PRIVATE KEY-----'.encode()
+    hidden_jwt = b'eyJ' + b'a' * 25 + b'.' + b'b' * 10 + '\U000E007F'.encode() + b'b' * 20 + b'.' + b'c' * 15
+    if content_reasons(hidden_token) != ['secret token literal'] or content_reasons(tag_hyphen) != ['secret token literal'] or content_reasons(tag_body) != ['secret token literal']:
+        raise SystemExit('self-test failed: a tag-hidden token was not detected')
+    if content_reasons(hidden_key) != ['private key'] or content_reasons(hidden_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a tag-hidden key or JWT was not detected')
+    if content_reasons(b'sk-\n' + b'a' * 30) or content_reasons(b'rt_' + b'short' + '\U000E0001'.encode()):
+        raise SystemExit('self-test failed: ordinary wrapped text was blocked')
+    if content_reasons('-----BEGIN PU\U000E0042LIC KEY-----'.encode()):
+        raise SystemExit('self-test failed: a tagged public key was blocked')
 
 def main():
     self_test()
