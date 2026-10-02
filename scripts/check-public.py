@@ -886,6 +886,21 @@ def long_s_ascii(cp):
         return 's'
     return None
 
+
+def latin_ligature(cp):
+    # Latin ligatures and compatibility digraphs that NFKC expands to
+    # ASCII letters. Long s, roman numerals, the trademark sign, and
+    # squared unit symbols stay on their own folds.
+    return {
+        0x0132: 'IJ', 0x0133: 'ij',
+        0x01C7: 'LJ', 0x01C8: 'Lj', 0x01C9: 'lj',
+        0x01CA: 'NJ', 0x01CB: 'Nj', 0x01CC: 'nj',
+        0x01F1: 'DZ', 0x01F2: 'Dz', 0x01F3: 'dz',
+        0xFB00: 'ff', 0xFB01: 'fi', 0xFB02: 'fl',
+        0xFB03: 'ffi', 0xFB04: 'ffl',
+        0xFB05: 'st', 0xFB06: 'st',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -979,6 +994,15 @@ def fold_content(data):
         mapped = long_s_ascii(cp)
         if mapped is not None:
             out.append(mapped)
+            changed = True
+            continue
+        # Latin ligatures and compatibility digraphs expand to ASCII
+        # letters. This pass does not run NFKC, so a token or JWT written
+        # with them stayed split. One ligature is not long enough to spell
+        # a token by itself. Long s and roman numerals stay on their own folds.
+        expanded = latin_ligature(cp)
+        if expanded is not None:
+            out.append(expanded)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1534,6 +1558,23 @@ def self_test():
         raise SystemExit('self-test failed: a long s personal path was not detected')
     if content_reasons('long \u017f word'.encode()) or content_reasons('see \ufb05 later'.encode()) or content_reasons('see \u1e9b later'.encode()) or content_reasons('see \u1e9c later'.encode()) or content_reasons(('sk-' + '\u017f' * 10).encode()) or content_reasons('C:/U\u1e9bsers/Mayn'.encode()):
         raise SystemExit('self-test failed: ordinary long s text was blocked')
+    if latin_ligature(0x0132) != 'IJ' or latin_ligature(0x0133) != 'ij' or latin_ligature(0x01C7) != 'LJ' or latin_ligature(0x01C8) != 'Lj' or latin_ligature(0x01C9) != 'lj' or latin_ligature(0x01CA) != 'NJ' or latin_ligature(0x01CB) != 'Nj' or latin_ligature(0x01CC) != 'nj' or latin_ligature(0x01F1) != 'DZ' or latin_ligature(0x01F2) != 'Dz' or latin_ligature(0x01F3) != 'dz' or latin_ligature(0xFB00) != 'ff' or latin_ligature(0xFB01) != 'fi' or latin_ligature(0xFB02) != 'fl' or latin_ligature(0xFB03) != 'ffi' or latin_ligature(0xFB04) != 'ffl' or latin_ligature(0xFB05) != 'st' or latin_ligature(0xFB06) != 'st' or latin_ligature(ord('f')) is not None or latin_ligature(0x017F) is not None or latin_ligature(0x2161) is not None or latin_ligature(0x2122) is not None or latin_ligature(0x2116) is not None or latin_ligature(0x3373) is not None or latin_ligature(0xFB07) is not None:
+        raise SystemExit('self-test failed: latin ligature fold is wrong')
+    if sum(latin_ligature(cp) is not None for cp in range(0x30000)) != 18:
+        raise SystemExit('self-test failed: latin ligature fold count is wrong')
+    lig_fi = ('sk-' + '\ufb01' * 13).encode()
+    lig_st = ('rt_' + '\ufb06' * 13).encode()
+    lig_long_st = ('ghp_' + '\ufb05' * 13).encode()
+    lig_ffi = ('sk-' + 'a' * 10 + '\ufb03' + 'a' * 14).encode()
+    lig_dz = ('sk-' + 'a' * 10 + '\u01f1' + 'a' * 13).encode()
+    lig_ij = ('gho_' + '\u0133' * 13).encode()
+    lig_jwt = ('eyJ' + 'a' * 23 + '\ufb01' + '.' + 'b' * 28 + '\ufb01' + '.' + 'c' * 13 + '\ufb01').encode()
+    if content_reasons(lig_fi) != ['secret token literal'] or content_reasons(lig_st) != ['secret token literal'] or content_reasons(lig_long_st) != ['secret token literal'] or content_reasons(lig_ffi) != ['secret token literal'] or content_reasons(lig_dz) != ['secret token literal'] or content_reasons(lig_ij) != ['secret token literal']:
+        raise SystemExit('self-test failed: a ligature token was not detected')
+    if content_reasons(lig_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a ligature JWT was not detected')
+    if content_reasons('see \ufb05 later'.encode()) or content_reasons('the \ufb01le stays'.encode()) or content_reasons('see \u2122 later'.encode()) or content_reasons('see \u2116 later'.encode()) or content_reasons('see \u3373 later'.encode()) or content_reasons(('sk-' + '\ufb01' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u01f1' + 'a' * 12).encode()) or content_reasons('see \ufb07 later'.encode()):
+        raise SystemExit('self-test failed: ordinary ligature text was blocked')
 
 def main():
     self_test()
