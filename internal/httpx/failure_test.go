@@ -4835,3 +4835,51 @@ func TestTagDigitASCIIFoldsOnlyDigits(t *testing.T) {
 		t.Fatalf("tag digit fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsTagLowLine(t *testing.T) {
+	secret := "rt_Zz9qab7f"
+	mark := "rt\U000E005FZz9qab7f"
+	encoded := "rt%F3%A0%81%9FZz9qab7f"
+	inserted := "rt_\U000E005FZz9qab7f"
+	mixedSecret := "id_ed25519"
+	mixed := "i\U000E0064\U000E005Fed\U000E00325519"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "rt_Zz9qab7frt_Zz9qab7f")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "Zz9q", "ed25519"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "rt\U000E005FZz9qab7f"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "Zz9q"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag low line leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E005F later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag low line prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagLowLineFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagLowLinePieces(rawPieces("id\U000E005Frsa"))
+	if !ok || renderPieces(folded) != "id_rsa" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagLowLinePieces(rawPieces("id_rsa")); ok {
+		t.Fatalf("ascii underscore was folded")
+	}
+	if foldTagLowLineString("id\U000E0064_rsa") != "id\U000E0064_rsa" {
+		t.Fatalf("tag letter was treated as a low line")
+	}
+}
