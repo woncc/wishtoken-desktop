@@ -81,6 +81,9 @@ func maskCredentialPatterns(detail string) string {
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
 		spans = append(spans, credentialPatternSpans(renderPieces(pieces), pieces)...)
+		if dropped := dropMarkPieces(pieces); len(dropped) != len(pieces) {
+			spans = append(spans, credentialPatternSpans(renderPieces(dropped), dropped)...)
+		}
 		next := decodePieces(pieces)
 		if len(next) == len(pieces) {
 			break
