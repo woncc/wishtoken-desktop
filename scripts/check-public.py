@@ -577,6 +577,14 @@ TAG_LOW_LINE_FOLD = str.maketrans({0xE005F: '_'})
 # copies too.
 TAG_TILDE = '\U000E007E'
 TAG_TILDE_FOLD = str.maketrans({0xE007E: '~'})
+# Tag parentheses copy '(' and ')' and do not NFKC-fold. They are format
+# characters, so the component reading strips them. That turns
+# auth (1).json into auth 1.json and the copy-index alias never runs.
+# The parenthesis reading is tried after the tilde. Folding only the
+# parentheses still strips any other tag, so an extra tag letter cannot
+# rename the file. A second reading folds the other tag copies too.
+TAG_PAREN_CHARS = frozenset('\U000E0028\U000E0029')
+TAG_PAREN_FOLD = str.maketrans({0xE0028: '(', 0xE0029: ')'})
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -621,6 +629,12 @@ def path_reason(rel):
         if reason := component_path_reason(rel.translate(TAG_TILDE_FOLD)):
             return reason
         folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD).translate(TAG_TILDE_FOLD)
+        if reason := component_path_reason(folded):
+            return reason
+    if any(ch in TAG_PAREN_CHARS for ch in rel):
+        if reason := component_path_reason(rel.translate(TAG_PAREN_FOLD)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT).translate(TAG_LOW_LINE_FOLD).translate(TAG_TILDE_FOLD).translate(TAG_PAREN_FOLD)
         if reason := component_path_reason(folded):
             return reason
     return ''
@@ -863,6 +877,11 @@ def self_test():
         'nested/credentials.json\U000E007E1', 'ID_RSA\U000E007E3',
         'au\U000E0074h.json\U000E007E1', 'id\U000E005Frsa\U000E007E1',
         'Copy of auth.json\U000E007E1',
+        'auth \U000E00281\U000E0029.json', 'accounts \U000E00282\U000E0029.json',
+        'auth (1\U000E0029.json', 'auth \U000E00281).json',
+        'nested/tokens \U000E00281\U000E0029.json', 'ID_RSA \U000E00281\U000E0029',
+        'a\U000E0075th \U000E00281\U000E0029.json', 'id\U000E005Frsa \U000E00281\U000E0029',
+        'Copy\U000E0020of auth \U000E00281\U000E0029.json',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -973,6 +992,8 @@ def self_test():
         'id\U000E005Frsa.pub', 'script\U000E005F.go', 'notes\U000E005F.txt',
         'notes\U000E007E.txt', 'readme\U000E007Emd', 'notes\U000E007E1.txt',
         'script.go\U000E007E1', 'id_rsa.pub\U000E007E1',
+        'notes \U000E00281\U000E0029.txt', 'script \U000E00281\U000E0029.go',
+        'readme\U000E0028md', 'models\U000E0029.json',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
