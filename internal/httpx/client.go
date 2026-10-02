@@ -717,6 +717,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleSemi != needleComma {
 		spans = append(spans, exactSecretSpans(semiBase, needleSemi)...)
 	}
+	// Tag question mark copies '?' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored question mark. Folding it is a separate reading. It
+	// runs on the tag-semicolon reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag question mark cannot hide a token
+	// that has no question mark.
+	questionBase := semiBase
+	if semied, ok := foldTagSemicolonPieces(semiBase); ok {
+		questionBase = semied
+	}
+	needleQuestion := foldTagQuestionMarkString(needleSemi)
+	if questioned, ok := foldTagQuestionMarkPieces(questionBase); ok {
+		spans = append(spans, exactSecretSpans(questioned, needleQuestion)...)
+	} else if needleQuestion != needleSemi {
+		spans = append(spans, exactSecretSpans(questionBase, needleQuestion)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1768,6 +1784,46 @@ func foldTagSemicolonString(s string) string {
 		return s
 	}
 	folded, _ := foldTagSemicolonPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagQuestionMarkPieces maps the Unicode tag question mark to ASCII '?'.
+// It does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces
+// removes format characters, so a stored question mark written with a tag
+// would stay visible. One output piece covers the original rune. The drop
+// reading still runs on the unfolded pieces. Other tag characters stay out.
+func foldTagQuestionMarkPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003F {
+			out = append(out, secretPiece{b: '?', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagQuestionMarkString(s string) string {
+	if !strings.ContainsRune(s, 0xE003F) {
+		return s
+	}
+	folded, _ := foldTagQuestionMarkPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
