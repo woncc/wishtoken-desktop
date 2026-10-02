@@ -2572,3 +2572,73 @@ func TestLessGreaterASCIIFoldsOnlySigns(t *testing.T) {
 		t.Fatalf("less-greater fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsGraveAccents(t *testing.T) {
+	secret := "code`ver`1"
+	marked := strings.NewReplacer("`", "\uFF40").Replace(secret)
+	varia := strings.NewReplacer("`", "\u1FEF").Replace(secret)
+	encoded := strings.NewReplacer("`", "%EF%BD%80").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+varia+" later", secret)
+	for _, item := range []string{secret, varia, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("varia leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u02CB later",
+		"see \u0300 later",
+		"see \u00B4 later",
+		"see \u1FBF later",
+		"see \u1FCD later",
+		"path \uFF40 file",
+		"path \u1FEF file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("grave prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestGraveASCIIFoldsOnlyGraveAccents(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x1FEF, '`', true},
+		{0xFF40, '`', true},
+		{'`', 0, false},
+		{0x02CB, 0, false},
+		{0x0300, 0, false},
+		{0x00B4, 0, false},
+		{0x1FBF, 0, false},
+		{0x1FCD, 0, false},
+		{0xFF07, 0, false},
+		{0x2018, 0, false},
+		{0x2019, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := graveASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := graveASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("grave fold count %d", n)
+	}
+}
