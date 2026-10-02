@@ -175,11 +175,13 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // either. Ethiopic short rikrik, musical repeat dots, and Tolong Siki
 // sela are the same kind of unmapped sign. Proportion and squared
 // four-dot punctuation are confusable with "::" and do not fold to ':'.
+// Mongolian full stop and Manchu full stop are skeletoned as colons too;
+// the public-path check keeps them as dots so a private extension still matches.
 // url.Parse rejects every one of them as invalid userinfo, so an unlisted
 // character would otherwise be returned with its password intact. The Go
 // core has no Unicode normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd\u0903\u0a83\U00011002\U00011082\U00011182\U000115BE\U000116AC\U00011838\u0983\u0a03\u0c03\u0c83\u0d03\u0d83\u0f7f\u1038\u17c7\U00011303\U000114C1\U000119DF\U00011A39\U00011C3E\u1393\U0001D108\U00011DD9\u2237\u2e2c"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd\u0903\u0a83\U00011002\U00011082\U00011182\U000115BE\U000116AC\U00011838\u0983\u0a03\u0c03\u0c83\u0d03\u0d83\u0f7f\u1038\u17c7\U00011303\U000114C1\U000119DF\U00011A39\U00011C3E\u1393\U0001D108\U00011DD9\u2237\u2e2c\u1803\u1809"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -253,6 +255,8 @@ func foldUserinfoColons(s string) string {
 		"\U00011DD9", ":",
 		"\u2237", ":",
 		"\u2e2c", ":",
+		"\u1803", ":",
+		"\u1809", ":",
 	).Replace(s)
 }
 

@@ -40,6 +40,8 @@ DOT_LIKE = {
     ord('\u0702'): '.',
     ord('\u1362'): '.',
     ord('\u166e'): '.',
+    # These stay full stops here so auth.json still matches. UTS #39 skeletons
+    # them as colons; the proxy redactor folds that shape separately.
     ord('\u1803'): '.',
     ord('\u1809'): '.',
     ord('\u2cf9'): '.',
