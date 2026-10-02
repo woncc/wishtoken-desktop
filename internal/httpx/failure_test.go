@@ -1565,7 +1565,10 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x2340, 0, false},
 		{0x2341, '/', true},
 		{0x2342, 0, false},
-		{0x2298, 0, false},
+		{0x2298, '/', true},
+		{0x29B8, 0, false},
+		{0x2349, 0, false},
+		{0x2A38, 0, false},
 		{0x27CB, '/', true},
 		{0x2AFD, '/', true},
 		{0x1F67C, '/', true},
@@ -1605,7 +1608,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 31 {
+	if n != 32 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -1915,6 +1918,55 @@ func TestSanitizeFailureStripsQuadSlashes(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsCircledSlashes(t *testing.T) {
+	secret := "code/ver/1"
+	circled := strings.ReplaceAll(secret, "/", "\u2298")
+	encoded := strings.ReplaceAll(secret, "/", "%E2%8A%98")
+	got := SanitizeFailure("rejected "+circled+" "+encoded+" later", secret)
+	for _, item := range []string{secret, circled, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	back := "code\\ver\\1"
+	circledBack := strings.ReplaceAll(back, "\\", "\u29b8")
+	encodedBack := strings.ReplaceAll(back, "\\", "%E2%A6%B8")
+	got = SanitizeFailure("rejected "+circledBack+" "+encodedBack+" later", back)
+	for _, item := range []string{back, circledBack, encodedBack, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("backslash leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{"see \u2298 later", "see \u29b8 later", "see \u2349 later", "see \u2a38 later", "see \u29bc later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("circled prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsAPLCircleBackslash(t *testing.T) {
+	secret := "code\\ver\\1"
+	circled := strings.ReplaceAll(secret, "\\", "\u2349")
+	encoded := strings.ReplaceAll(secret, "\\", "%E2%8D%89")
+	got := SanitizeFailure("rejected "+circled+" "+encoded+" later", secret)
+	for _, item := range []string{secret, circled, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \u2349 later", "see \u2a38 later", "see \u20e0 later", "see \u2339 later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("circle backslash prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
 func TestSanitizeFailureStripsParentheses(t *testing.T) {
 	secret := "code(ver)1"
 	marked := strings.NewReplacer("(", "\u207d", ")", "\u208e").Replace(secret)
@@ -2218,7 +2270,11 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x233F, 0, false},
 		{0x2342, '\\', true},
 		{0x2341, 0, false},
-		{0x29B8, 0, false},
+		{0x29B8, '\\', true},
+		{0x2349, '\\', true},
+		{0x2298, 0, false},
+		{0x2A38, 0, false},
+		{0x20E0, 0, false},
 		{0x30CE, 0, false},
 		{0xFF0F, 0, false},
 	}
@@ -2234,7 +2290,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 23 {
+	if n != 25 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
