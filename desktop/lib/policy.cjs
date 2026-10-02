@@ -45,13 +45,17 @@ const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhos
 function redactProxyCredentials(text) {
   // %3A is a colon. user%3Apassword decodes to a password, but a username-only
   // check never sees a separator and would leave the secret in renderer text.
+  // %40 is @. user:password%40host still carries the password when that is the
+  // only terminator a literal-at check would look for.
   const sep = '(?::|%3[Aa])';
-  const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'gi');
-  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'gi');
-  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'g');
-  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
-  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
-  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  const at = '(?:@|%40)';
+  const userinfo = String.raw`[^\s\/?#@]+(?:${at}[^\s\/?#@]+)*${at}`;
+  const compact = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'gi');
+  const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'gi');
+  const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}${userinfo}`, 'g');
+  const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}${userinfo}(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\/?#]*\s[^\/?#]{0,200}?${at}(?=${PROXY_HOST})`, 'g');
   return text
     .replace(compact, '$1')
     .replace(spaced, '$1')
