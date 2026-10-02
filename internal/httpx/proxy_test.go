@@ -1245,3 +1245,31 @@ func TestRedactHidesCompatibilitySpaceInProxyPassword(t *testing.T) {
 		t.Fatalf("address changed: %q", got)
 	}
 }
+
+func TestRedactHidesLatinLigatureInProxyPassword(t *testing.T) {
+	const password = "staffToken12"
+	st := strings.NewReplacer("st", "\uFB06").Replace(password)
+	longST := strings.NewReplacer("st", "\uFB05").Replace(password)
+	encoded := strings.NewReplacer("st", "%EF%AC%86").Replace(password)
+	userinfo := url.PathEscape(password)
+	cases := []string{
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + st,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + longST,
+		"http://user:" + userinfo + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, st, longST, encoded, "staff", "Token12"} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") || !strings.Contains(got, "xxxxx") {
+			t.Fatalf("host or mask lost: %q", got)
+		}
+	}
+	plain := "member\uFB01le.test"
+	if got := Redact(plain); got != plain {
+		t.Fatalf("address changed: %q", got)
+	}
+}
