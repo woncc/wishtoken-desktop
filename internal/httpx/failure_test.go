@@ -1877,3 +1877,66 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsNumberSigns(t *testing.T) {
+	secret := "code#ver1"
+	marked := strings.ReplaceAll(secret, "#", "\uFE5F")
+	encoded := strings.ReplaceAll(secret, "#", "%EF%BC%83")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "#", "\uFF03")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u266f later",
+		"see \u2317 later",
+		"see \u203b later",
+		"path \uff03 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("number sign prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestNumberSignASCIIFoldsOnlyNumberSigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE5F, '#', true},
+		{0xFF03, '#', true},
+		{'#', 0, false},
+		{0x266F, 0, false},
+		{0x2317, 0, false},
+		{0x203B, 0, false},
+		{0xFF04, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := numberSignASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := numberSignASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("number sign fold count %d", n)
+	}
+}

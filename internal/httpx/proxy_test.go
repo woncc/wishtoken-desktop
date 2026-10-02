@@ -823,3 +823,23 @@ func TestRedactHidesReverseSolidusInProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesNumberSignInProxyPassword(t *testing.T) {
+	const password = "s3cret#proxy"
+	marked := strings.ReplaceAll(password, "#", "\uFF03")
+	small := strings.ReplaceAll(password, "#", "\uFE5F")
+	encoded := strings.ReplaceAll(password, "#", "%EF%BC%83")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+	}
+}

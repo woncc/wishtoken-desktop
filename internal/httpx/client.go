@@ -931,17 +931,74 @@ func escapeASCII(r rune) (byte, bool) {
 }
 
 // foldCredentialPieces maps compatibility letters, digits, and token
-// punctuation, including the percent sign, exclamation mark, and reverse
-// solidus, to ASCII. Credential redaction does not run NFKC. The percent
-// fold is part of this result because the decode loop consumes it: a
-// compatibility percent or hex digit still starts the next escape layer.
-// Marks are not dropped here.
+// punctuation, including the percent sign, exclamation mark, reverse
+// solidus, and number sign, to ASCII. Credential redaction does not run
+// NFKC. The percent fold is part of this result because the decode loop
+// consumes it: a compatibility percent or hex digit still starts the next
+// escape layer. Marks are not dropped here.
 func foldCredentialPieces(in []secretPiece) []secretPiece {
-	return foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in)))))))))))))))))
+	return foldNumberSignPieces(foldReverseSolidusPieces(foldExclamationPieces(foldPercentPieces(foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(in))))))))))))))))))
 }
 
 func foldCredentialString(s string) string {
-	return foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s)))))))))))))))))
+	return foldNumberSignString(foldReverseSolidusString(foldExclamationString(foldPercentString(foldDotString(foldHyphenString(foldFullwidthString(foldMathString(foldEnclosedString(foldSuperSubString(foldModifierString(foldSegmentedString(foldRomanString(foldLongSString(foldPlusEqualsString(foldLowLineString(foldSolidusTildeString(foldParenString(s))))))))))))))))))
+}
+
+// foldNumberSignPieces maps small and fullwidth number signs to ASCII '#'.
+// NFKC folds them, and this pass does not run NFKC, so a stored secret
+// written with those forms would stay visible. Music sharp, viewdata
+// square, and the reference mark do not fold to '#', so they stay out.
+// One output piece covers the original rune.
+func foldNumberSignPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if folded, ok := numberSignASCII(r); ok {
+			out = append(out, secretPiece{b: folded, start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldNumberSignString(s string) string {
+	if !numberSignFolded(s) {
+		return s
+	}
+	return renderPieces(foldNumberSignPieces(rawPieces(s)))
+}
+
+func numberSignFolded(s string) bool {
+	for _, r := range s {
+		if _, ok := numberSignASCII(r); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func numberSignASCII(r rune) (byte, bool) {
+	switch r {
+	case 0xFE5F, 0xFF03:
+		return '#', true
+	default:
+		return 0, false
+	}
 }
 
 // foldReverseSolidusPieces maps small and fullwidth reverse solidus to ASCII.
