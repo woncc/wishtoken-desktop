@@ -957,3 +957,157 @@ func TestSuperSubASCIIFoldsOnlyLettersAndDigits(t *testing.T) {
 		t.Fatalf("superscript fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsModifierLetters(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"e", "\u1d49",
+		"i", "\u2139",
+		"h", "\u02b0",
+		"c", "\u1d9c",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "e", "%E1%B5%89", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"e", "\u1d49",
+		"i", "\u1d62",
+		"o", "\u1d52",
+		"V", "\u2c7d",
+		"c", "\u1d9c",
+	).Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	kelvin := "bridgeKtoken1"
+	markedKelvin := strings.ReplaceAll(kelvin, "K", "\u212a")
+	got = SanitizeFailure("rejected "+markedKelvin+" later", kelvin)
+	for _, item := range []string{kelvin, markedKelvin, "bridge", "token1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("kelvin secret leaked %q in %q", item, got)
+		}
+	}
+	smallQ := "tokenqvalue1"
+	markedQ := strings.ReplaceAll(smallQ, "q", "\U000107a5")
+	got = SanitizeFailure("rejected "+markedQ+" later", smallQ)
+	for _, item := range []string{smallQ, markedQ, "token", "value1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("modifier q leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u02b9 later",
+		"long \u017f word",
+		"chapter \u2160 later",
+		"schwa \u1d4a here",
+		"digit \U0001fbf0 later",
+		"hook \u02b1 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("modifier prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestModifierASCIIFoldsOnlySingleLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x02B0, 'h', true},
+		{0x02B1, 0, false},
+		{0x02B2, 'j', true},
+		{0x02B3, 'r', true},
+		{0x02B7, 'w', true},
+		{0x02B8, 'y', true},
+		{0x02B9, 0, false},
+		{0x02D7, 0, false},
+		{0x02E1, 'l', true},
+		{0x02E2, 's', true},
+		{0x02E3, 'x', true},
+		{0x017F, 0, false},
+		{0x1D2C, 'A', true},
+		{0x1D2D, 0, false},
+		{0x1D2E, 'B', true},
+		{0x1D30, 'D', true},
+		{0x1D31, 'E', true},
+		{0x1D32, 0, false},
+		{0x1D33, 'G', true},
+		{0x1D34, 'H', true},
+		{0x1D35, 'I', true},
+		{0x1D36, 'J', true},
+		{0x1D37, 'K', true},
+		{0x1D38, 'L', true},
+		{0x1D39, 'M', true},
+		{0x1D3A, 'N', true},
+		{0x1D3C, 'O', true},
+		{0x1D3E, 'P', true},
+		{0x1D3F, 'R', true},
+		{0x1D40, 'T', true},
+		{0x1D41, 'U', true},
+		{0x1D42, 'W', true},
+		{0x1D43, 'a', true},
+		{0x1D47, 'b', true},
+		{0x1D48, 'd', true},
+		{0x1D49, 'e', true},
+		{0x1D4A, 0, false},
+		{0x1D4D, 'g', true},
+		{0x1D4F, 'k', true},
+		{0x1D50, 'm', true},
+		{0x1D52, 'o', true},
+		{0x1D56, 'p', true},
+		{0x1D57, 't', true},
+		{0x1D58, 'u', true},
+		{0x1D5B, 'v', true},
+		{0x1D5D, 0, false},
+		{0x1D62, 'i', true},
+		{0x1D63, 'r', true},
+		{0x1D64, 'u', true},
+		{0x1D65, 'v', true},
+		{0x1D9C, 'c', true},
+		{0x1DA0, 'f', true},
+		{0x1DBB, 'z', true},
+		{0x2C7C, 'j', true},
+		{0x2C7D, 'V', true},
+		{0xA7F2, 'C', true},
+		{0xA7F3, 'F', true},
+		{0xA7F4, 'Q', true},
+		{0xA7F8, 0, false},
+		{0xA7F9, 0, false},
+		{0x107A5, 'q', true},
+		{0x212A, 'K', true},
+		{0x2126, 0, false},
+		{0x2139, 'i', true},
+		{0x2160, 0, false},
+		{0x2161, 0, false},
+		{0x2170, 0, false},
+		{0x1FBF0, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := modifierASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := modifierASCII(r); ok {
+			n++
+		}
+	}
+	if n != 53 {
+		t.Fatalf("modifier fold count %d", n)
+	}
+}
