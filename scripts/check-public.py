@@ -796,6 +796,26 @@ def circled_number(cp):
         return str((cp - 0x32B1) + 36)
     return None
 
+
+def super_sub_ascii(cp):
+    # Superscript and subscript letters and digits NFKC-fold to one ASCII
+    # character. The holes in those blocks are not letters and stay out.
+    singles = {
+        0x00AA: 'a', 0x00BA: 'o', 0x00B2: '2', 0x00B3: '3', 0x00B9: '1',
+        0x2070: '0', 0x2071: 'i', 0x207F: 'n',
+    }
+    if cp in singles:
+        return singles[cp]
+    if 0x2074 <= cp <= 0x2079:
+        return chr(cp - 0x2074 + ord('4'))
+    if 0x2080 <= cp <= 0x2089:
+        return chr(cp - 0x2080 + ord('0'))
+    if 0x2090 <= cp <= 0x2093:
+        return 'aeox'[cp - 0x2090]
+    if 0x2095 <= cp <= 0x209C:
+        return 'hklmnpst'[cp - 0x2095]
+    return None
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -842,6 +862,13 @@ def fold_content(data):
         expanded = circled_number(cp)
         if expanded is not None:
             out.append(expanded)
+            changed = True
+            continue
+        # Superscript and subscript forms NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split.
+        mapped = super_sub_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1314,6 +1341,15 @@ def self_test():
         raise SystemExit('self-test failed: a multi-digit circled number was not detected')
     if content_reasons('step \u2469'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2469').encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: an ordinary circled number was blocked')
+    if super_sub_ascii(0x00B9) != '1' or super_sub_ascii(0x2070) != '0' or super_sub_ascii(0x2079) != '9' or super_sub_ascii(0x2071) != 'i' or super_sub_ascii(0x207F) != 'n' or super_sub_ascii(0x2080) != '0' or super_sub_ascii(0x2089) != '9' or super_sub_ascii(0x2090) != 'a' or super_sub_ascii(0x209C) != 't' or super_sub_ascii(0x00AA) != 'a' or super_sub_ascii(0x207A) is not None or super_sub_ascii(0x2094) is not None:
+        raise SystemExit('self-test failed: superscript fold is wrong')
+    sup_token = ('sk-' + '\u2071' * 30).encode()
+    sub_digit = ('rt_' + '\u2080' * 30).encode()
+    ordinal = ('ghp_' + '\u00aa' * 30).encode()
+    if content_reasons(sup_token) != ['secret token literal'] or content_reasons(sub_digit) != ['secret token literal'] or content_reasons(ordinal) != ['secret token literal']:
+        raise SystemExit('self-test failed: a superscript token was not detected')
+    if content_reasons('m\u00b2'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u207a' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2071' * 10).encode()):
+        raise SystemExit('self-test failed: ordinary superscript text was blocked')
 
 def main():
     self_test()
