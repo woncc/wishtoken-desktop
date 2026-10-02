@@ -468,6 +468,9 @@ const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_
 // A numeric reference can also be an invisible mark. "&#8203;" and "&#x200B;"
 // are U+200B. A supplementary reference such as "&#xE0100;" folds to U+200B.
 // Otherwise "user:secret@my&#8203;proxy:7890" keeps the password.
+// "&ZeroWidthSpace;", "&zwnj;", "&zwj;", "&lrm;", "&rlm;", and "&shy;" are
+// invisible marks. The semicolon is required. Otherwise
+// "user:secret@my&ZeroWidthSpace;proxy:7890" keeps the password.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -496,7 +499,13 @@ const HTML_NAMED = new Map([
   ['sup1', '\u00B9'],
   ['sup2', '\u00B2'],
   ['sup3', '\u00B3'],
-  ['percnt', '%']
+  ['percnt', '%'],
+  ['ZeroWidthSpace', '\u200B'],
+  ['zwnj', '\u200C'],
+  ['zwj', '\u200D'],
+  ['lrm', '\u200E'],
+  ['rlm', '\u200F'],
+  ['shy', '\u00AD']
 ]);
 const HTML_LEGACY = ['AMP', 'amp', 'middot', 'sup1', 'sup2', 'sup3'];
 const HTML_STRICT = [...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name));
