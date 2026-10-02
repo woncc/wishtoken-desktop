@@ -822,7 +822,8 @@ def modifier_ascii(cp):
     # blocks do the same, so they are listed too. Kelvin sign and the
     # information source are the letterlike symbols with that one-letter
     # fold. Hooked, turned, and non-Latin modifiers are not ASCII copies.
-    # Long s, roman numerals, and segmented digits stay out.
+    # Roman numerals and segmented digits stay out. Long s is folded
+    # separately.
     return {
         0x02B0: 'h', 0x02B2: 'j', 0x02B3: 'r', 0x02B7: 'w', 0x02B8: 'y',
         0x02E1: 'l', 0x02E2: 's', 0x02E3: 'x',
@@ -875,6 +876,40 @@ def additive_roman(cp):
         0x2176: 'vii', 0x2177: 'viii', 0x2178: 'ix',
         0x217A: 'xi', 0x217B: 'xii',
     }.get(cp)
+
+
+def long_s_ascii(cp):
+    # Latin small letter long s NFKC-folds to ASCII s. Long s with a dot
+    # or a stroke stays phonetic. The long s t ligature expands to "st"
+    # and stays on the ligature fold. Subscript s is a superscript fold.
+    if cp == 0x017F:
+        return 's'
+    return None
+
+
+def latin_ligature(cp):
+    # Latin ligatures and compatibility digraphs that NFKC expands to
+    # ASCII letters. Long s, roman numerals, the trademark sign, and
+    # squared unit symbols stay on their own folds.
+    return {
+        0x0132: 'IJ', 0x0133: 'ij',
+        0x01C7: 'LJ', 0x01C8: 'Lj', 0x01C9: 'lj',
+        0x01CA: 'NJ', 0x01CB: 'Nj', 0x01CC: 'nj',
+        0x01F1: 'DZ', 0x01F2: 'Dz', 0x01F3: 'dz',
+        0xFB00: 'ff', 0xFB01: 'fi', 0xFB02: 'fl',
+        0xFB03: 'ffi', 0xFB04: 'ffl',
+        0xFB05: 'st', 0xFB06: 'st',
+    }.get(cp)
+
+
+def low_line_ascii(cp):
+    # Presentation forms and the fullwidth low line NFKC-fold to ASCII '_'.
+    # A double low line expands to a space plus a mark, and a low macron
+    # does not fold to '_'. Fullwidth low line is also inside the fullwidth
+    # ASCII block, so either pass produces the same byte.
+    if cp in {0xFE33, 0xFE34, 0xFE4D, 0xFE4E, 0xFE4F, 0xFF3F}:
+        return '_'
+    return None
 
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
@@ -960,6 +995,50 @@ def fold_content(data):
         expanded = additive_roman(cp)
         if expanded is not None:
             out.append(expanded)
+            changed = True
+            continue
+        # Latin small letter long s NFKC-folds to ASCII s. This pass does
+        # not run NFKC, so a token, JWT, or personal path written with it
+        # stayed split. Long s with a dot or a stroke stays phonetic, and
+        # the long s t ligature expands to two letters on its own fold.
+        mapped = long_s_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Latin ligatures and compatibility digraphs expand to ASCII
+        # letters. This pass does not run NFKC, so a token or JWT written
+        # with them stayed split. One ligature is not long enough to spell
+        # a token by itself. Long s and roman numerals stay on their own folds.
+        expanded = latin_ligature(cp)
+        if expanded is not None:
+            out.append(expanded)
+            changed = True
+            continue
+        # Low lines NFKC-fold to ASCII '_'. This pass does not run NFKC, so
+        # a token or JWT written with a presentation form stayed split. A
+        # double low line and a low macron are not '_', so they stay out.
+        mapped = low_line_ascii(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Hyphen lookalikes are the same set the path check uses. This pass
+        # does not run NFKC, so a token, JWT, or PEM header written with one
+        # stayed split. Fold them before marks are dropped: a spacing hyphen
+        # would otherwise disappear, and the header would no longer match.
+        # Soft hyphen is format, not in this table, and is folded next.
+        mapped = HYPHEN_LIKE.get(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Soft hyphen is a format character. Dropping it with the other
+        # format characters removes a hyphen a PEM header or sk- prefix
+        # needs, so the secret stayed hidden. Fold it to ASCII '-' first.
+        # Other format characters still only split a token.
+        if cp == 0x00AD:
+            out.append('-')
             changed = True
             continue
         # Mn/Me/Mc add no base letter. Dropping them keeps a split token
@@ -1451,14 +1530,13 @@ def self_test():
     mod_jwt = ('\u1d49\u02b8\U00001D36' + '\u1d43' * 25 + '.' + '\u1d47' * 30 + '.' + '\u1d9c' * 15).encode()
     mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
     mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
-    mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
     if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
         raise SystemExit('self-test failed: a modifier token was not detected')
     if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a modifier key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(mod_path):
         raise SystemExit('self-test failed: a modifier personal path was not detected')
-    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+    if content_reasons(mod_hole) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary modifier text was blocked')
     if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
         raise SystemExit('self-test failed: segmented digit fold is wrong')
@@ -1499,6 +1577,83 @@ def self_test():
         raise SystemExit('self-test failed: an additive roman secret was not detected')
     if content_reasons('see \u2161 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2185' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2166' * 2).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2153' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary additive roman text was blocked')
+    if long_s_ascii(0x017F) != 's' or long_s_ascii(ord('s')) is not None or long_s_ascii(0xFB05) is not None or long_s_ascii(0x1E9B) is not None or long_s_ascii(0x1E9C) is not None or long_s_ascii(0x1E9D) is not None or long_s_ascii(0x209B) is not None:
+        raise SystemExit('self-test failed: long s fold is wrong')
+    if sum(long_s_ascii(cp) is not None for cp in range(0x30000)) != 1:
+        raise SystemExit('self-test failed: long s fold count is wrong')
+    long_token = ('sk-' + '\u017f' * 30).encode()
+    long_prefix = ('\u017fk-' + 'a' * 30).encode()
+    long_mix = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
+    long_jwt = ('eyJ' + '\u017f' * 25 + '.' + '\u017f' * 30 + '.' + '\u017f' * 15).encode()
+    long_path = 'C:/U\u017fers/Mayn'.encode()
+    if content_reasons(long_token) != ['secret token literal'] or content_reasons(long_prefix) != ['secret token literal'] or content_reasons(long_mix) != ['secret token literal']:
+        raise SystemExit('self-test failed: a long s token was not detected')
+    if content_reasons(long_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a long s JWT was not detected')
+    if 'personal Windows path' not in content_reasons(long_path):
+        raise SystemExit('self-test failed: a long s personal path was not detected')
+    if content_reasons('long \u017f word'.encode()) or content_reasons('see \ufb05 later'.encode()) or content_reasons('see \u1e9b later'.encode()) or content_reasons('see \u1e9c later'.encode()) or content_reasons(('sk-' + '\u017f' * 10).encode()) or content_reasons('C:/U\u1e9bsers/Mayn'.encode()):
+        raise SystemExit('self-test failed: ordinary long s text was blocked')
+    if latin_ligature(0x0132) != 'IJ' or latin_ligature(0x0133) != 'ij' or latin_ligature(0x01C7) != 'LJ' or latin_ligature(0x01C8) != 'Lj' or latin_ligature(0x01C9) != 'lj' or latin_ligature(0x01CA) != 'NJ' or latin_ligature(0x01CB) != 'Nj' or latin_ligature(0x01CC) != 'nj' or latin_ligature(0x01F1) != 'DZ' or latin_ligature(0x01F2) != 'Dz' or latin_ligature(0x01F3) != 'dz' or latin_ligature(0xFB00) != 'ff' or latin_ligature(0xFB01) != 'fi' or latin_ligature(0xFB02) != 'fl' or latin_ligature(0xFB03) != 'ffi' or latin_ligature(0xFB04) != 'ffl' or latin_ligature(0xFB05) != 'st' or latin_ligature(0xFB06) != 'st' or latin_ligature(ord('f')) is not None or latin_ligature(0x017F) is not None or latin_ligature(0x2161) is not None or latin_ligature(0x2122) is not None or latin_ligature(0x2116) is not None or latin_ligature(0x3373) is not None or latin_ligature(0xFB07) is not None:
+        raise SystemExit('self-test failed: latin ligature fold is wrong')
+    if sum(latin_ligature(cp) is not None for cp in range(0x30000)) != 18:
+        raise SystemExit('self-test failed: latin ligature fold count is wrong')
+    lig_fi = ('sk-' + '\ufb01' * 13).encode()
+    lig_st = ('rt_' + '\ufb06' * 13).encode()
+    lig_long_st = ('ghp_' + '\ufb05' * 13).encode()
+    lig_ffi = ('sk-' + 'a' * 10 + '\ufb03' + 'a' * 14).encode()
+    lig_dz = ('sk-' + 'a' * 10 + '\u01f1' + 'a' * 13).encode()
+    lig_ij = ('gho_' + '\u0133' * 13).encode()
+    lig_jwt = ('eyJ' + 'a' * 23 + '\ufb01' + '.' + 'b' * 28 + '\ufb01' + '.' + 'c' * 13 + '\ufb01').encode()
+    if content_reasons(lig_fi) != ['secret token literal'] or content_reasons(lig_st) != ['secret token literal'] or content_reasons(lig_long_st) != ['secret token literal'] or content_reasons(lig_ffi) != ['secret token literal'] or content_reasons(lig_dz) != ['secret token literal'] or content_reasons(lig_ij) != ['secret token literal']:
+        raise SystemExit('self-test failed: a ligature token was not detected')
+    if content_reasons(lig_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a ligature JWT was not detected')
+    if content_reasons('see \ufb05 later'.encode()) or content_reasons('the \ufb01le stays'.encode()) or content_reasons('see \u2122 later'.encode()) or content_reasons('see \u2116 later'.encode()) or content_reasons('see \u3373 later'.encode()) or content_reasons(('sk-' + '\ufb01' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u01f1' + 'a' * 12).encode()) or content_reasons('see \ufb07 later'.encode()):
+        raise SystemExit('self-test failed: ordinary ligature text was blocked')
+    if low_line_ascii(0xFE33) != '_' or low_line_ascii(0xFE34) != '_' or low_line_ascii(0xFE4D) != '_' or low_line_ascii(0xFE4E) != '_' or low_line_ascii(0xFE4F) != '_' or low_line_ascii(0xFF3F) != '_' or low_line_ascii(ord('_')) is not None or low_line_ascii(0x2017) is not None or low_line_ascii(0x02CD) is not None or low_line_ascii(0xFF0D) is not None or low_line_ascii(0x0332) is not None:
+        raise SystemExit('self-test failed: low line fold is wrong')
+    if sum(low_line_ascii(cp) is not None for cp in range(0x30000)) != 6:
+        raise SystemExit('self-test failed: low line fold count is wrong')
+    low_mix = ('sk-' + 'a' * 10 + '\ufe4d' + 'a' * 20).encode()
+    low_wavy = ('rt_' + 'a' * 10 + '\ufe34' + 'a' * 14).encode()
+    low_pat = ('github' + '\ufe4f' + 'pat_' + 'a' * 25).encode()
+    low_jwt = ('eyJ' + 'a' * 24 + '\ufe33' + '.' + 'b' * 30 + '.' + 'c' * 15).encode()
+    low_wide = ('ghp_' + 'a' * 12 + '\uff3f' + 'a' * 12).encode()
+    if content_reasons(low_mix) != ['secret token literal'] or content_reasons(low_wavy) != ['secret token literal'] or content_reasons(low_pat) != ['secret token literal'] or content_reasons(low_wide) != ['secret token literal']:
+        raise SystemExit('self-test failed: a low line token was not detected')
+    if content_reasons(low_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a low line JWT was not detected')
+    if content_reasons('see \u2017 later'.encode()) or content_reasons('see \u02cd later'.encode()) or content_reasons('low \uff3f line'.encode()) or content_reasons(('sk-' + '\ufe4d' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2017' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u02cd' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary low line text was blocked')
+    if len(HYPHEN_LIKE) != 37 or HYPHEN_LIKE[0x2011] != '-' or HYPHEN_LIKE[0x2013] != '-' or HYPHEN_LIKE[0x2014] != '-' or HYPHEN_LIKE[0x2015] != '-' or HYPHEN_LIKE[0x2212] != '-' or HYPHEN_LIKE[0x05BE] != '-' or HYPHEN_LIKE[0x207B] != '-' or HYPHEN_LIKE[0x208B] != '-' or HYPHEN_LIKE[0x2E3A] != '-' or HYPHEN_LIKE[0x301C] != '-' or HYPHEN_LIKE[0xFF0D] != '-' or HYPHEN_LIKE.get(0x2016) is not None or HYPHEN_LIKE.get(0x00AD) is not None or HYPHEN_LIKE.get(ord('-')) is not None:
+        raise SystemExit('self-test failed: hyphen lookalike table is wrong')
+    hy_nb = ('rt_sub' + '\u2011' + 'mitted_' + 'a' * 14).encode()
+    hy_minus = ('sk-' + 'a' * 10 + '\u2212' + 'a' * 14).encode()
+    hy_maqaf = ('ghp_' + 'a' * 10 + '\u05be' + 'a' * 14).encode()
+    hy_super = ('gho_' + 'a' * 12 + '\u207b' + 'a' * 12).encode()
+    hy_wave = ('eyJ' + 'a' * 20 + '\u301c' + 'a' * 4 + '.' + 'b' * 30 + '.' + 'c' * 15).encode()
+    hy_pem = ('\u2014' * 5 + 'BEGIN OPENSSH PRIVATE KEY' + '\u2014' * 5).encode()
+    if content_reasons(hy_nb) != ['secret token literal'] or content_reasons(hy_minus) != ['secret token literal'] or content_reasons(hy_maqaf) != ['secret token literal'] or content_reasons(hy_super) != ['secret token literal']:
+        raise SystemExit('self-test failed: a hyphen-lookalike token was not detected')
+    if content_reasons(hy_wave) != ['JWT literal']:
+        raise SystemExit('self-test failed: a hyphen-lookalike JWT was not detected')
+    if content_reasons(hy_pem) != ['private key']:
+        raise SystemExit('self-test failed: a hyphen-lookalike private key was not detected')
+    if content_reasons('re\u2013try later'.encode()) or content_reasons('re\u2014try later'.encode()) or content_reasons('re\u05betry later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2016' + 'a' * 20).encode()):
+        raise SystemExit('self-test failed: ordinary hyphen text was blocked')
+    shy_pem = ('----' + '\u00ad' + 'BEGIN OPENSSH PRIVATE KEY-----').encode()
+    shy_prefix = ('sk' + '\u00ad' + 'a' * 30).encode()
+    shy_token = ('sk-' + 'a' * 12 + '\u00ad' + 'a' * 12).encode()
+    shy_jwt = ('eyJ' + 'a' * 24 + '\u00ad' + '.' + 'b' * 29 + '\u00ad' + '.' + 'c' * 14 + '\u00ad').encode()
+    if content_reasons(shy_pem) != ['private key']:
+        raise SystemExit('self-test failed: a soft-hyphen private key was not detected')
+    if content_reasons(shy_prefix) != ['secret token literal'] or content_reasons(shy_token) != ['secret token literal']:
+        raise SystemExit('self-test failed: a soft-hyphen token was not detected')
+    if content_reasons(shy_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a soft-hyphen JWT was not detected')
+    if content_reasons('slow\u00addown'.encode()) or content_reasons(('----BEGIN OPENSSH PRIVATE KEY-----').encode()) or content_reasons(('sk-' + 'a' * 12 + '\u200b' + 'a' * 12).encode()) or content_reasons(('sk' + '\u00ad' + 'a' * 10).encode()):
+        raise SystemExit('self-test failed: ordinary soft hyphen text was blocked')
 
 def main():
     self_test()
