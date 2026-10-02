@@ -739,8 +739,16 @@ function decodeProxyHtml(text) {
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
+// A percent-encoded hyphen is still a hyphen inside a host label. The same
+// extra "25" depth already accepted for a port digit applies. Otherwise
+// "user:secret@my%2Dproxy:7890" and "user:secret@ex%252Dample.com" keep the
+// password. An encoded underscore is the other mark a single-label host
+// already allows. Otherwise "user:secret@my%5Fproxy:7890" keeps the password.
+function decodeEncodedLabelPunct(text) {
+  return String(text).replace(/%(?:25){0,3}2[Dd]/g, '-').replace(/%(?:25){0,3}5[Ff]/g, '_');
+}
 function redactProxyCredentials(text) {
-  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(String(text)))));
+  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text)))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.

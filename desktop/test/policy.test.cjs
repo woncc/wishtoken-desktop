@@ -3337,3 +3337,65 @@ test('renderer text drops proxy passwords hidden by the remaining invisible mark
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords when a host hyphen or underscore is encoded', () => {
+  const password = 's3cret-token';
+  const nest = (token, extra) => {
+    let out = token;
+    for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const cases = [
+    [`user:${password}@my%2Dproxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my%2dproxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest('%2D', 1)}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my${nest('%2D', 3)}proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my%2D%2Dproxy:7890`, 'my--proxy:7890'],
+    [`user:${password}@ex%2Dample.com`, 'ex-ample.com'],
+    [`user:${password}@ex%2Dample.com:8080`, 'ex-ample.com:8080'],
+    [`user:${password}@ex${nest('%2D', 1)}ample.com:8080/x`, 'ex-ample.com:8080/x'],
+    [`http://user:${password}@ex%2Dample.com:8080/x`, 'http://ex-ample.com:8080/x'],
+    [`http://us%2Der:${password}@ex-ample.com:8080/x`, 'http://ex-ample.com:8080/x'],
+    [`(user:${password}@my%2Dproxy:7890)`, '(my-proxy:7890)'],
+    [`a=1&user:${password}@my%2Dproxy:7890&b=2`, 'a=1&my-proxy:7890&b=2'],
+    [`user:${password}@my%5Fproxy:7890`, 'my_proxy:7890'],
+    [`user:${password}@my%5fproxy:7890`, 'my_proxy:7890'],
+    [`user:${password}@my${nest('%5F', 1)}proxy:7890`, 'my_proxy:7890'],
+    [`user:${password}@my${nest('%5F', 3)}proxy:7890`, 'my_proxy:7890'],
+    [`socks5://alice:${password}@my%5Fproxy:7890`, 'socks5://my_proxy:7890'],
+    [`note %2D later user:${password}@10.1:8080`, 'note - later 10.1:8080'],
+    [`two user:${password}@my%2Dproxy:7890) and user:other-secret@10.1:8080.`, 'two my-proxy:7890) and 10.1:8080.'],
+    [`invalid proxy url "http://user:s3cret/token@my%2Dproxy:7890": invalid port ":s3cret" after host`, 'invalid proxy url "http://my-proxy:7890": invalid port ":[凭据已隐藏]" after host']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  const unchanged = [
+    `Build v1%2D2@beta`,
+    `file%2Dname.txt`,
+    `score 1%2D2@10.5`,
+    `version%2D1:2@host`,
+    `user:${password}@my%2Dproxy`,
+    `user:${password}@my%5Fproxy`,
+    `user:${password}@10%2D1:8080`,
+    `ex%2Dample.com`,
+    'http://user@127.0.0.1:7890'
+  ];
+  for (const input of unchanged) assert.equal(redactPublic(input), input);
+  const proxy = `http://user:${password}@127.0.0.1:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@my%2Dproxy:7890`, email: 'a@example.test', last_error: `dial user:${password}@my%5Fproxy:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial my_proxy:7890 failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
