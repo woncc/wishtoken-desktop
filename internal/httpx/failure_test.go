@@ -760,3 +760,102 @@ func TestMathASCIIFoldsOnlyMathematicalLetters(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsEnclosedLetters(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"e", "\u24d4",
+		"J", "\u24bf",
+		"1", "\u2460",
+		"0", "\u24ea",
+		"2", "\u2461",
+		"c", "\U0001F12B",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "e", "%E2%93%94", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"V", "\U0001F145",
+		"1", "\u2460",
+		"2", "\u2461",
+		"e", "\u24d4",
+	).Replace(secret)
+	encodedSecret := strings.Replace(secret, "V", "%F0%9F%85%85", 1)
+	got = SanitizeFailure("rejected "+markedSecret+" "+encodedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, encodedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("short secret context lost: %q", got)
+	}
+	for _, prose := range []string{
+		"\u24d7\u24d4\u24db\u24db\u24de",
+		"build \u2460 stays",
+		"see \u24b6 later",
+		"see \u24ea later",
+		"see \u249c later",
+		"see \u2469 later",
+		"see \U0001F14A later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("enclosed prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestEnclosedASCIIFoldsOnlySingleLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x2460, '1', true},
+		{0x2468, '9', true},
+		{0x2469, 0, false},
+		{0x24B6, 'A', true},
+		{0x24CF, 'Z', true},
+		{0x24B5, 0, false},
+		{0x24D0, 'a', true},
+		{0x24D4, 'e', true},
+		{0x24E9, 'z', true},
+		{0x24EA, '0', true},
+		{0x24FF, 0, false},
+		{0x1F12B, 'C', true},
+		{0x1F12C, 'R', true},
+		{0x1F12A, 0, false},
+		{0x1F12D, 0, false},
+		{0x1F130, 'A', true},
+		{0x1F145, 'V', true},
+		{0x1F149, 'Z', true},
+		{0x1F14A, 0, false},
+		{0x1F150, 0, false},
+		{0x2474, 0, false},
+		{0x2488, 0, false},
+		{0x249C, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := enclosedASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := enclosedASCII(r); ok {
+			n++
+		}
+	}
+	if n != 90 {
+		t.Fatalf("enclosed fold count %d", n)
+	}
+}
