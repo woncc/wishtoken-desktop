@@ -516,3 +516,54 @@ test('renderer text drops proxy passwords embedded in a query, path, or fragment
   assert.equal(delivered.accounts[0].last_error, 'dial a=1&my-proxy:7890');
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords that contain a slash, question mark, or hash', () => {
+  const cases = [
+    ['http://user:s3cret/token@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['http://user:s3cret?x@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['http://user:s3cret#x@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['user:s3cret/token@10.0.0.8:1080', '10.0.0.8:1080'],
+    ['(user:s3cret/token@my-proxy:7890)', '(my-proxy:7890)'],
+    ['http://example.com/?x=user:s3cret/token@10.0.0.8:1080', 'http://example.com/?x=10.0.0.8:1080'],
+    ['http://example.com/user:s3cret?x@127.1:7890', 'http://example.com/127.1:7890'],
+    ['http://127.0.0.1:9#user:s3cret#token@127.0.0.1%3A7890', 'http://127.0.0.1:9#127.0.0.1%3A7890'],
+    ['via user:s3cret /token@my-proxy:7890 failed', 'via my-proxy:7890 failed'],
+    ['socks5://alice:hun/ter2@10.0.0.8:1080', 'socks5://10.0.0.8:1080'],
+    ['http://user:p@ss/word@127.0.0.1:7890/x', 'http://127.0.0.1:7890/x'],
+    ['http://user:s3cret%2Ftoken@127.0.0.1:7890', 'http://127.0.0.1:7890'],
+    ['http://user:s3cret%3Ftoken@10.0.0.8:1080', 'http://10.0.0.8:1080'],
+    ['http://user:s3cret%23token@my-proxy:7890', 'http://my-proxy:7890'],
+    ['two user:s3cret/token@127.0.0.1:7890) and user:other?secret@10.0.0.8:1080.', 'two 127.0.0.1:7890) and 10.0.0.8:1080.'],
+    ['invalid proxy url "http://user:s3cret/token@127.0.0.1:7890": parse "http://user:s3cret/token@127.0.0.1:7890": invalid port ":s3cret" after host', 'invalid proxy url "http://127.0.0.1:7890": parse "http://127.0.0.1:7890": invalid port ":[凭据已隐藏]" after host']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hun/ter2'), false);
+    assert.equal(got.includes('other?secret'), false);
+    assert.equal(got.includes('p@ss'), false);
+  }
+  assert.equal(redactPublic('http://example.com/foo:bar@baz'), 'http://example.com/foo:bar@baz');
+  assert.equal(redactPublic('http://example.com/foo:bar/baz@qux'), 'http://example.com/foo:bar/baz@qux');
+  assert.equal(redactPublic('http://example.com/foo:bar%40baz'), 'http://example.com/foo:bar%40baz');
+  assert.equal(redactPublic('http://127.0.0.1:7890/path?q=1#frag'), 'http://127.0.0.1:7890/path?q=1#frag');
+  assert.equal(redactPublic('see (http://127.0.0.1:7890)'), 'see (http://127.0.0.1:7890)');
+  assert.equal(redactPublic('Build v1:2@beta'), 'Build v1:2@beta');
+  assert.equal(redactPublic('user:s3cret@internal'), 'user:s3cret@internal');
+  assert.equal(redactPublic('member@example.test'), 'member@example.test');
+  assert.equal(redactPublic('invalid port ":8080" after host'), 'invalid port ":8080" after host');
+  const proxy = 'http://user:s3cret/token@127.0.0.1:7890';
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: 'note user:s3cret?x@my-proxy:7890', email: 'a@example.test', last_error: 'invalid proxy url "http://user:s3cret/token@10.0.0.8:1080": invalid port ":s3cret" after host' }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'invalid proxy url "http://10.0.0.8:1080": invalid port ":[凭据已隐藏]" after host');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
