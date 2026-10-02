@@ -253,7 +253,9 @@ func redactProxy(u string) string {
 }
 
 // ScrubDisplay masks proxy passwords and credential-shaped text for management
-// responses. The stored proxy URL itself is redacted separately.
+// responses. The stored proxy URL itself is redacted separately. A token
+// embedded in a name, tag, or error is removed even when the field also
+// contains ordinary text.
 func ScrubDisplay(value string) string { return scrubDisplay(value) }
 
 func scrubDisplay(value string) string {
@@ -261,7 +263,8 @@ func scrubDisplay(value string) string {
 	if value == "" {
 		return ""
 	}
-	return httpx.Redact(value)
+	value = httpx.Redact(value)
+	return httpx.SanitizeFailure(value)
 }
 
 func scrubDisplayList(values []string) []string {
