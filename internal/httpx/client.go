@@ -781,6 +781,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needleDollar != needleAmpersand {
 		spans = append(spans, exactSecretSpans(dollarBase, needleDollar)...)
 	}
+	// Tag number sign copies '#' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That splits a token and
+	// misses the stored number sign. Folding it is a separate reading. It runs
+	// on the tag-dollar-sign reading so one secret can use both. The drop
+	// reading still runs, so an inserted tag number sign cannot hide a token
+	// that has no number sign.
+	numberBase := dollarBase
+	if dollared, ok := foldTagDollarPieces(dollarBase); ok {
+		numberBase = dollared
+	}
+	needleNumber := foldTagNumberSignString(needleDollar)
+	if numbered, ok := foldTagNumberSignPieces(numberBase); ok {
+		spans = append(spans, exactSecretSpans(numbered, needleNumber)...)
+	} else if needleNumber != needleDollar {
+		spans = append(spans, exactSecretSpans(numberBase, needleNumber)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -1992,6 +2008,46 @@ func foldTagDollarString(s string) string {
 		return s
 	}
 	folded, _ := foldTagDollarPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagNumberSignPieces maps the Unicode tag number sign to ASCII '#'. It
+// does not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored number sign written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagNumberSignPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE0023 {
+			out = append(out, secretPiece{b: '#', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagNumberSignString(s string) string {
+	if !strings.ContainsRune(s, 0xE0023) {
+		return s
+	}
+	folded, _ := foldTagNumberSignPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
