@@ -542,6 +542,12 @@ def component_private(part):
 # joins "Copy of" into one word, and deletes the dot, colon, or hyphen the
 # private name needs. The punctuation reading is tried only after that strip
 # reading fails. Language tag and cancel tag are not ASCII copies and stay out.
+# Tag letters are the same kind of format character. Stripping one deletes the
+# letter auth.json needs. That reading is tried after punctuation, including
+# when the same name also uses a tag separator. An inserted tag letter is
+# still removed by the strip reading. Tag digits are a later reading: stripping
+# one deletes the digit in id_ed25519, while folding it keeps an inserted tag
+# letter from renaming that file.
 TAG_PUNCT_CHARS = frozenset('\U000E0020\U000E002D\U000E002E\U000E002F\U000E003A\U000E005C')
 TAG_PUNCT = str.maketrans({
     0xE0020: ' ',
@@ -551,6 +557,12 @@ TAG_PUNCT = str.maketrans({
     0xE003A: ':',
     0xE005C: '/',
 })
+_TAG_LETTERS = (*range(0xE0041, 0xE005B), *range(0xE0061, 0xE007B))
+TAG_LETTER_CHARS = frozenset(chr(cp) for cp in _TAG_LETTERS)
+TAG_LETTER = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_LETTERS})
+_TAG_DIGITS = range(0xE0030, 0xE003A)
+TAG_DIGIT_CHARS = frozenset(chr(cp) for cp in _TAG_DIGITS)
+TAG_DIGIT = str.maketrans({cp: chr(cp - 0xE0000) for cp in _TAG_DIGITS})
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -564,8 +576,27 @@ def path_reason(rel):
     if shy in rel:
         if reason := component_path_reason(rel.replace(shy, '-')):
             return reason
-    if any(ch in TAG_PUNCT_CHARS for ch in rel):
-        return component_path_reason(rel.translate(TAG_PUNCT))
+    has_tag_punct = any(ch in TAG_PUNCT_CHARS for ch in rel)
+    has_tag_letter = any(ch in TAG_LETTER_CHARS for ch in rel)
+    if has_tag_punct:
+        # Punctuation folding still strips any other tag, so an extra tag
+        # letter beside auth.json cannot spell a different filename.
+        if reason := component_path_reason(rel.translate(TAG_PUNCT)):
+            return reason
+    if has_tag_letter:
+        folded = rel.translate(TAG_LETTER)
+        if has_tag_punct:
+            folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER)
+        if reason := component_path_reason(folded):
+            return reason
+    if any(ch in TAG_DIGIT_CHARS for ch in rel):
+        # Digit folding still strips any other tag, so an extra tag letter
+        # beside id_ed25519 cannot spell a different filename.
+        if reason := component_path_reason(rel.translate(TAG_DIGIT)):
+            return reason
+        folded = rel.translate(TAG_PUNCT).translate(TAG_LETTER).translate(TAG_DIGIT)
+        if reason := component_path_reason(folded):
+            return reason
     return ''
 
 def component_path_reason(rel):
@@ -789,6 +820,15 @@ def self_test():
         'auth.json\U000E0001',
         'Copy\U000E0020of auth.json', 'Copy of\U000E0020auth.json',
         'Copy of auth\U000E0020.json',
+        'a\U000E0075th.json', '\U000E0061uth.json', 't\U000E006Fkens.json',
+        'ID_\U000E0052SA', '\U000E0041CCOUNTS.JSON',
+        'au\U000E0074h.json', 'Copy of a\U000E0075th.json',
+        'nested/\U000E0061uth.json/extra.txt', 'launch-\U000E0068istory.json',
+        'au\U000E0074h\U000E002Ejson', 'credentials\U000E002Ejs\U000E006Fn',
+        '\U000E002En\U000E0065trc', 'id_rs\U000E0061', 'auth.json\U000E0061',
+        'id_ed\U000E00325519', 'ID_ED\U000E00325519',
+        'id_ed\U000E00325519\U000E0061', 'id_\U000E0065d\U000E00325519',
+        'nested/id_ed\U000E00325519/extra.txt', 'id_ed2551\U000E0039',
         'readme\u1393auth.json', 'notes\U0001d108id_rsa', 'file\U00011dd9credentials.json',
         'docs\u1393accounts.json', 'nested/file\U0001d108.netrc', 'ID_RSA\U00011dd9x',
         'auth.json\u1393secret', 'readme\U0001d108.env', 'file\U00011dd9.netrc',
@@ -891,6 +931,11 @@ def self_test():
         'au\U000E002Fth.txt', 'notes\U000E0001readme.txt',
         'Copy\U000E0020of README.md', 'notes\U000E0020readme.txt',
         'script\U000E0020.go', 'id_rsa\U000E0020.pub',
+        'notes\U000E0061.txt', 'script\U000E0067o.go', 'id_rs\U000E0061.pub',
+        'readme\U000E0041md', 'au\U000E0074h.txt',
+        'docs/handover-not-private\U000E0061.md',
+        'notes\U000E0031.txt', 'script\U000E0030.go', 'id_ed\U000E00325519.pub',
+        'readme\U000E0039md',
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',

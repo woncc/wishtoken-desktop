@@ -1883,3 +1883,49 @@ func TestManagementHidesSecretsSplitByTagSpace(t *testing.T) {
 		t.Fatalf("display context lost: %d %s", status, body)
 	}
 }
+
+func TestManagementHidesSecretsSplitByTagLetter(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9qab7f3a"
+	half := strings.NewReplacer("q", "\U000E0071").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("q", "%F3%A0%81%B1").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("Z", "\U000E005A", "a", "\U000E0061").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
+
+func TestManagementHidesSecretsSplitByTagDigit(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	acc := testAccount("acct_one", "one@example.test")
+	acc.RefreshToken = "rt_Zz9qab7f3a"
+	half := strings.NewReplacer("9", "\U000E0039").Replace(acc.RefreshToken)
+	encoded := strings.NewReplacer("3", "%F3%A0%80%B3").Replace(acc.RefreshToken)
+	mixed := strings.NewReplacer("q", "\U000E0071", "3", "\U000E0033").Replace(acc.RefreshToken)
+	acc.Name = "note " + half
+	acc.LastError = "rejected " + encoded + " " + mixed
+	f := newFixture(t, cfg, acc)
+	status, body := getRaw(t, f, "/api/accounts")
+	payload := strings.Split(acc.AccessToken, ".")[1]
+	for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, half, encoded, mixed, payload, "eyJ", "Zz9q", "ab7f3a"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("leaked %q: %d %s", leaked, status, body)
+		}
+	}
+	if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+		t.Fatalf("display context lost: %d %s", status, body)
+	}
+}
