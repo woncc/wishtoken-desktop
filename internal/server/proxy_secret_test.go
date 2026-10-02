@@ -366,6 +366,33 @@ func TestManagementHidesTwoDotColonProxyPasswords(t *testing.T) {
 	}
 }
 
+func TestManagementHidesVisargaProxyPasswords(t *testing.T) {
+	const password = "s3cret-proxy"
+	proxyURL := "http://user\u0903" + password + "@127.0.0.1:7890"
+	encodedColon := encodeEveryByte("\u0983")
+	encoded := "http://user" + encodedColon + password + "@127.0.0.1:7890"
+	hiddenAt := "http://user\u0a83" + password + "\uFF20127.0.0.1:7890"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	cfg.ProxyURL = proxyURL
+	acc := testAccount("acct_one", "one@example.test")
+	acc.ProxyURL = encoded
+	acc.Name = "note " + hiddenAt + " " + "\U00011002" + password
+	acc.LastError = "dial " + encoded + " via " + "\u17c7" + password
+	f := newFixture(t, cfg, acc)
+	for _, route := range []string{"/api/status", "/api/accounts", "/api/settings"} {
+		status, body := getRaw(t, f, route)
+		if status != http.StatusOK || strings.Contains(body, password) || strings.Contains(body, encodedColon+password) || strings.Contains(body, "\u0903"+password) || strings.Contains(body, "\u0983"+password) || strings.Contains(body, "\u0a83"+password) || strings.Contains(body, "\U00011002"+password) || strings.Contains(body, "\u17c7"+password) {
+			t.Fatalf("%s leaked visarga: %d %s", route, status, body)
+		}
+	}
+	redacted := httpx.Redact(cfg.ProxyURL)
+	status, body := putJSON(t, f, "/api/settings", `{"proxy_url":"`+redacted+`"}`)
+	if status != http.StatusOK || strings.Contains(body, password) || f.srv.Config().ProxyURL != cfg.ProxyURL {
+		t.Fatalf("redacted save: %d %s stored %q", status, body, f.srv.Config().ProxyURL)
+	}
+}
+
 func TestManagementHidesAtSignProxyPasswords(t *testing.T) {
 	const password = "s3cret-proxy"
 	proxyURL := "http://user:" + password + "\uFF20127.0.0.1:7890"

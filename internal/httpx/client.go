@@ -170,12 +170,14 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // cuneiform colon punctuation and the SignWriting colon. A vertical
 // two-dot leader NFKC-folds to ".." rather than ':', and runic multiple
 // punctuation, Samaritan afsaaq, Manichaean two dots, the Khojki word
-// separator, and Lisu mya jeu do not fold to ':'. url.Parse rejects
+// separator, and Lisu mya jeu do not fold to ':'. Visarga signs, including
+// Bengali visarga and the marks confusable with it, do not fold to ':'
+// either. url.Parse rejects
 // every one of them as invalid userinfo, so an unlisted character would
 // otherwise be returned with its password intact. The Go core has no
 // Unicode normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A\ufe30\u16ec\u0831\U00010af5\U0001123a\ua4fd\u0903\u0a83\U00011002\U00011082\U00011182\U000115BE\U000116AC\U00011838\u0983\u0a03\u0c03\u0c83\u0d03\u0d83\u0f7f\u1038\u17c7\U00011303\U000114C1\U000119DF\U00011A39\U00011C3E"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -222,6 +224,28 @@ func foldUserinfoColons(s string) string {
 		"\U00010af5", ":",
 		"\U0001123a", ":",
 		"\ua4fd", ":",
+		"\u0903", ":",
+		"\u0a83", ":",
+		"\U00011002", ":",
+		"\U00011082", ":",
+		"\U00011182", ":",
+		"\U000115BE", ":",
+		"\U000116AC", ":",
+		"\U00011838", ":",
+		"\u0983", ":",
+		"\u0a03", ":",
+		"\u0c03", ":",
+		"\u0c83", ":",
+		"\u0d03", ":",
+		"\u0d83", ":",
+		"\u0f7f", ":",
+		"\u1038", ":",
+		"\u17c7", ":",
+		"\U00011303", ":",
+		"\U000114C1", ":",
+		"\U000119DF", ":",
+		"\U00011A39", ":",
+		"\U00011C3E", ":",
 	).Replace(s)
 }
 
