@@ -570,8 +570,9 @@ function htmlProxyChar(cp) {
   // U+2212, and "&horbar;" is U+2015. U+FE58 and U+FE31 fold to U+2014.
   // U+FE32 folds to U+2013. U+FE33, U+FE34, U+FE4D, U+FE4E, U+FE4F, and
   // U+FF3F fold to "_". "&lowbar;" and "&UnderBar;" are U+005F.
-  // A numeric reference has to yield the same character so the label fold
-  // can see it.
+  // U+FF21..U+FF3A and U+FF41..U+FF5A fold to ASCII letters. A numeric
+  // reference has to yield the same character so the label fold can see it.
+  if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -835,8 +836,44 @@ function foldLabelHyphens(text) {
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE31\uFE32\uFE58\uFE63\uFF0D]/g, '-')
     .replace(/[\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]/g, '_');
 }
+// U+FF21..U+FF3A and U+FF41..U+FF5A fold to A-Z and a-z under NFKC. A
+// single-label or dotted host already allows those letters. Their literal,
+// percent-encoded, and numeric forms kept the password too. Otherwise
+// "user:secret@my\uFF4Dproxy:7890" and "user:secret@ex\uFF41mple.com:8080"
+// keep the password. Modifier letters and other NFKC letters stay as written.
+function readEncodedFullwidthLetter(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A))) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedFullwidthLetters(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const letter = readEncodedFullwidthLetter(text, index);
+    if (letter) {
+      out += letter.char;
+      index = letter.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldFullwidthLetters(text) {
+  return text.replace(/[\uFF21-\uFF3A\uFF41-\uFF5A]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
+}
 function redactProxyCredentials(text) {
-  const decoded = foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text))))));
+  const decoded = foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
