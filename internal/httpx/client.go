@@ -4351,8 +4351,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // backslash do not, but a management response can still hide a stored
 // backslash with them. Falling diagonals do not either: the box drawing, the
 // mathematical falling diagonal, the squared falling diagonal, CJK stroke D,
-// the dot radical, and the very heavy reverse solidus. This pass does not
-// run NFKC. Forward solidus lookalikes fold to '/'. Ideographs stay out.
+// the dot radical, the very heavy reverse solidus, the Greek notation
+// slashes, and the kana repeat lower half. This pass does not run NFKC.
+// Forward solidus lookalikes fold to '/'. The dot radical's ideograph
+// folds here too. Letters and other ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -4399,7 +4401,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x31D4, 0xFE68, 0xFF3C, 0x1F67D:
+	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x2572, 0x27CD, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D:
 		return '\\', true
 	default:
 		return 0, false
@@ -4664,13 +4666,18 @@ func parenASCII(r rune) (byte, bool) {
 // response can still hide a stored slash with them. Diagonal symbols do not
 // either: Philippine punctuation, the caret insertion point, box drawings,
 // a rising mathematical diagonal, dotted and heavy solidi, squared rising
-// diagonal, CJK strokes P and SP, the slash radical, and the double and
-// triple solidus operators. Each of those stays one slash, so an expanded
-// form cannot glue the token back together. This pass does not run NFKC.
-// A reverse solidus folds to a backslash on its own pass. Greek notation
-// slashes and the kana repeat mark stay out. Tilde operator, swung dash,
-// and wave dash do not fold to '~'. Small tilde expands to a space plus a
-// mark, so it stays out. One output piece covers the original rune.
+// diagonal, CJK strokes P and SP, the slash radical, the double and
+// triple solidus operators, the kana repeat upper halves, and the slash
+// radical's ideograph. Each of those stays one slash, so an expanded
+// form cannot glue the token back together.
+// This pass does not run NFKC.
+// A reverse solidus folds to a backslash on its own pass, including the
+// Greek notation slashes and the kana repeat lower half. The full vertical
+// kana repeat stays out. The slash radical's ideograph folds to '/'.
+// Letters and other ideographs stay out.
+// Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
+// expands to a space plus a mark, so it stays out. One output piece covers
+// the original rune.
 func foldSolidusTildePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -4716,7 +4723,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2E4A, 0x2F03, 0x31D2, 0x31D3, 0xFF0F, 0x1F67C:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2571, 0x27CB, 0x29C4, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2E4A, 0x2F03, 0x3033, 0x3034, 0x31D2, 0x31D3, 0x4E3F, 0xFF0F, 0x1F67C:
 		return '/', true
 	case 0xFF5E:
 		return '~', true

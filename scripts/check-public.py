@@ -412,9 +412,13 @@ SEPARATOR_LIKE = {
     ord('\u31d2'): '/',
     ord('\u31d3'): '/',
     ord('\u31d4'): '/',
-    # Greek notation slashes and the vertical kana repeat mark do not
+    # Greek notation slashes and the vertical kana repeat halves do not
     # NFKC-fold to a slash, but each one still splits the next component.
+    # The voiced upper half is that slash plus dakuten, and the lower half
+    # is the backslash twin. The full vertical repeat is not a slash.
     ord('\u3033'): '/',
+    ord('\u3034'): '/',
+    ord('\u3035'): '/',
     ord('\U0001d23a'): '/',
     ord('\U0001d20f'): '/',
     ord('\U0001d23b'): '/',
@@ -1253,7 +1257,7 @@ def self_test():
         'nested/id_rsa\u2afdx', 'Diagnostics\u2afbcapture.png', 'tokens.json\u244aextra.txt',
         'auth.json\u31d2secret.txt', 'credentials\u31d3token.txt', 'notes\u31d4id_rsa',
         'nested/id_rsa\u31d2x', 'Diagnostics\u31d3capture.png', 'tokens.json\u31d4extra.txt',
-        'auth.json\u3033secret.txt', 'credentials\U0001d23atoken.txt', 'notes\U0001d20fid_rsa',
+        'auth.json\u3033secret.txt', 'auth.json\u3034secret.txt', 'credentials\u3035token.txt', 'credentials\U0001d23atoken.txt', 'notes\U0001d20fid_rsa',
         'nested/id_rsa\U0001d23bx', 'Diagnostics\u3033capture.png', 'tokens.json\U0001d23aextra.txt',
         'auth.json\U0001f67csecret.txt', 'credentials\U0001f67dtoken.txt', 'notes\U0001f67cid_rsa',
         'nested/id_rsa\U0001f67dx', 'Diagnostics\U0001f67ccapture.png', 'tokens.json\U0001f67dextra.txt',
@@ -1387,7 +1391,7 @@ def self_test():
         'notes\u2afdreadme.txt', 'script.go\u2afbextra.txt', 'id_rsa.pub\u244afoo.txt',
         'models.json\u2afdreadme.txt',
         'notes\u31d2readme.txt', 'script.go\u31d3Zone.Identifier', 'id_rsa.pub\u31d4foo.txt',
-        'notes\u3033readme.txt', 'script.go\U0001d23aZone.Identifier', 'id_rsa.pub\U0001d20ffoo.txt',
+        'notes\u3033readme.txt', 'notes\u3034readme.txt', 'script.go\u3035Zone.Identifier', 'script.go\U0001d23aZone.Identifier', 'id_rsa.pub\U0001d20ffoo.txt',
         'models.json\U0001d23breadme.txt',
         'notes\U0001f67creadme.txt', 'script.go\U0001f67dZone.Identifier', 'id_rsa.pub\U0001f67cfoo.txt',
         'models.json\U0001f67dreadme.txt',
@@ -1709,7 +1713,7 @@ def self_test():
         raise SystemExit('self-test failed: a colon-lookalike personal path was not detected')
     if content_reasons('see \u2236 later'.encode()) or content_reasons('see \u0903 later'.encode()) or content_reasons('C\u2236/Users/other'.encode()) or content_reasons('C\u2025/Users/Mayn'.encode()) or content_reasons(('sk-' + '\u2236' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u0903' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary colon text was blocked')
-    if len(SEPARATOR_LIKE) != 77 or SEPARATOR_LIKE[0x00A5] != '/' or SEPARATOR_LIKE[0x20A9] != '/' or SEPARATOR_LIKE[0x2215] != '/' or SEPARATOR_LIKE[0x2216] != '/' or SEPARATOR_LIKE[0x2044] != '/' or SEPARATOR_LIKE[0xFE68] != '/' or SEPARATOR_LIKE[0x00BC] != '/' or SEPARATOR_LIKE[0xFF0F] != '/' or SEPARATOR_LIKE[0xFF3C] != '/' or SEPARATOR_LIKE.get(ord('/')) is not None or SEPARATOR_LIKE.get(0x2025) is not None:
+    if len(SEPARATOR_LIKE) != 79 or SEPARATOR_LIKE[0x00A5] != '/' or SEPARATOR_LIKE[0x20A9] != '/' or SEPARATOR_LIKE[0x2215] != '/' or SEPARATOR_LIKE[0x2216] != '/' or SEPARATOR_LIKE[0x2044] != '/' or SEPARATOR_LIKE[0xFE68] != '/' or SEPARATOR_LIKE[0x00BC] != '/' or SEPARATOR_LIKE[0xFF0F] != '/' or SEPARATOR_LIKE[0xFF3C] != '/' or SEPARATOR_LIKE.get(ord('/')) is not None or SEPARATOR_LIKE.get(0x2025) is not None:
         raise SystemExit('self-test failed: slash lookalike table is wrong')
     slash_yen = 'C:\u00a5Users\u00a5Mayn'.encode()
     slash_won = 'D:\u20a9Git_Project\u20a9kawang'.encode()
@@ -1720,7 +1724,7 @@ def self_test():
     slash_wide = 'C:\uff0fUsers\uff0fMayn'.encode()
     if any('personal Windows path' not in content_reasons(item) for item in (slash_yen, slash_won, slash_div, slash_set, slash_small, slash_frac, slash_wide)):
         raise SystemExit('self-test failed: a slash-lookalike personal path was not detected')
-    if content_reasons('see \u00a5 later'.encode()) or content_reasons('see \u30ce later'.encode()) or content_reasons('about \u00bc later'.encode()) or content_reasons('C:\u2215Users\u2215other'.encode()) or content_reasons('C:\u2215tmp\u2215Mayn'.encode()) or content_reasons(('sk-' + '\u2215' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u00a5' + 'a' * 20).encode()):
+    if content_reasons('see \u00a5 later'.encode()) or content_reasons('see \u3031 later'.encode()) or content_reasons('see \u3035 later'.encode()) or content_reasons('see \u30ce later'.encode()) or content_reasons('about \u00bc later'.encode()) or content_reasons('C:\u2215Users\u2215other'.encode()) or content_reasons('C:\u2215tmp\u2215Mayn'.encode()) or content_reasons(('sk-' + '\u2215' + 'a' * 30).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u00a5' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary slash text was blocked')
 
 def main():

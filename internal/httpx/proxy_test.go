@@ -809,14 +809,20 @@ func TestRedactHidesReverseSolidusInProxyPassword(t *testing.T) {
 	marked := strings.ReplaceAll(password, "\\", "\uFF3C")
 	small := strings.ReplaceAll(password, "\\", "\uFE68")
 	encoded := strings.ReplaceAll(password, "\\", "%EF%BC%BC")
+	greek := strings.ReplaceAll(password, "\\", "\U0001d23b")
+	encodedGreek := strings.ReplaceAll(password, "\\", "%F0%9D%88%BB")
+	kana := strings.ReplaceAll(password, "\\", "\u3035")
 	cases := []string{
 		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
 		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
 		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + greek,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encodedGreek,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + kana,
 	}
 	for _, in := range cases {
 		got := Redact(in)
-		for _, leaked := range []string{password, marked, small, encoded} {
+		for _, leaked := range []string{password, marked, small, encoded, greek, encodedGreek, kana} {
 			if strings.Contains(got, leaked) {
 				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
 			}
