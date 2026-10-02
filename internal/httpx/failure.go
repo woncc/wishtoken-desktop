@@ -35,7 +35,7 @@ func SanitizeFailure(detail string, secrets ...string) string {
 		if len(secret) < 8 {
 			continue
 		}
-		detail = maskEncodedSecret(detail, secret, "[redacted]")
+		detail = MaskEncodedSecret(detail, secret, "[redacted]")
 		if esc := url.QueryEscape(secret); esc != secret {
 			detail = strings.ReplaceAll(detail, esc, "[redacted]")
 		}

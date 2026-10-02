@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/xxx-holic/wishtoken-desktop/internal/httpx"
 )
 
 // redactManagement buffers a management response and removes OAuth material
@@ -85,15 +87,18 @@ func (s *Server) oauthSecrets() []string {
 }
 
 func replaceSecrets(raw []byte, secrets []string) []byte {
+	text := string(raw)
 	for _, secret := range secrets {
-		raw = bytes.ReplaceAll(raw, []byte(secret), []byte("[redacted]"))
+		// Exact bytes miss a token copied with a spacing mark or percent
+		// encoding. Mask the known secret without reformatting the JSON.
+		text = httpx.MaskEncodedSecret(text, secret, "[redacted]")
 		quoted, err := json.Marshal(secret)
 		if err != nil || len(quoted) < 2 {
 			continue
 		}
-		raw = bytes.ReplaceAll(raw, quoted[1:len(quoted)-1], []byte("[redacted]"))
+		text = httpx.MaskEncodedSecret(text, string(quoted[1:len(quoted)-1]), "[redacted]")
 	}
-	return raw
+	return []byte(text)
 }
 
 func blankCredentialFields(raw []byte) ([]byte, bool) {

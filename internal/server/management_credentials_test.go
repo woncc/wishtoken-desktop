@@ -220,3 +220,26 @@ func TestManagementHidesCredentialsSplitBySpacingMarks(t *testing.T) {
 		t.Fatalf("display context lost: %d %s", status, body)
 	}
 }
+
+func TestRedactHidesSecretsSplitBySpacingMarks(t *testing.T) {
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	f := newFixture(t, cfg, testAccount("acct_one", "one@example.test"))
+	acc := f.srv.Store.List()[0]
+	refresh := acc.RefreshToken
+	if len(refresh) < 12 {
+		t.Fatal("fixture refresh token is too short")
+	}
+	split := refresh[:4] + "\u093e" + refresh[4:]
+	encoded := refresh[:4] + "%E0%A4%BE" + refresh[4:]
+	body := []byte(`{"note":"see ` + split + ` and ` + encoded + `","access_token":"` + acc.AccessToken + `"}`)
+	out := string(f.srv.redactManagementBody(body))
+	for _, leaked := range []string{refresh, split, encoded, acc.AccessToken} {
+		if strings.Contains(out, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, out)
+		}
+	}
+	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") {
+		t.Fatalf("note was rewritten: %s", out)
+	}
+}

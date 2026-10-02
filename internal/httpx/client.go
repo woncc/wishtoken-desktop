@@ -290,16 +290,18 @@ func maskProxyPassword(redacted, password string) string {
 	}
 	// url.URL.Redacted keeps RawQuery and RawFragment. A password hidden there
 	// by one or more layers of percent-encoding must not survive either.
-	redacted = maskEncodedSecret(redacted, password, "xxxxx")
+	redacted = MaskEncodedSecret(redacted, password, "xxxxx")
 	if esc := url.QueryEscape(password); esc != password {
 		redacted = strings.ReplaceAll(redacted, esc, "xxxxx")
 	}
 	return redacted
 }
 
-// maskEncodedSecret replaces secret even when some or all of its bytes are
-// percent-encoded, including nested escapes such as %2573 for 's'.
-func maskEncodedSecret(s, secret, repl string) string {
+// MaskEncodedSecret replaces secret even when some or all of its bytes are
+// percent-encoded, including nested escapes such as %2573 for 's'. Marks that
+// do not add a base letter are ignored while matching, and the surrounding
+// text is not reformatted.
+func MaskEncodedSecret(s, secret, repl string) string {
 	if secret == "" || s == "" || repl == "" {
 		return s
 	}
