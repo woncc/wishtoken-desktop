@@ -70,6 +70,13 @@ COLON_LIKE = {
     ord('\u2255'): ':',
     ord('\u2982'): ':',
     ord('\u2af6'): ':',
+    # These do not NFKC-fold to ':'. Cuneiform colon punctuation and the
+    # SignWriting colon still separate a following private name.
+    ord('\U00012471'): ':',
+    ord('\U00012472'): ':',
+    ord('\U00012473'): ':',
+    ord('\U00012474'): ':',
+    ord('\U0001DA8A'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -353,6 +360,8 @@ def self_test():
         'nested/file\u2a74accounts.json', 'ID_RSA\u2a74x', 'file\u2a74.netrc',
         'readme\u205dauth.json', 'notes\u2254id_rsa', 'file\u2255credentials.json',
         'docs\u2982accounts.json', 'nested/file\u2af6.netrc', 'ID_RSA\u205dx',
+        'readme\U00012471auth.json', 'notes\U00012472id_rsa', 'file\U00012473credentials.json',
+        'docs\U00012474accounts.json', 'nested/file\U0001DA8A.netrc', 'ID_RSA\U00012473x',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -376,6 +385,7 @@ def self_test():
         'notes\U00010781readme.txt', 'script.go\U00010782Zone.Identifier', 'models.json\U00010781readme.txt',
         'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
         'notes\u205dreadme.txt', 'script.go\u2254Zone.Identifier', 'models.json\u2af6readme.txt',
+        'notes\U00012471readme.txt', 'script.go\U00012472Zone.Identifier', 'models.json\U0001DA8Areadme.txt',
         'models.json\u0589readme',
     )
     for rel in blocked:

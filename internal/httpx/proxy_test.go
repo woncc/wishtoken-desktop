@@ -437,6 +437,50 @@ func TestRedactHidesColonOperators(t *testing.T) {
 	}
 }
 
+func TestRedactHidesHistoricColons(t *testing.T) {
+	const password = "s3cret-proxy"
+	// Cuneiform colon punctuation and the SignWriting colon do not NFKC-fold
+	// to ASCII ':'.
+	runes := []rune{'\U00012471', '\U00012472', '\U00012473', '\U00012474', '\U0001DA8A'}
+	for _, r := range runes {
+		raw := string(r)
+		encoded := encodeEveryByte(raw)
+		nested := encodeEveryByte(encoded)
+		cases := []string{
+			"http://user" + raw + password + "@127.0.0.1:7890",
+			"user" + raw + password + "@127.0.0.1:7890",
+			"http://user" + encoded + password + "@127.0.0.1:7890",
+			"http://user" + nested + password + "@127.0.0.1:7890",
+			"http://user" + raw + password + "%zz@127.0.0.1:7890",
+			"http://user" + raw + password + "\uFF20127.0.0.1:7890",
+		}
+		for _, in := range cases {
+			got := Redact(in)
+			for _, leaked := range []string{password, raw + password, encoded + password, nested + password} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+				}
+			}
+			if !strings.Contains(got, "xxxxx") {
+				t.Fatalf("redact %q did not mask password: %q", in, got)
+			}
+			if again := Redact(got); strings.Contains(again, password) {
+				t.Fatalf("second redact leaked: %q", again)
+			}
+			if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+				t.Fatalf("preserve %q -> %q", in, kept)
+			}
+		}
+	}
+	short := Redact("http://user\U00012471name@127.0.0.1:7890")
+	if strings.Contains(short, "\U00012471") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a historic colon: %q", short)
+	}
+	if Redact("http://user\U0001DA8A@127.0.0.1:7890") != "http://user\U0001DA8A@127.0.0.1:7890" {
+		t.Fatal("historic colon without a password was rewritten")
+	}
+}
+
 func TestRedactHidesAtSignLookalikes(t *testing.T) {
 	const password = "s3cret-proxy"
 	const other = "other-secret"

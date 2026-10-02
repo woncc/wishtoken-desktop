@@ -166,12 +166,13 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 // foldUserinfoColons maps colon characters that can conceal a proxy password.
 // NFKC folds the three compatibility colons to ASCII ':'. Superscript
 // triangular colons fold to the modifier colons, and double colon equal
-// expands to '::='. The remaining lookalikes do not fold at all. url.Parse
-// rejects every one of them as invalid userinfo, so an unlisted character
-// would otherwise be returned with its password intact. The Go core has no
+// expands to '::='. The remaining lookalikes do not fold at all, including
+// cuneiform colon punctuation and the SignWriting colon. url.Parse rejects
+// every one of them as invalid userinfo, so an unlisted character would
+// otherwise be returned with its password intact. The Go core has no
 // Unicode normalization dependency, so each one is listed.
 func foldUserinfoColons(s string) string {
-	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6"
+	const lookalikes = "\ufe13\ufe55\uff1a\u2236\u02d0\u02d1\U00010781\U00010782\ua789\u02f8\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u0589\u05c3\u1361\u1365\u1366\u205a\u205d\u1804\ua6f4\u2a74\u2254\u2255\u2982\u2af6\U00012471\U00012472\U00012473\U00012474\U0001DA8A"
 	if !strings.ContainsAny(s, lookalikes) {
 		return s
 	}
@@ -207,6 +208,11 @@ func foldUserinfoColons(s string) string {
 		"\u2255", ":",
 		"\u2982", ":",
 		"\u2af6", ":",
+		"\U00012471", ":",
+		"\U00012472", ":",
+		"\U00012473", ":",
+		"\U00012474", ":",
+		"\U0001DA8A", ":",
 	).Replace(s)
 }
 
