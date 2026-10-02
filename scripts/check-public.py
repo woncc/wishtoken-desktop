@@ -59,6 +59,9 @@ COLON_LIKE = {
     # superscript from hiding the stream split if normalization is reordered.
     ord('\U00010781'): ':',
     ord('\U00010782'): ':',
+    # NFKC expands this to '::=', which leaves '=' stuck to the next name.
+    # Fold it before normalization so the stream split still sees that name.
+    ord('\u2a74'): ':',
 }
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
@@ -86,9 +89,11 @@ def forbidden_name(folded):
 
 def normalize_component(name):
     # Compatibility forms such as fullwidth letters and colons fold to ASCII.
+    # Colon lookalikes are folded first: double colon equal expands to '::='
+    # and would otherwise leave '=' glued to the following stream name.
     # Format, control, and line-separator characters can sit inside a name
     # without changing how a person reads it.
-    folded = unicodedata.normalize('NFKC', name).translate(DOT_LIKE).translate(COLON_LIKE).casefold()
+    folded = unicodedata.normalize('NFKC', name.translate(COLON_LIKE)).translate(DOT_LIKE).translate(COLON_LIKE).casefold()
     return ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
 
 def strip_edges(value):
@@ -184,7 +189,9 @@ SEPARATOR_LIKE = {
 }
 
 def normalized_rel(rel):
-    folded = unicodedata.normalize('NFKC', rel).translate(DOT_LIKE).translate(SEPARATOR_LIKE)
+    # Fold colon lookalikes before NFKC. Double colon equal expands to '::='
+    # and would otherwise glue '=' onto the following name.
+    folded = unicodedata.normalize('NFKC', rel.translate(COLON_LIKE)).translate(DOT_LIKE).translate(SEPARATOR_LIKE).translate(COLON_LIKE)
     return folded.replace('\\', '/')
 
 def forbidden_suffix(name):
@@ -334,6 +341,8 @@ def self_test():
         'docs\ua6f4credentials.json', 'nested/file\u1804accounts.json', 'ID_RSA\ua6f4x',
         'readme\U00010781auth.json', 'notes\U00010782id_rsa', 'auth.json\U00010781secret',
         'docs\U00010782credentials.json', 'nested/file\U00010781accounts.json', 'ID_RSA\U00010782x',
+        'readme\u2a74auth.json', 'notes\u2a74id_rsa', 'docs\u2a74credentials.json',
+        'nested/file\u2a74accounts.json', 'ID_RSA\u2a74x', 'file\u2a74.netrc',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -355,6 +364,7 @@ def self_test():
         'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
         'notes\u1804readme.txt', 'script.go\ua6f4Zone.Identifier', 'models.json\u1804readme.txt',
         'notes\U00010781readme.txt', 'script.go\U00010782Zone.Identifier', 'models.json\U00010781readme.txt',
+        'notes\u2a74readme.txt', 'script.go\u2a74Zone.Identifier', 'id_rsa.pub\u2a74extra',
         'models.json\u0589readme',
     )
     for rel in blocked:

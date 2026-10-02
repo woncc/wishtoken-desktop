@@ -137,7 +137,7 @@ func isColonSeparator(r rune) bool {
 	case ':', '\ufe13', '\ufe55', '\uff1a', '\u2236', '\u02d0', '\u02d1', '\U00010781', '\U00010782', '\ua789', '\u02f8',
 		'\u0703', '\u0704', '\u0705', '\u0706', '\u0707', '\u0708', '\u0709',
 		'\u0589', '\u05c3', '\u1361', '\u1365', '\u1366', '\u205a',
-		'\u1804', '\ua6f4':
+		'\u1804', '\ua6f4', '\u2a74':
 		return true
 	default:
 		return false
