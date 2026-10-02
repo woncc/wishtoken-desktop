@@ -781,3 +781,111 @@ func TestRedactHidesAtSignLookalikes(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHidesExclamationInProxyPassword(t *testing.T) {
+	const password = "s3cret!proxy"
+	marked := strings.ReplaceAll(password, "!", "\uFF01")
+	small := strings.ReplaceAll(password, "!", "\uFE57")
+	vertical := strings.ReplaceAll(password, "!", "\uFE15")
+	encoded := strings.ReplaceAll(password, "!", "%EF%BC%81")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + vertical,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, vertical, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+	}
+}
+
+func TestRedactHidesReverseSolidusInProxyPassword(t *testing.T) {
+	const password = "s3cret\\proxy"
+	marked := strings.ReplaceAll(password, "\\", "\uFF3C")
+	small := strings.ReplaceAll(password, "\\", "\uFE68")
+	encoded := strings.ReplaceAll(password, "\\", "%EF%BC%BC")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+	}
+}
+
+func TestRedactHidesNumberSignInProxyPassword(t *testing.T) {
+	const password = "s3cret#proxy"
+	marked := strings.ReplaceAll(password, "#", "\uFF03")
+	small := strings.ReplaceAll(password, "#", "\uFE5F")
+	encoded := strings.ReplaceAll(password, "#", "%EF%BC%83")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+	}
+}
+
+func TestRedactHidesDollarSignInProxyPassword(t *testing.T) {
+	const password = "s3cret$proxy"
+	marked := strings.ReplaceAll(password, "$", "\uFF04")
+	small := strings.ReplaceAll(password, "$", "\uFE69")
+	encoded := strings.ReplaceAll(password, "$", "%EF%BC%84")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") {
+			t.Fatalf("host lost: %q", got)
+		}
+	}
+}
+
+func TestRedactHidesAmpersandInProxyPassword(t *testing.T) {
+	const password = "s3cret&proxy"
+	marked := strings.ReplaceAll(password, "&", "\uFF06")
+	small := strings.ReplaceAll(password, "&", "\uFE60")
+	encoded := strings.ReplaceAll(password, "&", "%EF%BC%86")
+	cases := []string{
+		"http://user:" + password + "@127.0.0.1:7890?q=" + marked,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + small,
+		"http://user:" + password + "@127.0.0.1:7890?q=" + encoded,
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, marked, small, encoded} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "127.0.0.1") {
+			t.Fatalf("host lost: %q", got)
+		}
+	}
+}

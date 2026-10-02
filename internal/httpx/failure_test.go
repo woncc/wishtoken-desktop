@@ -1737,3 +1737,335 @@ func fullwidthHexEscapes(encoded string) string {
 	}
 	return b.String()
 }
+
+func TestSanitizeFailureStripsExclamationMarks(t *testing.T) {
+	secret := "code!ver1"
+	marked := strings.ReplaceAll(secret, "!", "\uFE57")
+	encoded := strings.ReplaceAll(secret, "!", "%EF%BC%81")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.ReplaceAll(secret, "!", "\uFE15")
+	full := strings.ReplaceAll(secret, "!", "\uFF01")
+	got = SanitizeFailure("rejected "+vertical+" "+full+" later", secret)
+	for _, item := range []string{secret, vertical, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u00a1 later",
+		"see \u01c3 later",
+		"see \u203c later",
+		"see \u2049 later",
+		"see \u2757 later",
+		"see \u2762 later",
+		"path \uff01 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("exclamation prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestExclamationASCIIFoldsOnlyExclamationMarks(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE15, '!', true},
+		{0xFE57, '!', true},
+		{0xFF01, '!', true},
+		{'!', 0, false},
+		{0x00A1, 0, false},
+		{0x01C3, 0, false},
+		{0x203C, 0, false},
+		{0x2049, 0, false},
+		{0x2757, 0, false},
+		{0x2762, 0, false},
+		{0xFF1F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := exclamationASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := exclamationASCII(r); ok {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("exclamation fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsReverseSolidus(t *testing.T) {
+	secret := "code\\ver1"
+	marked := strings.ReplaceAll(secret, "\\", "\uFE68")
+	encoded := strings.ReplaceAll(secret, "\\", "%EF%BC%BC")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "\\", "\uFF3C")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2216 later",
+		"see \u29f5 later",
+		"see \u29f9 later",
+		"see \u00a5 later",
+		"see \u20a9 later",
+		"see \u244a later",
+		"path \uff3c file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("reverse solidus prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE68, '\\', true},
+		{0xFF3C, '\\', true},
+		{'\\', 0, false},
+		{0x00A5, 0, false},
+		{0x20A9, 0, false},
+		{0x2216, 0, false},
+		{0x29F5, 0, false},
+		{0x29F9, 0, false},
+		{0x244A, 0, false},
+		{0xFF0F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := reverseSolidusASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := reverseSolidusASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("reverse solidus fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsNumberSigns(t *testing.T) {
+	secret := "code#ver1"
+	marked := strings.ReplaceAll(secret, "#", "\uFE5F")
+	encoded := strings.ReplaceAll(secret, "#", "%EF%BC%83")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "#", "\uFF03")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u266f later",
+		"see \u2317 later",
+		"see \u203b later",
+		"path \uff03 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("number sign prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestNumberSignASCIIFoldsOnlyNumberSigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE5F, '#', true},
+		{0xFF03, '#', true},
+		{'#', 0, false},
+		{0x266F, 0, false},
+		{0x2317, 0, false},
+		{0x203B, 0, false},
+		{0xFF04, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := numberSignASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := numberSignASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("number sign fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsDollarSigns(t *testing.T) {
+	secret := "code$ver1"
+	marked := strings.ReplaceAll(secret, "$", "\uFE69")
+	encoded := strings.ReplaceAll(secret, "$", "%EF%BC%84")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "$", "\uFF04")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u1f4b2 later",
+		"see \u00a2 later",
+		"see \u00a3 later",
+		"see \u20ac later",
+		"path \uff04 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("dollar prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestDollarASCIIFoldsOnlyDollarSigns(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE69, '$', true},
+		{0xFF04, '$', true},
+		{'$', 0, false},
+		{0x1F4B2, 0, false},
+		{0x00A2, 0, false},
+		{0x00A3, 0, false},
+		{0x00A4, 0, false},
+		{0x20AC, 0, false},
+		{0xFF03, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := dollarASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := dollarASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("dollar fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsAmpersands(t *testing.T) {
+	secret := "code&ver1"
+	marked := strings.ReplaceAll(secret, "&", "\uFE60")
+	encoded := strings.ReplaceAll(secret, "&", "%EF%BC%86")
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	full := strings.ReplaceAll(secret, "&", "\uFF06")
+	got = SanitizeFailure("rejected "+full+" later", secret)
+	for _, item := range []string{secret, full, "code", "ver1"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("fullwidth leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u214b later",
+		"see \U0001f674 later",
+		"see \U0001f675 later",
+		"path \uff06 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("ampersand prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestAmpersandASCIIFoldsOnlyAmpersands(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFE60, '&', true},
+		{0xFF06, '&', true},
+		{'&', 0, false},
+		{0x214B, 0, false},
+		{0x1F674, 0, false},
+		{0x1F675, 0, false},
+		{0xFF05, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := ampersandASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := ampersandASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("ampersand fold count %d", n)
+	}
+}
