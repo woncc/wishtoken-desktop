@@ -81,6 +81,9 @@ const SECRET_TEXT = [
 // already do. Percent-encoding hides the same cut, including a nested
 // %252F, and U+FF0F U+FE16 U+FE56 U+FF1F U+FE5F U+FF03 fold to those marks.
 // Otherwise "user:secret@my-proxy:7890%2Fnext" keeps the password.
+// A whitespace character ends the host too. The literal forms already do.
+// Percent-encoding hides that cut, including a nested %2520. Otherwise
+// "user:secret@my-proxy:7890%20next" keeps the password.
 const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃]';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃]';
 const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃]';
@@ -216,7 +219,18 @@ function pathTail() {
   return `(?:${parts.join('|')})`;
 }
 const PATH_JOIN = pathTail();
-const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN})`;
+// These are the characters /\s/ already treats as a host boundary.
+const SPACE_CHARS = ['\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020', '\u00A0', '\u1680', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u2028', '\u2029', '\u202F', '\u205F', '\u3000', '\uFEFF'];
+function spaceTail() {
+  const parts = [];
+  for (const char of SPACE_CHARS) {
+    const encoded = percentBytes(char);
+    for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
+  }
+  return `(?:${parts.join('|')})`;
+}
+const SPACE_JOIN = spaceTail();
+const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN})`;
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
