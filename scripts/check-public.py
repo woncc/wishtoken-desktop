@@ -32,6 +32,27 @@ COMPRESSED_SUFFIXES = {'.gz', '.gzip', '.bz2', '.xz', '.zst', '.br', '.7z', '.ta
 PARTIAL_SUFFIXES = {'.crdownload', '.part', '.partial', '.download'}
 # NFKC folds a halfwidth full stop into an ideographic one, which is still not ASCII '.'.
 DOT_LIKE = {ord('\u3002'): '.'}
+# These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
+COLON_LIKE = {
+    ord('\u2236'): ':',
+    ord('\u02d0'): ':',
+    ord('\u02d1'): ':',
+    ord('\ua789'): ':',
+    ord('\u02f8'): ':',
+    ord('\u0703'): ':',
+    ord('\u0704'): ':',
+    ord('\u0705'): ':',
+    ord('\u0706'): ':',
+    ord('\u0707'): ':',
+    ord('\u0708'): ':',
+    ord('\u0709'): ':',
+    ord('\u0589'): ':',
+    ord('\u05c3'): ':',
+    ord('\u1361'): ':',
+    ord('\u1365'): ':',
+    ord('\u1366'): ':',
+    ord('\u205a'): ':',
+}
 BACKUP_SUFFIXES = {
     '.orig', '.save', '.old', '.copy', '.backup', '.bak2',
     '.swp', '.swo', '.swn', '.tmp',
@@ -60,7 +81,7 @@ def normalize_component(name):
     # Compatibility forms such as fullwidth letters and colons fold to ASCII.
     # Format, control, and line-separator characters can sit inside a name
     # without changing how a person reads it.
-    folded = unicodedata.normalize('NFKC', name).translate(DOT_LIKE).casefold()
+    folded = unicodedata.normalize('NFKC', name).translate(DOT_LIKE).translate(COLON_LIKE).casefold()
     return ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
 
 def strip_edges(value):
@@ -154,14 +175,24 @@ def normalized_rel(rel):
     folded = unicodedata.normalize('NFKC', rel).translate(DOT_LIKE).translate(SEPARATOR_LIKE)
     return folded.replace('\\', '/')
 
-def component_private(part):
-    name = visible_name(part)
+def forbidden_suffix(name):
     if not name:
         return False
-    if name in FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name):
+    if name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')):
         return True
-    suffix = Path(name).suffix
-    return name.startswith('.env.') or name.startswith(('sub2api-account-', 'sub2api-rotation-')) or suffix in FORBIDDEN_SUFFIXES
+    # A colon splits an NTFS stream name. The stream can still end in .log or
+    # .bak.txt, so judge the unsplit filename before that split is trusted.
+    folded = strip_alias(name)
+    return Path(name).suffix in FORBIDDEN_SUFFIXES or Path(folded).suffix in FORBIDDEN_SUFFIXES
+
+def component_private(part):
+    name = visible_name(part)
+    whole = strip_edges(normalize_component(part))
+    if not name and not whole:
+        return False
+    if name and (name in FOLD_PARTS or name in FOLD_NAMES or secret_alias(name) or private_filename(name)):
+        return True
+    return forbidden_suffix(name) or (whole != name and forbidden_suffix(whole))
 
 def path_reason(rel):
     # A private name is not safe just because a later component looks ordinary.
@@ -261,6 +292,10 @@ def self_test():
         'auth.json\u00a5secret.txt', 'tokens.json\u20a9extra.txt', 'auth.json\uff0fsecret.txt',
         'accounts.json\uff3cnotes.txt', 'Diagnostics\u2044capture.png', 'auth.json\u200b/payload.txt',
         'auth.json.crdownload', 'auth.json.part', 'credentials.json.partial', 'accounts.json.download',
+        'auth.json\u0705secret.txt', 'id_rsa\u02d1', 'accounts.json\u1365extra', 'tokens.json\u205anotes',
+        'credentials\u05c3token', 'nested/auth.json\u0709/payload.txt', 'ID_RSA\u0706x', 'auth.json\u2236secret.txt',
+        'Copy of auth.json\u1361notes', 'auth\u3002json\u0708secret', 'notes.bak\u0589readme',
+        'notes\u0705trace.log', 'readme\u0705trace.log.txt', 'notes:trace.log',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -277,6 +312,8 @@ def self_test():
         'notes\\readme.txt', 'readme\u2044notes.txt', 'script.go\u00a5extra.txt',
         'models.json\uff0freadme.txt',
         'readme.br', 'notes.tar', 'script.go.part', 'models.json.7z', 'readme.tgz', 'notes.crdownload',
+        'script.go\u0705extra', 'notes\u1365txt', 'readme\u205anotes.txt', 'id_rsa.pub\u02d1extra',
+        'models.json\u0589readme',
     )
     for rel in blocked:
         if not path_reason(rel):
