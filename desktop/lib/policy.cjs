@@ -572,11 +572,11 @@ function htmlProxyChar(cp) {
   // U+FF3F fold to "_". "&lowbar;" and "&UnderBar;" are U+005F.
   // U+FF21..U+FF3A and U+FF41..U+FF5A fold to ASCII letters. U+24B6..U+24E9
   // fold to ASCII letters too. Letterlike symbols that fold to one ASCII
-  // letter do as well. A numeric reference has to yield the same character
-  // so the label fold can see it.
+  // letter do as well, and so do U+00AA, U+00BA, and U+017F. A numeric
+  // reference has to yield the same character so the label fold can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp)) return char;
   if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -991,8 +991,55 @@ function decodeEncodedLetterlikeLetters(text) {
 function foldLetterlikeLetters(text) {
   return text.replace(LETTERLIKE_FOLD, char => LETTERLIKE_ASCII[char]);
 }
+// U+00AA and U+00BA fold to "a" and "o". U+017F folds to "s". A
+// single-label or dotted host already allows those letters. Their literal,
+// percent-encoded, and numeric forms kept the password too. Otherwise
+// "user:secret@my\u017Fproxy:7890" and "user:secret@ex\u00AAmple.com:8080"
+// keep the password. The micro sign and modifier letters stay as written.
+const LATIN_COMPAT_ASCII = {
+  '\u00AA': 'a',
+  '\u00BA': 'o',
+  '\u017F': 's'
+};
+const LATIN_COMPAT_FOLD = new RegExp(`[${Object.keys(LATIN_COMPAT_ASCII).join('')}]`, 'g');
+function isLatinCompatLetter(cp) {
+  return Object.prototype.hasOwnProperty.call(LATIN_COMPAT_ASCII, String.fromCodePoint(cp));
+}
+function readEncodedLatinCompatLetter(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 2; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xC2 || lead > 0xDF || bytes[1] < 0x80 || bytes[1] > 0xBF) return null;
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isLatinCompatLetter(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedLatinCompatLetters(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const letter = readEncodedLatinCompatLetter(text, index);
+    if (letter) {
+      out += letter.char;
+      index = letter.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldLatinCompatLetters(text) {
+  return text.replace(LATIN_COMPAT_FOLD, char => LATIN_COMPAT_ASCII[char]);
+}
 function redactProxyCredentials(text) {
-  const decoded = foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))));
+  const decoded = foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedLabelPunct(text))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
