@@ -5030,3 +5030,51 @@ func TestTagPercentFoldIsOnlyThatCharacter(t *testing.T) {
 		t.Fatalf("tag percent joined the credential fold")
 	}
 }
+
+func TestSanitizeFailureStripsTagCommercialAt(t *testing.T) {
+	secret := "code@verifier12"
+	mark := "code\U000E0040verifier12"
+	encoded := "code%F3%A0%81%80verifier12"
+	inserted := "code@\U000E0040verifier12"
+	mixedSecret := "rt%Zz9q@ab7f"
+	mixed := "rt\U000E0025Zz9q\U000E0040ab7f"
+	text := "rejected " + mark + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "code@verifier12code@verifier12")
+	for _, leaked := range []string{secret, mark, encoded, inserted, mixedSecret, mixed, "verifier12", "Zz9q", "ab7f"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "code\U000E0040verifier12"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "verifier12"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag commercial at leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0040 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag commercial at prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagCommercialAtFoldIsOnlyThatCharacter(t *testing.T) {
+	folded, ok := foldTagCommercialAtPieces(rawPieces("code\U000E0040verifier12"))
+	if !ok || renderPieces(folded) != "code@verifier12" {
+		t.Fatalf("folded %q ok=%v", renderPieces(folded), ok)
+	}
+	if _, ok := foldTagCommercialAtPieces(rawPieces("code@verifier12")); ok {
+		t.Fatalf("ascii commercial at was folded")
+	}
+	if foldTagCommercialAtString("100\U000E0025done") != "100\U000E0025done" {
+		t.Fatalf("tag percent was treated as a commercial at")
+	}
+}
