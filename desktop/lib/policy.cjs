@@ -167,9 +167,16 @@ const SECRET_TEXT = [
 // U+3002 does not fold to ".". U+FE12 and U+FF61 fold to U+3002. Those marks
 // already end a host, but "user:secret@127%E3%80%820%E3%80%820%E3%80%821:7890"
 // kept the password because they did not split labels.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD\u2254\u2255\u29F4\u2A74]';
+// Format characters and default ignorables are not part of a host, but they
+// are also a boundary. Deleting one after a port would glue the next word on
+// and keep the password. A mark counts inside a label only when another host
+// character follows; otherwise the existing tail check still sees it.
+// Supplementary format characters fold to U+200B first. U+200B is in this set.
+const PROXY_MARK = '\u00AD\u034F\u0600\u0601\u0602\u0603\u0604\u0605\u061C\u06DD\u070F\u0890\u0891\u08E2\u115F\u1160\u180E\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206A\u206B\u206C\u206D\u206E\u206F\u3164\uFE00\uFE01\uFE02\uFE03\uFE04\uFE05\uFE06\uFE07\uFE08\uFE09\uFE0A\uFE0B\uFE0C\uFE0D\uFE0E\uFE0F\uFEFF\uFFA0\uFFF9\uFFFA\uFFFB';
+const MARK = `[${PROXY_MARK}]`;
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30:\uFE13\uFE55\uFF1A\u2236\u02D0\uA789\u02F8\u0703\u0704\u0589\u1803\u1809\u2237\u2E2C\u0705\u0706\u0707\u0708\u0709\u1393\u1365\u1366\u1804\u02D1\u05C3\u0831\u0903\u0A83\u1361\u16EC\u205A\uA4FD\u2254\u2255\u29F4\u2A74' + PROXY_MARK + ']';
 const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
-const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30]';
+const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F．﹒․。︒｡··ᐧ‧∙⋅⸱・･\u2022\u2023\u2043\u204C\u204D\u25E6\u29BF\u0964\u0965\u06D4\u0701\u0702\u2025\uFE30' + PROXY_MARK + ']';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
 // U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
@@ -273,12 +280,13 @@ const FULLWIDTH_DIGIT = '%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb][Cc]%(?:25){0,3}9\\
 const ALT_DIGIT = '[\\u00B2\\u00B3\\u00B9\\u2070\\u2074-\\u2079\\u2080-\\u2089]';
 const ALT_DIGIT_ENC = '(?:%(?:25){0,3}[Cc]2%(?:25){0,3}[Bb][239]|%(?:25){0,3}[Ee]2%(?:25){0,3}81%(?:25){0,3}[Bb][04-9]|%(?:25){0,3}[Ee]2%(?:25){0,3}82%(?:25){0,3}8\\d)';
 const DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
-const numericLabel = `(?:${DIGIT}{1,4}|0[xX][0-9A-Fa-f]{1,8})`;
-const domainLabel = '[A-Za-z0-9-]+';
-const literalDomain = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
-const encodedDomain = `${domainLabel}(?:${DOT_SEP}${domainLabel})*${DOT_SEP}[A-Za-z]{2,}`;
-const fourNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){3}`;
-const shortNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){0,2}`;
+const numericLabel = `(?:(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){1,4}|0[xX][0-9A-Fa-f]{1,8})`;
+const domainLabel = `(?:[A-Za-z0-9-](?:${MARK}(?=[A-Za-z0-9-]))?)+`;
+const literalDomain = `(?:[A-Za-z0-9.-](?:${MARK}(?=[A-Za-z0-9.-]))?)+\\.(?:[A-Za-z](?:${MARK}(?=[A-Za-z]))?){2,}`;
+const encodedDomain = `${domainLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${domainLabel})*${MARK}?(?=${DOT_SEP})${DOT_SEP}(?:[A-Za-z](?:${MARK}(?=[A-Za-z]))?){2,}`;
+const fourNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numericLabel}){3}`;
+const shortNumeric = `${numericLabel}(?:${MARK}?(?=${DOT_SEP})${DOT_SEP}${numericLabel}){0,2}`;
+const LOCAL_HOST = 'localhost'.split('').map((ch, index, chars) => ch + (index < chars.length - 1 ? `(?:${MARK}(?=${chars[index + 1]}))?` : '')).join('');
 const PORT_DIGIT = `(?:\\d|[\\uFF10-\\uFF19]|${ALT_DIGIT}|%3\\d|%25(?:25){0,2}3\\d|${FULLWIDTH_DIGIT}|${ALT_DIGIT_ENC})`;
 // U+FF06 U+FE60 fold to "&". U+FF1D U+FE66 U+207C U+208C fold to "=".
 const QUERY_CHARS = ['\uFF06', '\uFE60', '\uFF1D', '\uFE66', '\u207C', '\u208C'];
@@ -429,7 +437,7 @@ function stopTail() {
   return `(?:${parts.join('|')})`;
 }
 const STOP_JOIN = stopTail();
-const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
+const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_HOST}|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${MARK}*${proxyPort}${PORT_DIGIT}+)?|(?:${MARK})*(?:${shortNumeric}|(?:${DIGIT}(?:${MARK}(?=${DIGIT}))?){4,10}|[A-Za-z](?:[A-Za-z0-9_-]|${MARK}(?=[A-Za-z0-9_-]))*)${MARK}*${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN}|${PERIOD_JOIN}|${COLON_SEP}|${MIDDLE_JOIN}|${STOP_JOIN})`;
 // "&#58;", "&#x3A;", and "&colon;" are a colon. "&#64;" and "&commat;" are "@".
 // The same references hide a digit or a host dot, and a numeric reference may
 // omit its semicolon. Nested "&amp;#58;" is still a colon. Decode those marks
@@ -510,7 +518,16 @@ function htmlProxyChar(cp) {
   const char = String.fromCodePoint(cp);
   return PROXY_HTML_CHARS.has(char) ? char : '';
 }
+const PROXY_MARK_CODES = new Set(Array.from(PROXY_MARK, char => char.codePointAt(0)));
+const SUPP_INVISIBLE = /[\u{110BD}\u{110CD}\u{13430}-\u{1343F}\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0001}\u{E0020}-\u{E007F}\u{E0100}-\u{E01EF}]/gu;
+function isProxyMark(char) {
+  return PROXY_MARK_CODES.has(char.codePointAt(0));
+}
+function foldProxyInvisibles(text) {
+  return text.replace(SUPP_INVISIBLE, '\u200B');
+}
 function readHtmlAtom(text, index) {
+  while (index < text.length && isProxyMark(text[index])) index += 1;
   if (index >= text.length) return null;
   const encoded = /^%(?:25){0,3}([0-9A-Fa-f]{2})/.exec(text.slice(index));
   if (encoded) {
@@ -612,7 +629,7 @@ function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
 function redactProxyCredentials(text) {
-  const decoded = decodeProxyHtml(String(text));
+  const decoded = decodeProxyHtml(foldProxyInvisibles(String(text)));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
