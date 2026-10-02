@@ -4345,11 +4345,12 @@ func numberSignASCII(r rune) (byte, bool) {
 	}
 }
 
-// foldReverseSolidusPieces maps small and fullwidth reverse solidus to ASCII.
-// NFKC folds them, and this pass does not run NFKC, so a stored secret
-// written with those forms would stay visible. Set minus, the reverse
-// solidus operator, and big reverse solidus do not fold to a backslash.
-// Yen and won signs do not either. One output piece covers the original rune.
+// foldReverseSolidusPieces maps reverse-solidus characters to ASCII.
+// NFKC folds the small and fullwidth forms. Yen, won, set minus, the reverse
+// solidus operator, the stroked form, big reverse solidus, and the OCR double
+// backslash do not, but a management response can still hide a stored
+// backslash with them. This pass does not run NFKC. Forward solidus
+// lookalikes fold to '/'. One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -4395,7 +4396,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0xFE68, 0xFF3C:
+	case 0x00A5, 0x20A9, 0x2216, 0x244A, 0x29F5, 0x29F7, 0x29F9, 0xFE68, 0xFF3C:
 		return '\\', true
 	default:
 		return 0, false
@@ -4654,13 +4655,14 @@ func parenASCII(r rune) (byte, bool) {
 	}
 }
 
-// foldSolidusTildePieces maps fullwidth solidus and fullwidth tilde to ASCII.
-// NFKC folds them, and this pass does not run NFKC, so a bearer token, an
-// opaque token, or a stored secret written with those forms would stay
-// visible. Division slash, fraction slash, and big solidus do not fold to
-// '/', and a reverse solidus folds to a backslash. Tilde operator, swung
-// dash, and wave dash do not fold to '~'. Small tilde expands to a space
-// plus a mark, so it stays out. One output piece covers the original rune.
+// foldSolidusTildePieces maps solidus and tilde characters to ASCII.
+// NFKC folds fullwidth solidus and fullwidth tilde. Division slash, fraction
+// slash, solidus with overbar, and big solidus do not, but a management
+// response can still hide a stored slash with them. This pass does not run
+// NFKC. A reverse solidus folds to a backslash on its own pass. Tilde
+// operator, swung dash, and wave dash do not fold to '~'. Small tilde
+// expands to a space plus a mark, so it stays out. One output piece covers
+// the original rune.
 func foldSolidusTildePieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
 		return in
@@ -4706,7 +4708,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0xFF0F:
+	case 0x2044, 0x2215, 0x29F6, 0x29F8, 0xFF0F:
 		return '/', true
 	case 0xFF5E:
 		return '~', true

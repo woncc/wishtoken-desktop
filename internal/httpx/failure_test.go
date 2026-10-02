@@ -1549,11 +1549,16 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 	}{
 		{0xFF0F, '/', true},
 		{0xFF5E, '~', true},
+		{0x2044, '/', true},
+		{0x2215, '/', true},
+		{0x29F6, '/', true},
+		{0x29F8, '/', true},
 		{'/', 0, false},
 		{'~', 0, false},
-		{0x2215, 0, false},
-		{0x2044, 0, false},
-		{0x29F8, 0, false},
+		{0x2216, 0, false},
+		{0x00A5, 0, false},
+		{0x30CE, 0, false},
+		{0x2571, 0, false},
 		{0xFF3C, 0, false},
 		{0xFE68, 0, false},
 		{0x223C, 0, false},
@@ -1573,8 +1578,66 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 2 {
+	if n != 6 {
 		t.Fatalf("solidus tilde fold count %d", n)
+	}
+}
+
+func TestSanitizeFailureStripsSlashLookalikes(t *testing.T) {
+	secret := "code/ver/1"
+	division := strings.ReplaceAll(secret, "/", "\u2215")
+	fraction := strings.ReplaceAll(secret, "/", "\u2044")
+	big := strings.ReplaceAll(secret, "/", "\u29f8")
+	over := strings.ReplaceAll(secret, "/", "\u29f6")
+	encoded := strings.ReplaceAll(secret, "/", "%E2%88%95")
+	got := SanitizeFailure("rejected "+division+" "+encoded+" later", secret)
+	for _, item := range []string{secret, division, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	got = SanitizeFailure("rejected "+fraction+" "+big+" "+over+" later", secret)
+	for _, item := range []string{secret, fraction, big, over, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("lookalike leaked %q in %q", item, got)
+		}
+	}
+	opaque := "tokenValue1tokenValue1tokenVal/x"
+	markedOpaque := strings.ReplaceAll(opaque, "/", "\u2215")
+	got = SanitizeFailure("rejected " + markedOpaque + " later")
+	for _, item := range []string{opaque, markedOpaque, "tokenValue", "tokenVal"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("opaque leaked %q in %q", item, got)
+		}
+	}
+	back := "code\\ver\\1"
+	yen := strings.ReplaceAll(back, "\\", "\u00a5")
+	won := strings.ReplaceAll(back, "\\", "\u20a9")
+	set := strings.ReplaceAll(back, "\\", "\u2216")
+	op := strings.ReplaceAll(back, "\\", "\u29f5")
+	stroke := strings.ReplaceAll(back, "\\", "\u29f7")
+	bigBack := strings.ReplaceAll(back, "\\", "\u29f9")
+	ocr := strings.ReplaceAll(back, "\\", "\u244a")
+	encodedBack := strings.ReplaceAll(back, "\\", "%C2%A5")
+	got = SanitizeFailure("rejected "+yen+" "+encodedBack+" "+won+" "+set+" "+op+" "+stroke+" "+bigBack+" "+ocr+" later", back)
+	for _, item := range []string{back, yen, won, set, op, stroke, bigBack, ocr, encodedBack, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("backslash leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2215 later",
+		"see \u00a5 later",
+		"see \u244a later",
+		"see \u30ce later",
+		"see \u2571 later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("slash prose changed: %q -> %q", prose, got)
+		}
 	}
 }
 
@@ -1852,13 +1915,17 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 	}{
 		{0xFE68, '\\', true},
 		{0xFF3C, '\\', true},
+		{0x00A5, '\\', true},
+		{0x20A9, '\\', true},
+		{0x2216, '\\', true},
+		{0x244A, '\\', true},
+		{0x29F5, '\\', true},
+		{0x29F7, '\\', true},
+		{0x29F9, '\\', true},
 		{'\\', 0, false},
-		{0x00A5, 0, false},
-		{0x20A9, 0, false},
-		{0x2216, 0, false},
-		{0x29F5, 0, false},
-		{0x29F9, 0, false},
-		{0x244A, 0, false},
+		{0x2215, 0, false},
+		{0x2044, 0, false},
+		{0x2572, 0, false},
 		{0xFF0F, 0, false},
 	}
 	for _, check := range checks {
@@ -1873,7 +1940,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 			n++
 		}
 	}
-	if n != 2 {
+	if n != 9 {
 		t.Fatalf("reverse solidus fold count %d", n)
 	}
 }
