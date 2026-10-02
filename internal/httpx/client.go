@@ -359,10 +359,11 @@ func decodePieces(in []secretPiece) []secretPiece {
 }
 
 func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
-	// A hyphen lookalike is not ignorable: dropping it would glue the token
-	// together and miss the stored ASCII hyphen. Fold first, then drop marks.
-	needle := foldHyphenString(secret)
-	folded := foldHyphenPieces(pieces)
+	// A hyphen or compatibility full stop is not ignorable: dropping it would
+	// glue the token together and miss the stored ASCII byte. Fold first,
+	// then drop marks.
+	needle := foldDotString(foldHyphenString(secret))
+	folded := foldDotPieces(foldHyphenPieces(pieces))
 	spans := exactSecretSpans(folded, needle)
 	// Soft hyphen is a format character, so the drop pass below removes it.
 	// That joins a hyphenated token and misses the stored '-'. Folding it to
@@ -500,6 +501,64 @@ func hyphenLike(r rune) bool {
 		'\u207b', '\u208b', '\ufe32', '\ufe63', '\uff0d',
 		'\u2043', '\u02d7', '\u2212', '\u2796', '\U00010191',
 		'\u2cba', '\u2cbb', '\u174d', '\u1bf3', '\uaa7d':
+		return true
+	default:
+		return false
+	}
+}
+
+// foldDotPieces maps compatibility full stops to ASCII '.'. One dot leader,
+// small full stop, and fullwidth full stop NFKC-fold to '.'. Vertical
+// ideographic full stop and halfwidth ideographic full stop fold to U+3002.
+// This pass does not run NFKC, so a JWT split by one of those marks would
+// miss both the stored token and the JWT pattern. One output piece covers
+// the original rune.
+func foldDotPieces(in []secretPiece) []secretPiece {
+	if len(in) == 0 {
+		return in
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if dotLike(r) {
+			out = append(out, secretPiece{b: '.', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in
+	}
+	return out
+}
+
+func foldDotString(s string) string {
+	if !dotFolded(s) {
+		return s
+	}
+	return renderPieces(foldDotPieces(rawPieces(s)))
+}
+
+func dotFolded(s string) bool {
+	for _, r := range s {
+		if dotLike(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func dotLike(r rune) bool {
+	switch r {
+	case '\u2024', '\ufe52', '\uff0e', '\ufe12', '\uff61':
 		return true
 	default:
 		return false

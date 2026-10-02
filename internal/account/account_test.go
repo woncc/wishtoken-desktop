@@ -623,3 +623,27 @@ func TestViewHidesCredentialsSplitByCompatibilityHyphens(t *testing.T) {
 		t.Fatalf("display context lost: %+v", view)
 	}
 }
+
+func TestViewHidesCredentialsSplitByCompatibilityFullStops(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	full := strings.ReplaceAll(jwt, ".", "\uff0e")
+	leader := strings.ReplaceAll(jwt, ".", "\u2024")
+	small := strings.ReplaceAll(jwt, ".", "\ufe52")
+	vertical := strings.ReplaceAll(jwt, ".", "\ufe12")
+	half := strings.ReplaceAll(jwt, ".", "\uff61")
+	acc := Account{
+		Name: "note " + full, Email: "kept@example.com", PlanType: "plus",
+		AccessToken: jwt, Source: "from " + leader, Tags: []string{"team", small, vertical},
+		LastError: "rejected " + half, AccountID: "acct_keep",
+	}
+	view := acc.View()
+	shown := view.Name + "\n" + view.Email + "\n" + view.PlanType + "\n" + view.Source + "\n" + strings.Join(view.Tags, "\n") + "\n" + view.LastError + "\n" + acc.Label()
+	for _, leaked := range []string{jwt, full, leader, small, vertical, half, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(shown, leaked) {
+			t.Fatalf("leaked %q in %s", leaked, shown)
+		}
+	}
+	if view.Email != "kept@example.com" || view.PlanType != "plus" || !strings.Contains(view.Name, "note") || !strings.Contains(view.LastError, "rejected") || !strings.Contains(view.Source, "from") || len(view.Tags) != 1 || view.Tags[0] != "team" {
+		t.Fatalf("display context lost: %+v", view)
+	}
+}

@@ -495,3 +495,30 @@ func TestSanitizeFailureStripsCompatibilityHyphens(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsCompatibilityFullStops(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	dots := []rune{'\u2024', '\ufe52', '\uff0e', '\ufe12', '\uff61'}
+	encoded := strings.ReplaceAll(jwt, ".", "%EF%BC%8E")
+	var parts []string
+	var leaked []string
+	for _, r := range dots {
+		marked := strings.ReplaceAll(jwt, ".", string(r))
+		parts = append(parts, marked)
+		leaked = append(leaked, marked)
+	}
+	got := SanitizeFailure("rejected "+strings.Join(parts, " ")+" "+encoded+" later", jwt)
+	for _, item := range append([]string{jwt, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"}, leaked...) {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see file\u2024txt later", "end\ufe52 next", "version 1\uff0e2 stays", "wait\ufe12 please", "half\uff61width"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("full stop prose changed: %q -> %q", prose, got)
+		}
+	}
+}
