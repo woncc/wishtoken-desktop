@@ -83,18 +83,16 @@ func maskCredentialPatterns(detail string) string {
 	pieces := rawPieces(detail)
 	var spans [][2]int
 	for layer := 0; layer < 5; layer++ {
-		// Fold parentheses, fullwidth solidus and tilde, low lines, plus and
-		// equals signs, long s, roman numerals, segmented digits, modifier
-		// letters, superscripts and subscripts, enclosed letters and digits,
-		// mathematical alphanumeric symbols, fullwidth letters and digits,
-		// hyphen lookalikes, and full stops before the ASCII token classes
-		// run, and before marks are dropped.
-		// This pass does not run NFKC. A non-breaking hyphen is not itself
-		// a mark, but a spacing mark shaped like one has to become '-'
-		// first. A full stop has to become '.' or the JWT pattern misses
-		// the token. Spacing marks shaped like full stops are a second
-		// reading so an inserted mark can still be dropped.
-		folded := foldDotPieces(foldHyphenPieces(foldFullwidthPieces(foldMathPieces(foldEnclosedPieces(foldSuperSubPieces(foldModifierPieces(foldSegmentedPieces(foldRomanPieces(foldLongSPieces(foldPlusEqualsPieces(foldLowLinePieces(foldSolidusTildePieces(foldParenPieces(pieces))))))))))))))
+		// Fold the credential alphabet, including a compatibility percent
+		// sign, before the ASCII token classes run and before marks are
+		// dropped. This pass does not run NFKC. A non-breaking hyphen is
+		// not itself a mark, but a spacing mark shaped like one has to
+		// become '-' first. A full stop has to become '.' or the JWT
+		// pattern misses the token. Spacing marks shaped like full stops
+		// are a second reading so an inserted mark can still be dropped.
+		// The same folded bytes are decoded below, so a small or fullwidth
+		// percent and compatibility hex digits still reveal the next layer.
+		folded := foldCredentialPieces(pieces)
 		spans = append(spans, credentialPatternSpans(renderPieces(folded), folded)...)
 		if spacing, ok := foldSpacingStopPieces(folded); ok {
 			spans = append(spans, credentialPatternSpans(renderPieces(spacing), spacing)...)
@@ -108,8 +106,8 @@ func maskCredentialPatterns(detail string) string {
 			spans = append(spans, credentialPatternSpans(rendered, dropped)...)
 			spans = append(spans, gluedBearerSpans(rendered, dropped)...)
 		}
-		next := decodePieces(pieces)
-		if len(next) == len(pieces) {
+		next := decodePieces(folded)
+		if len(next) == len(folded) {
 			break
 		}
 		pieces = next
