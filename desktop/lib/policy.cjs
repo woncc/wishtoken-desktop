@@ -439,6 +439,8 @@ const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${enc
 // the numeric decoder already accepts. "&percnt;", "&#37;", and "&#x25;" are
 // "%", so a percent-encoded colon can hide behind them. "&amp" and "&AMP"
 // may omit the semicolon, including directly before the next name.
+// encodeURIComponent("&#58;") is "%26%2358%3B". A nested "%2526" layer hides
+// the same reference. Decode those spans on the copy before the scrubber.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -470,10 +472,21 @@ const HTML_NAMED = new Map([
   ['percnt', '%']
 ]);
 const HTML_LEGACY = ['AMP', 'amp', 'middot', 'sup1', 'sup2', 'sup3'];
+const HTML_STRICT = [...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name));
 function namedAlt(names) {
   return names.slice().sort((a, b) => b.length - a.length || (a < b ? -1 : 1)).join('|');
 }
-const HTML_REF = new RegExp(`&#(0*[0-9]{1,7})(?![0-9]);?|&#[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]);?|&(?:(${namedAlt(HTML_LEGACY)});?|(${namedAlt([...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name)))});)`, 'g');
+function encByte(hexClass) {
+  return `%(?:25){0,3}${hexClass}`;
+}
+const ENC_AMP = encByte('26');
+const ENC_HASH = encByte('23');
+const ENC_SEMI = encByte('3[Bb]');
+const HTML_REF = new RegExp(`&#(0*[0-9]{1,7})(?![0-9]);?|&#[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]);?|&(?:(${namedAlt(HTML_LEGACY)});?|(${namedAlt(HTML_STRICT)});)`, 'g');
+const ENC_NUMERIC = new RegExp(`${ENC_AMP}(?:${ENC_HASH}|#)(?:(0*[0-9]{1,7})(?![0-9])|[xX](0*[0-9a-fA-F]{1,6})(?![0-9a-fA-F]))(?:${ENC_SEMI}|;)?`, 'g');
+const ENC_LEGACY = new RegExp(`${ENC_AMP}(${namedAlt(HTML_LEGACY)})(?:${ENC_SEMI}|;)?`, 'g');
+const ENC_STRICT = new RegExp(`${ENC_AMP}(${namedAlt(HTML_STRICT)})(?:${ENC_SEMI}|;)`, 'g');
+const ENC_TAIL = new RegExp(`(&(?:#(?:[0-9]{1,7}|[xX][0-9a-fA-F]{1,6})|${namedAlt([...HTML_NAMED.keys()])}))(?:${ENC_SEMI})`, 'g');
 function proxyHtmlChars() {
   const chars = new Set([':', '@', '&', '.', '%']);
   for (const list of [COLON_CHARS, SIGN_COLONS, AT_CHARS, DOT_CHARS, MIDDLE_CHARS, STOP_CHARS, MONGOLIAN_STOPS]) {
@@ -492,10 +505,20 @@ function htmlProxyChar(cp) {
   const char = String.fromCodePoint(cp);
   return PROXY_HTML_CHARS.has(char) ? char : '';
 }
+function decodeEncodedHtml(text) {
+  return text
+    .replace(ENC_NUMERIC, (match, dec, hex) => {
+      const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);
+      return htmlProxyChar(cp) || match;
+    })
+    .replace(ENC_LEGACY, (match, name) => HTML_NAMED.get(name) || match)
+    .replace(ENC_STRICT, (match, name) => HTML_NAMED.get(name) || match)
+    .replace(ENC_TAIL, '$1;');
+}
 function decodeProxyHtml(text) {
   let out = text;
   for (let pass = 0; pass < 4; pass += 1) {
-    const next = out.replace(HTML_REF, (match, dec, hex, legacy, strict) => {
+    const next = decodeEncodedHtml(out).replace(HTML_REF, (match, dec, hex, legacy, strict) => {
       const named = legacy || strict;
       if (named) return HTML_NAMED.get(named) || match;
       const cp = dec != null ? Number(dec) : Number.parseInt(hex, 16);

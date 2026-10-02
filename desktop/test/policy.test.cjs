@@ -2836,3 +2836,79 @@ test('renderer text drops proxy passwords hidden by an HTML entity alias', () =>
   assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
   assert.equal(snap.settings.proxy_url, proxy);
 });
+
+test('renderer text drops proxy passwords hidden by an encoded HTML reference', () => {
+  const password = 's3cret-token';
+  const nest = (value, layers) => {
+    let out = value;
+    for (let layer = 0; layer < layers; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const colon = '%26%2358%3B';
+  const cases = [
+    [`user${colon}${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26%23x3A%3B${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26%23X3a%3b${password}@my-proxy:7890`, 'my-proxy:7890'],
+    [`user%26%2300058%3B${password}@10.0.0.8:1080`, '10.0.0.8:1080'],
+    [`user%26%2358${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26colon%3B${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26Assign%3B${password}@my-proxy:7890`, 'my-proxy:7890'],
+    [`user%26amp%3Bcolon%3B${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26ampcolon%3B${password}@10.0.0.8:1080`, '10.0.0.8:1080'],
+    [`user${nest(colon, 1)}${password}@127.1:7890`, '127.1:7890'],
+    [`user${nest(colon, 3).toLowerCase()}${password}@[::1]:8792`, '[::1]:8792'],
+    [`http://user${colon}${password}%26%2364%3B127.0.0.1:7890/x`, 'http://127.0.0.1:7890/x'],
+    [`http://user%26colon%3B${password}%26commat%3B127.0.0.1:7890`, 'http://127.0.0.1:7890'],
+    [`(user%26Assign%3B${password}@10.0.0.8:1080)`, '(10.0.0.8:1080)'],
+    [`socks5://alice%26colon%3Bhunter2@my-proxy:7890`, 'socks5://my-proxy:7890'],
+    [`via user%26%2358%3B${password} proxy@10.1.1.1:8080 failed`, 'via 10.1.1.1:8080 failed'],
+    [`user${colon}${password}/token@my-proxy:7890`, 'my-proxy:7890'],
+    [`http://example.com/?x=user%26colon%3B${password}@10.0.0.8:1080`, 'http://example.com/?x=10.0.0.8:1080'],
+    [`user:${password}@my-proxy%26%2358%3B7890`, 'my-proxy:7890'],
+    [`user:${password}@127%26%2346%3B0%26%2346%3B0%26%2346%3B1:7890`, '127.0.0.1:7890'],
+    [`user:${password}@127%26bull%3B0%26sdot%3B0%26period%3B1:7890`, '127\u20220\u22C50.1:7890'],
+    [`user%26percnt%3B3A${password}@127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user%26%2337%3B3A${password}@my-proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}%26%2364%3B127.0.0.1:7890`, '127.0.0.1:7890'],
+    [`user:${password}%26%23x40%3Bmy-proxy:7890`, 'my-proxy:7890'],
+    [`user:${password}@my-proxy:%26sup2%3B%26sup3%3B%26sup1%3B%26sup2%3B`, 'my-proxy:\u00B2\u00B3\u00B9\u00B2'],
+    [`note %26Assign%3Buser:${password}@10.1:8080`, 'note \u225410.1:8080'],
+    [`two user${colon}${password}@my-proxy:7890) and user%26colon%3Bother-secret@10.1:8080.`, 'two my-proxy:7890) and 10.1:8080.'],
+    [`invalid proxy url "http://user%26%2358%3Bs3cret/token@my-proxy:7890": invalid port "%26%2358%3Bs3cret" after host`, 'invalid proxy url "http://my-proxy:7890": invalid port ":[凭据已隐藏]" after host'],
+    [`a=1&user%26colon%3B${password}@my-proxy:7890&b=2`, 'a=1&my-proxy:7890&b=2']
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('hunter2'), false);
+    assert.equal(got.includes('other-secret'), false);
+  }
+  const unchanged = [
+    'Build v1%26%2358%3B2@beta',
+    `user%26colon%3B${password}@internal`,
+    `user%26%2337%3B3A${password}@internal`,
+    'score 1%26%2337%3B3A2@10.5',
+    'note 100%26%2337%3B off',
+    'member%26commat%3Bexample.test',
+    'http://user%26%2340%3B127.0.0.1:7890',
+    'user%26colons3cret@127.0.0.1:7890',
+    'see %26bull%3B later',
+    'note %26amp off',
+    'http://user@127.0.0.1:7890'
+  ];
+  for (const input of unchanged) assert.equal(redactPublic(input), input);
+  const proxy = `http://user%26%2358%3B${password}@127.0.0.1:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user%26Assign%3B${password}@my-proxy:7890`, email: 'a@example.test', last_error: `dial user:${password}%26%2364%3B127.0.0.1:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, 'note my-proxy:7890');
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, 'dial 127.0.0.1:7890 failed');
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
