@@ -850,6 +850,18 @@ def segmented_digit(cp):
         return chr(cp - 0x1FBF0 + ord('0'))
     return None
 
+
+def roman_ascii(cp):
+    # Roman numerals that NFKC-fold to one ASCII letter. Additive numerals
+    # expand to more than one letter and stay out. Archaic thousand signs
+    # do not fold to ASCII.
+    return {
+        0x2160: 'I', 0x2164: 'V', 0x2169: 'X', 0x216C: 'L',
+        0x216D: 'C', 0x216E: 'D', 0x216F: 'M',
+        0x2170: 'i', 0x2174: 'v', 0x2179: 'x', 0x217C: 'l',
+        0x217D: 'c', 0x217E: 'd', 0x217F: 'm',
+    }.get(cp)
+
 def fold_content(data):
     # Tag ASCII copies a stored byte and does not NFKC-fold. Other format
     # characters, including the language tag and cancel tag, only split a
@@ -916,6 +928,14 @@ def fold_content(data):
         # Segmented digits NFKC-fold to ASCII digits. This pass does not run
         # NFKC, so a token or JWT written with them stayed split.
         mapped = segmented_digit(cp)
+        if mapped is not None:
+            out.append(mapped)
+            changed = True
+            continue
+        # Single-letter roman numerals NFKC-fold to ASCII. This pass does
+        # not run NFKC, so a token written with them stayed split. Additive
+        # numerals expand to more than one letter and stay out.
+        mapped = roman_ascii(cp)
         if mapped is not None:
             out.append(mapped)
             changed = True
@@ -1410,14 +1430,13 @@ def self_test():
     mod_path = '\uA7F2:/Users/\U00001D42\u2139\u02e2\u02b0\U00001D40\u1d52\U00001D2C\u1d56\u1d56/project'.encode()
     mod_hole = ('sk-' + 'a' * 10 + '\u1d4a' + 'a' * 20).encode()
     mod_long_s = ('sk-' + 'a' * 10 + '\u017f' + 'a' * 20).encode()
-    mod_roman = ('sk-' + 'a' * 10 + '\u2160' + 'a' * 20).encode()
     if content_reasons(mod_token) != ['secret token literal'] or content_reasons(mod_sub) != ['secret token literal'] or content_reasons(mod_q) != ['secret token literal'] or content_reasons(mod_kelvin) != ['secret token literal']:
         raise SystemExit('self-test failed: a modifier token was not detected')
     if content_reasons(mod_key) != ['private key'] or content_reasons(mod_jwt) != ['JWT literal']:
         raise SystemExit('self-test failed: a modifier key or JWT was not detected')
     if 'personal Windows path' not in content_reasons(mod_path):
         raise SystemExit('self-test failed: a modifier personal path was not detected')
-    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons(mod_roman) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
+    if content_reasons(mod_hole) or content_reasons(mod_long_s) or content_reasons('see \u02b0 later'.encode()) or content_reasons(('sk-' + '\u02e2' * 10).encode()) or content_reasons(('-----BEGIN ' + '\U00001D3E' + 'UBLIC KEY-----').encode()):
         raise SystemExit('self-test failed: ordinary modifier text was blocked')
     if segmented_digit(0x1FBEF) is not None or segmented_digit(0x1FBF0) != '0' or segmented_digit(0x1FBF1) != '1' or segmented_digit(0x1FBF5) != '5' or segmented_digit(0x1FBF9) != '9' or segmented_digit(0x1FBFA) is not None or segmented_digit(0x2469) is not None or segmented_digit(0x2474) is not None or segmented_digit(0x2488) is not None or segmented_digit(0x24EA) is not None or segmented_digit(ord('5')) is not None:
         raise SystemExit('self-test failed: segmented digit fold is wrong')
@@ -1430,6 +1449,23 @@ def self_test():
         raise SystemExit('self-test failed: a segmented digit secret was not detected')
     if content_reasons('see \U0001fbf0 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2474' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2488' + 'a' * 20).encode()) or content_reasons(('rt_' + '\U0001fbf0' * 10).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u24eb' + 'a' * 20).encode()):
         raise SystemExit('self-test failed: ordinary segmented text was blocked')
+    if roman_ascii(0x215F) is not None or roman_ascii(0x2160) != 'I' or roman_ascii(0x2161) is not None or roman_ascii(0x2164) != 'V' or roman_ascii(0x2169) != 'X' or roman_ascii(0x216C) != 'L' or roman_ascii(0x216D) != 'C' or roman_ascii(0x216E) != 'D' or roman_ascii(0x216F) != 'M' or roman_ascii(0x2170) != 'i' or roman_ascii(0x2171) is not None or roman_ascii(0x2174) != 'v' or roman_ascii(0x2179) != 'x' or roman_ascii(0x217C) != 'l' or roman_ascii(0x217D) != 'c' or roman_ascii(0x217E) != 'd' or roman_ascii(0x217F) != 'm' or roman_ascii(0x2180) is not None or roman_ascii(0x2183) is not None:
+        raise SystemExit('self-test failed: roman numeral fold is wrong')
+    if sum(roman_ascii(cp) is not None for cp in range(0x2150, 0x2190)) != 14:
+        raise SystemExit('self-test failed: roman numeral fold count is wrong')
+    roman_token = ('sk-' + '\u2170' * 30).encode()
+    roman_upper = ('ghp_' + '\u2164' * 30).encode()
+    roman_key = ('-----BEGIN OPENSSH PR' + '\u2160' + 'VATE KEY-----').encode()
+    roman_jwt = ('eyJ' + '\u2170' * 25 + '.' + '\u2174' * 30 + '.' + '\u2179' * 15).encode()
+    roman_path = ('\u216d' + ':/Users/Mayn/project').encode()
+    if content_reasons(roman_token) != ['secret token literal'] or content_reasons(roman_upper) != ['secret token literal']:
+        raise SystemExit('self-test failed: a roman token was not detected')
+    if content_reasons(roman_key) != ['private key'] or content_reasons(roman_jwt) != ['JWT literal']:
+        raise SystemExit('self-test failed: a roman key or JWT was not detected')
+    if 'personal Windows path' not in content_reasons(roman_path):
+        raise SystemExit('self-test failed: a roman personal path was not detected')
+    if content_reasons('chapter \u2160 later'.encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2161' + 'a' * 20).encode()) or content_reasons(('sk-' + 'a' * 10 + '\u2180' + 'a' * 20).encode()) or content_reasons(('sk-' + '\u2170' * 10).encode()) or content_reasons(('-----BEGIN ' + '\u216d' + 'ERTIFICATE-----').encode()):
+        raise SystemExit('self-test failed: ordinary roman text was blocked')
 
 def main():
     self_test()
