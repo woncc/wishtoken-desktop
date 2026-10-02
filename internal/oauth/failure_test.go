@@ -143,3 +143,34 @@ func TestLoginExchangePageOmitsToken(t *testing.T) {
 		t.Fatalf("exchange error: %v", s.err)
 	}
 }
+
+func TestLoginCallbackOmitsEncodedCredentialText(t *testing.T) {
+	token := "rt_callback_123456789"
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	encodedToken := percentEncode(token)
+	encodedJWT := percentEncode(jwt)
+	q := url.Values{}
+	q.Set("error", "access_denied")
+	q.Set("error_description", "rejected "+encodedToken+" "+encodedJWT)
+	s := &LoginSession{done: make(chan struct{})}
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback?"+q.Encode(), nil)
+	rec := httptest.NewRecorder()
+	s.handleCallback(rec, req)
+	body := rec.Body.String()
+	for _, leaked := range []string{token, encodedToken, jwt, encodedJWT, "eyJ"} {
+		if strings.Contains(body, leaked) || (s.err != nil && strings.Contains(s.err.Error(), leaked)) {
+			t.Fatalf("leaked %q body=%s err=%v", leaked, body, s.err)
+		}
+	}
+	if !strings.Contains(body, "access_denied") || s.err == nil || !strings.Contains(s.err.Error(), "access_denied") {
+		t.Fatalf("lost callback context body=%s err=%v", body, s.err)
+	}
+}
+
+func percentEncode(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		fmt.Fprintf(&b, "%%%02X", s[i])
+	}
+	return b.String()
+}

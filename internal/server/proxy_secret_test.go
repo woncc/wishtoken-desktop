@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -124,5 +125,27 @@ func TestManagementHidesProxyPasswordInDisplayFields(t *testing.T) {
 	}
 	if !strings.Contains(body, "xxxxx") || !strings.Contains(body, "one@example.test") {
 		t.Fatalf("redacted account lost context: %s", body)
+	}
+}
+
+func TestManagementHidesEncodedProxyPassword(t *testing.T) {
+	const password = "s3cret-proxy"
+	var encoded strings.Builder
+	for i := 0; i < len(password); i++ {
+		fmt.Fprintf(&encoded, "%%%02X", password[i])
+	}
+	proxyURL := "http://user:" + password + "@127.0.0.1:7890?q=" + encoded.String()
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	cfg.ProxyURL = proxyURL
+	acc := testAccount("acct_one", "one@example.test")
+	acc.ProxyURL = proxyURL
+	acc.LastError = "dial " + proxyURL
+	f := newFixture(t, cfg, acc)
+	for _, route := range []string{"/api/status", "/api/accounts", "/api/settings"} {
+		status, body := getRaw(t, f, route)
+		if status != http.StatusOK || strings.Contains(body, password) || strings.Contains(body, encoded.String()) {
+			t.Fatalf("%s leaked encoded proxy password: %d %s", route, status, body)
+		}
 	}
 }
