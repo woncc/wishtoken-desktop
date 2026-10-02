@@ -578,8 +578,10 @@ function htmlProxyChar(cp) {
   // character. U+2011 folds to U+2010. U+2012, U+2013, U+2014, and U+2015 do
   // not fold to "-". "&ndash;" is U+2013, "&mdash;" is U+2014, "&minus;" is
   // U+2212, and "&horbar;" is U+2015. U+FE58 and U+FE31 fold to U+2014.
-  // U+FE32 folds to U+2013. U+FE33, U+FE34, U+FE4D, U+FE4E, U+FE4F, and
-  // U+FF3F fold to "_". "&lowbar;" and "&UnderBar;" are U+005F.
+  // U+FE32 folds to U+2013. U+2E17, U+2E1A, U+2E3A, U+2E3B, U+2E40, and
+  // U+2E5D do not fold to "-" either, and neither do U+058A, U+1400, or
+  // U+1806. U+FE33, U+FE34, U+FE4D, U+FE4E, U+FE4F,
+  // and U+FF3F fold to "_". "&lowbar;" and "&UnderBar;" are U+005F.
   // U+FF21..U+FF3A and U+FF41..U+FF5A fold to ASCII letters. U+24B6..U+24E9
   // fold to ASCII letters too. Letterlike symbols that fold to one ASCII
   // letter do as well, and so do U+00AA, U+00BA, and U+017F. Modifier
@@ -592,7 +594,7 @@ function htmlProxyChar(cp) {
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
   if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp)) return char;
-  if (cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
+  if (cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
 const PROXY_MARK_CODES = new Set(Array.from(PROXY_MARK, char => char.codePointAt(0)));
@@ -827,6 +829,17 @@ function noteSecret(secrets, secret) {
 // "user:secret@my\uFE4Dproxy:7890" and "user:secret@my&lowbar;proxy:7890"
 // keep the password. A dotted host does not take an underscore, so
 // "user:secret@ex\uFE4Dample.com:8080" stays as written.
+// U+2E17, U+2E1A, U+2E3A, U+2E3B, U+2E40, and U+2E5D are supplemental
+// hyphens. They do not fold to "-" under NFKC. A host label already allows
+// a hyphen, so the same marks kept the password. Their literal,
+// percent-encoded, and numeric forms do too. Otherwise
+// "user:secret@my\u2E17proxy:7890" and "user:secret@ex\u2E40ample.com:8080"
+// keep the password. The redacted host uses an ASCII hyphen.
+// U+058A, U+1400, and U+1806 are hyphens from other scripts. They do not
+// fold to "-" under NFKC. A host label already allows a hyphen, so the same
+// marks kept the password. Their literal, percent-encoded, and numeric forms
+// do too. Otherwise "user:secret@my\u058Aproxy:7890" and
+// "user:secret@ex\u1400ample.com:8080" keep the password.
 function decodeEncodedLabelPunct(text) {
   return String(text)
     .replace(/%(?:25){0,3}2[Dd]/g, '-')
@@ -848,11 +861,20 @@ function decodeEncodedLabelPunct(text) {
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}93/g, '-')
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}94/g, '-')
     .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}80%(?:25){0,3}95/g, '-')
-    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}88%(?:25){0,3}92/g, '-');
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}88%(?:25){0,3}92/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]8%(?:25){0,3}97/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]8%(?:25){0,3}9[Aa]/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]8%(?:25){0,3}[Bb][Aa]/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]8%(?:25){0,3}[Bb][Bb]/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]9%(?:25){0,3}80/g, '-')
+    .replace(/%(?:25){0,3}[Ee]2%(?:25){0,3}[Bb]9%(?:25){0,3}9[Dd]/g, '-')
+    .replace(/%(?:25){0,3}[Dd]6%(?:25){0,3}8[Aa]/g, '-')
+    .replace(/%(?:25){0,3}[Ee]1%(?:25){0,3}90%(?:25){0,3}80/g, '-')
+    .replace(/%(?:25){0,3}[Ee]1%(?:25){0,3}[Aa]0%(?:25){0,3}86/g, '-');
 }
 function foldLabelHyphens(text) {
   return text
-    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE31\uFE32\uFE58\uFE63\uFF0D]/g, '-')
+    .replace(/[\u058A\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u2015\u2212\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u2E5D\uFE31\uFE32\uFE58\uFE63\uFF0D]/g, '-')
     .replace(/[\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]/g, '_');
 }
 // U+FF21..U+FF3A and U+FF41..U+FF5A fold to A-Z and a-z under NFKC. A
