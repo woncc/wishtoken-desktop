@@ -2642,3 +2642,61 @@ func TestGraveASCIIFoldsOnlyGraveAccents(t *testing.T) {
 		t.Fatalf("grave fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsCircumflexAccents(t *testing.T) {
+	secret := "code^ver^1"
+	marked := strings.NewReplacer("^", "\uFF3E").Replace(secret)
+	encoded := strings.NewReplacer("^", "%EF%BC%BE").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{
+		"see \u02C6 later",
+		"see \u0302 later",
+		"see \u2038 later",
+		"see \u2303 later",
+		"path \uFF3E file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("circumflex prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestCircumflexASCIIFoldsOnlyCircumflex(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF3E, '^', true},
+		{'^', 0, false},
+		{0x02C6, 0, false},
+		{0x0302, 0, false},
+		{0x2038, 0, false},
+		{0x2303, 0, false},
+		{0xFF40, 0, false},
+		{0x2227, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := circumflexASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := circumflexASCII(r); ok {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("circumflex fold count %d", n)
+	}
+}
