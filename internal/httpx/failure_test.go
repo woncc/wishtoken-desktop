@@ -607,3 +607,156 @@ func TestSanitizeFailureStripsFullwidthLetters(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeFailureStripsMathLetters(t *testing.T) {
+	jwt := "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl"
+	marked := strings.NewReplacer(
+		"e", "\U0001D41E",
+		"J", "\U0001D43D",
+		"1", "\U0001D7CF",
+		"h", "\u210E",
+		"b", "\u212C",
+		"c", "\u2102",
+		"d", "\u2146",
+	).Replace(jwt)
+	encoded := strings.Replace(jwt, "e", "%F0%9D%90%9E", 1)
+	// No stored secret: the JWT pattern has to see the folded letters.
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{jwt, marked, encoded, "eyJ", "c2lnbmF0dXJl", "eyJzdWIiOiJ1c2VyIn0"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	secret := "codeVerifier12"
+	markedSecret := strings.NewReplacer(
+		"V", "\U0001D415",
+		"1", "\U0001D7CF",
+		"2", "\U0001D7D0",
+		"e", "\u212F",
+		"o", "\u2134",
+	).Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "Verifier12", "erifier"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("short secret context lost: %q", got)
+	}
+	for _, prose := range []string{
+		"\U0001D421\U0001D41E\U0001D425\U0001D425\U0001D428",
+		"build \U0001D7CF stays",
+		"see \U0001D400 later",
+		"see \u210E later",
+		"see \U0001D6A8 later",
+		"see \u212A later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("math prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestMathASCIIFoldsOnlyMathematicalLetters(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x1D400, 'A', true},
+		{0x1D419, 'Z', true},
+		{0x1D41A, 'a', true},
+		{0x1D433, 'z', true},
+		{0x1D434, 'A', true},
+		{0x1D44D, 'Z', true},
+		{0x1D44E, 'a', true},
+		{0x1D454, 'g', true},
+		{0x1D455, 0, false},
+		{0x1D456, 'i', true},
+		{0x1D467, 'z', true},
+		{0x1D49C, 'A', true},
+		{0x1D49D, 0, false},
+		{0x1D49E, 'C', true},
+		{0x1D4B5, 'Z', true},
+		{0x1D4B6, 'a', true},
+		{0x1D4B9, 'd', true},
+		{0x1D4BA, 0, false},
+		{0x1D4BB, 'f', true},
+		{0x1D4BC, 0, false},
+		{0x1D4BD, 'h', true},
+		{0x1D4C3, 'n', true},
+		{0x1D4C4, 0, false},
+		{0x1D4C5, 'p', true},
+		{0x1D4CF, 'z', true},
+		{0x1D4D0, 'A', true},
+		{0x1D503, 'z', true},
+		{0x1D504, 'A', true},
+		{0x1D506, 0, false},
+		{0x1D507, 'D', true},
+		{0x1D51C, 'Y', true},
+		{0x1D51D, 0, false},
+		{0x1D51E, 'a', true},
+		{0x1D537, 'z', true},
+		{0x1D538, 'A', true},
+		{0x1D53A, 0, false},
+		{0x1D546, 'O', true},
+		{0x1D547, 0, false},
+		{0x1D54A, 'S', true},
+		{0x1D550, 'Y', true},
+		{0x1D551, 0, false},
+		{0x1D552, 'a', true},
+		{0x1D56B, 'z', true},
+		{0x1D56C, 'A', true},
+		{0x1D6A3, 'z', true},
+		{0x1D6A4, 0, false},
+		{0x1D6A8, 0, false},
+		{0x1D7CE, '0', true},
+		{0x1D7D7, '9', true},
+		{0x1D7D8, '0', true},
+		{0x1D7FF, '9', true},
+		{0x2102, 'C', true},
+		{0x210A, 'g', true},
+		{0x210B, 'H', true},
+		{0x210C, 'H', true},
+		{0x210D, 'H', true},
+		{0x210E, 'h', true},
+		{0x2110, 'I', true},
+		{0x2111, 'I', true},
+		{0x2112, 'L', true},
+		{0x2113, 'l', true},
+		{0x2115, 'N', true},
+		{0x2119, 'P', true},
+		{0x211A, 'Q', true},
+		{0x211B, 'R', true},
+		{0x211C, 'R', true},
+		{0x211D, 'R', true},
+		{0x2124, 'Z', true},
+		{0x2128, 'Z', true},
+		{0x212A, 0, false},
+		{0x212C, 'B', true},
+		{0x212D, 'C', true},
+		{0x212F, 'e', true},
+		{0x2130, 'E', true},
+		{0x2131, 'F', true},
+		{0x2133, 'M', true},
+		{0x2134, 'o', true},
+		{0x2139, 0, false},
+		{0x2145, 'D', true},
+		{0x2146, 'd', true},
+		{0x2147, 'e', true},
+		{0x2148, 'i', true},
+		{0x2149, 'j', true},
+		{'A', 0, false},
+		{'\uff21', 0, false},
+	}
+	for _, check := range checks {
+		got, ok := mathASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+}
