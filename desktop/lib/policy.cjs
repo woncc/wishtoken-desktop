@@ -93,9 +93,12 @@ const SECRET_TEXT = [
 // a nested %2560. U+1FEF folds to a backtick and U+FE68 folds to a backslash,
 // and so do their percent-encoded forms. Otherwise
 // "user:secret@my-proxy:7890%60next" keeps the password.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨]';
-const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨]';
-const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨]';
+// A C0 control or DEL ends the host too. Tab and the newline controls are
+// already whitespace. Percent-encoding hides the rest, including a nested
+// %2500. Otherwise "user:secret@my-proxy:7890%00next" keeps the password.
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F]';
+const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”＆﹠＝﹦⁼₌⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;,;︔﹔；︐﹐，!︕﹗！／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F]';
+const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”&=＆﹠＝﹦⁼₌(<{\\[⁽⁾₍₎︵︶︷︸﹇﹈﹙﹚﹛﹜﹤﹥（）＜＞［］｛｝~*+$^～﹡＊⁺₊﬩﹢＋﹩＄＾;︔﹔︐﹐︕﹗／︖﹖？﹟＃＂＇`﹨\u0000-\u0008\u000E-\u001F\u007F]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
 // U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
@@ -262,7 +265,22 @@ function escapeTail() {
   return `(?:${parts.join('|')})`;
 }
 const ESCAPE_JOIN = escapeTail();
-const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN})`;
+const CONTROL_CHARS = [];
+for (let cp = 0; cp <= 0x1F; cp += 1) {
+  if (cp >= 0x09 && cp <= 0x0D) continue;
+  CONTROL_CHARS.push(String.fromCodePoint(cp));
+}
+CONTROL_CHARS.push('\u007F');
+function controlTail() {
+  const parts = [];
+  for (const char of CONTROL_CHARS) {
+    const encoded = percentBytes(char);
+    for (let extra = 0; extra < 4; extra += 1) parts.push(nestPercent(encoded, extra));
+  }
+  return `(?:${parts.join('|')})`;
+}
+const CONTROL_JOIN = controlTail();
+const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL}|${QUERY_JOIN}|${BRACKET_JOIN}|${SHELL_JOIN}|${LIST_JOIN}|${BANG_JOIN}|${PATH_JOIN}|${SPACE_JOIN}|${QUOTE_JOIN}|${ESCAPE_JOIN}|${CONTROL_JOIN})`;
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
