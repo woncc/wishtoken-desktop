@@ -460,6 +460,22 @@ func findSecretSpans(pieces []secretPiece, secret string) [][2]int {
 	} else if needlePlus != needleLowLine {
 		spans = append(spans, exactSecretSpans(plusBase, needlePlus)...)
 	}
+	// Tag equals copies '=' and does not NFKC-fold. It is a format
+	// character, so the drop pass below removes it. That drops base64
+	// padding and misses the stored equals. Folding it is a separate
+	// reading. It runs on the tag-plus reading so one secret can use a tag
+	// plus and a tag equals. The drop reading still runs, so an inserted tag
+	// equals cannot hide a token that has no equals.
+	equalsBase := plusBase
+	if plused, ok := foldTagPlusPieces(plusBase); ok {
+		equalsBase = plused
+	}
+	needleEquals := foldTagEqualsString(needlePlus)
+	if equaled, ok := foldTagEqualsPieces(equalsBase); ok {
+		spans = append(spans, exactSecretSpans(equaled, needleEquals)...)
+	} else if needleEquals != needlePlus {
+		spans = append(spans, exactSecretSpans(equalsBase, needleEquals)...)
+	}
 	if spacing, ok := foldSpacingStopPieces(folded); ok {
 		needleStop := foldSpacingStopString(needle)
 		spans = append(spans, exactSecretSpans(spacing, needleStop)...)
@@ -857,6 +873,46 @@ func foldTagPlusString(s string) string {
 		return s
 	}
 	folded, _ := foldTagPlusPieces(rawPieces(s))
+	return renderPieces(folded)
+}
+
+// foldTagEqualsPieces maps the Unicode tag equals sign to ASCII '='. It does
+// not NFKC-fold. This pass does not run NFKC, and dropMarkPieces removes
+// format characters, so a stored equals written with a tag would stay
+// visible. One output piece covers the original rune. The drop reading still
+// runs on the unfolded pieces. Other tag characters stay out.
+func foldTagEqualsPieces(in []secretPiece) ([]secretPiece, bool) {
+	if len(in) == 0 {
+		return in, false
+	}
+	buf := renderPieces(in)
+	out := make([]secretPiece, 0, len(in))
+	changed := false
+	for i := 0; i < len(in); {
+		r, size := utf8.DecodeRuneInString(buf[i:])
+		if size <= 0 {
+			break
+		}
+		if r == 0xE003D {
+			out = append(out, secretPiece{b: '=', start: in[i].start, end: in[i+size-1].end})
+			changed = true
+			i += size
+			continue
+		}
+		out = append(out, in[i:i+size]...)
+		i += size
+	}
+	if !changed {
+		return in, false
+	}
+	return out, true
+}
+
+func foldTagEqualsString(s string) string {
+	if !strings.ContainsRune(s, 0xE003D) {
+		return s
+	}
+	folded, _ := foldTagEqualsPieces(rawPieces(s))
 	return renderPieces(folded)
 }
 
