@@ -36,8 +36,12 @@ const SECRET_TEXT = [
 // field is copied back after this pass so the editor can round-trip.
 // A single-label host counts only with an explicit port. "v1:2@beta" has no
 // port, so it stays ordinary text; "user:secret@my-proxy:7890" does not.
-const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|[A-Za-z][A-Za-z0-9_-]*:\\d{2,5})(?::\\d+)?(?=$|[\\s/?#])';
-const PROXY_BOUND = '[\\s"\'()<>]';
+// A closing quote, bracket, or sentence mark is not part of the host. The
+// lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}「」『』【】（）《》〈〉]';
+const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@「」『』【】（）《》〈〉]';
+const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
+const PROXY_HOST = '(?:\\[[0-9A-Fa-f:.%]+\\]|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost|[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|[A-Za-z][A-Za-z0-9_-]*:\\d{2,5})(?::\\d+)?(?=$|' + PROXY_TAIL + ')';
 function redactProxyCredentials(text) {
   // %3A is a colon. user%3Apassword decodes to a password, but a username-only
   // check never sees a separator and would leave the secret in renderer text.
@@ -46,8 +50,8 @@ function redactProxyCredentials(text) {
   const spaced = new RegExp(String.raw`\b([a-z][a-z0-9+.-]*:\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'gi');
   const relative = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@`, 'g');
   const relativeSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})(\/\/)[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
-  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
-  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})[^\s\/?#:@]+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
+  const bare = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\s\/?#@]+(?:@[^\s\/?#@]+)*@(?=${PROXY_HOST})`, 'g');
+  const bareSpaced = new RegExp(String.raw`(^|${PROXY_BOUND})${PROXY_USER}+${sep}[^\/?#]*\s[^\/?#]{0,200}?@(?=${PROXY_HOST})`, 'g');
   return text
     .replace(compact, '$1')
     .replace(spaced, '$1')
