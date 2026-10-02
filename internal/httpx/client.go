@@ -135,7 +135,8 @@ func Redact(raw string) string {
 }
 
 // splitEncodedPassword finds a colon hidden by one or more layers of percent
-// encoding. The decoded username and password are returned separately.
+// encoding, including a compatibility colon such as the fullwidth form.
+// The decoded username and password are returned separately.
 func splitEncodedPassword(userinfo string) (string, string, bool) {
 	decoded := userinfo
 	for i := 0; i < 4; i++ {
@@ -145,11 +146,25 @@ func splitEncodedPassword(userinfo string) (string, string, bool) {
 		}
 		decoded = next
 	}
-	name, secret, found := strings.Cut(decoded, ":")
+	name, secret, found := strings.Cut(foldUserinfoColons(decoded), ":")
 	if !found || secret == "" {
 		return "", "", false
 	}
 	return name, secret, true
+}
+
+// foldUserinfoColons maps colon characters that NFKC folds to ASCII ':'.
+// The Go core has no Unicode normalization dependency, so the three
+// compatibility colons are listed directly.
+func foldUserinfoColons(s string) string {
+	if !strings.ContainsAny(s, "\ufe13\ufe55\uff1a") {
+		return s
+	}
+	return strings.NewReplacer(
+		"\ufe13", ":",
+		"\ufe55", ":",
+		"\uff1a", ":",
+	).Replace(s)
 }
 
 func lenientUnescape(s string) string {

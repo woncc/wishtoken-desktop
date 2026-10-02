@@ -149,3 +149,23 @@ func TestManagementHidesEncodedProxyPassword(t *testing.T) {
 		}
 	}
 }
+
+func TestManagementHidesCompatibilityProxyColon(t *testing.T) {
+	const password = "s3cret-proxy"
+	proxyURL := "http://user\uff1a" + password + "@127.0.0.1:7890"
+	encoded := "http://user%EF%BC%9A" + password + "@127.0.0.1:7890"
+	cfg := config.Default()
+	cfg.APIKey = "synthetic-local-management-key"
+	cfg.ProxyURL = proxyURL
+	acc := testAccount("acct_one", "one@example.test")
+	acc.ProxyURL = encoded
+	acc.Name = "note " + proxyURL
+	acc.LastError = "dial " + encoded
+	f := newFixture(t, cfg, acc)
+	for _, route := range []string{"/api/status", "/api/accounts", "/api/settings"} {
+		status, body := getRaw(t, f, route)
+		if status != http.StatusOK || strings.Contains(body, password) || strings.Contains(body, "%EF%BC%9A"+password) {
+			t.Fatalf("%s leaked compatibility proxy colon: %d %s", route, status, body)
+		}
+	}
+}
