@@ -1577,3 +1577,80 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsParentheses(t *testing.T) {
+	secret := "code(ver)1"
+	marked := strings.NewReplacer("(", "\u207d", ")", "\u208e").Replace(secret)
+	encoded := strings.NewReplacer("(", "%EF%BC%88", ")", "%EF%BC%89").Replace(secret)
+	got := SanitizeFailure("rejected "+marked+" "+encoded+" later", secret)
+	for _, item := range []string{secret, marked, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	vertical := strings.NewReplacer("(", "\ufe35", ")", "\ufe36").Replace(secret)
+	got = SanitizeFailure("rejected "+vertical+" later", secret)
+	for _, item := range []string{secret, vertical, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("vertical leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2474 later",
+		"see \u27ee later",
+		"see \u2768 later",
+		"see \uff5f later",
+		"path \uff08 file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("paren prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestParenASCIIFoldsOnlyParentheses(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0x207D, '(', true},
+		{0x208D, '(', true},
+		{0xFE35, '(', true},
+		{0xFE59, '(', true},
+		{0xFF08, '(', true},
+		{0x207E, ')', true},
+		{0x208E, ')', true},
+		{0xFE36, ')', true},
+		{0xFE5A, ')', true},
+		{0xFF09, ')', true},
+		{'(', 0, false},
+		{')', 0, false},
+		{0x2474, 0, false},
+		{0x27EE, 0, false},
+		{0x27EF, 0, false},
+		{0x2985, 0, false},
+		{0xFF5F, 0, false},
+		{0x2768, 0, false},
+		{0x2E28, 0, false},
+		{0x207A, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := parenASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := parenASCII(r); ok {
+			n++
+		}
+	}
+	if n != 10 {
+		t.Fatalf("paren fold count %d", n)
+	}
+}
