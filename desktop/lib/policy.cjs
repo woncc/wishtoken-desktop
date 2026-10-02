@@ -43,17 +43,25 @@ const SECRET_TEXT = [
 // "." under NFKC, and so do their percent-encoded forms. A literal-dot check
 // leaves the password in "user:secret@127%2E0%2E0%2E1:7890". Fullwidth digits
 // are numeric labels as well.
+// Port digits can be percent-encoded, including a nested %2537, or fullwidth.
+// A literal-digit check leaves the password in
+// "user:secret@127.0.0.1%3A%37%38%39%30". One digit still does not make a
+// single-label host count.
 // A closing quote, bracket, or sentence mark is not part of the host. The
 // lookahead has to accept it, or "(user:secret@127.0.0.1:7890)" keeps the password.
+// A backtick, pipe, or backslash after the port is a boundary too, including
+// the fullwidth forms. Curly quotes count because straight quotes already do.
+// Otherwise a single-label host such as "user:secret@my-proxy:7890`next"
+// keeps the password.
 // A query, path, or fragment marker is a boundary too. Otherwise
 // "http://example.com/?x=user:secret@10.0.0.8:1080" keeps the password.
 // The same markers can sit inside the password. A URL parser rejects
 // "http://user:secret/token@10.0.0.8:1080", but the raw text, and the
 // "invalid port" fragment of that error, still contain the secret.
 // "=" and "&" are not part of the username, so a query key stays in place.
-const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉]';
-const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉]';
-const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«]';
+const PROXY_BOUND = '[\\s"\'()<>\\[\\]{}/?#&=「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”]';
+const PROXY_USER = '[^\\s"\'()<>\\[\\]{}/?#:@=&「」『』【】（）《》〈〉`｀|｜\\\\＼‘’“”]';
+const PROXY_TAIL = '[\\s/?#.,;:!)\\]}>"\'（）「」『』【】《》〈〉，。！？；、»«`｀|｜\\\\＼‘’“”]';
 // Compatibility colons and other colon-shaped marks still divide userinfo.
 // U+FE13 U+FE55 U+FF1A fold to ":" under NFKC. U+2236 U+02D0 U+A789 U+02F8
 // U+0703 U+0704 U+0589 do not, but a password can hide behind them too.
@@ -116,7 +124,8 @@ const literalDomain = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
 const encodedDomain = `${domainLabel}(?:${DOT_SEP}${domainLabel})*${DOT_SEP}[A-Za-z]{2,}`;
 const fourNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){3}`;
 const shortNumeric = `${numericLabel}(?:${DOT_SEP}${numericLabel}){0,2}`;
-const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}\\d+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}\\d{2,5})(?=$|${PROXY_TAIL})`;
+const PORT_DIGIT = '(?:\\d|[\\uFF10-\\uFF19]|%3\\d|%25(?:25){0,2}3\\d)';
+const PROXY_HOST = `(?:(?:\\[[0-9A-Fa-f:.%]+\\]|localhost|${literalDomain}|${encodedDomain}|${fourNumeric})(?:${proxyPort}${PORT_DIGIT}+)?|(?:${shortNumeric}|${DIGIT}{4,10}|[A-Za-z][A-Za-z0-9_-]*)${proxyPort}${PORT_DIGIT}{2,5})(?=$|${PROXY_TAIL})`;
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
