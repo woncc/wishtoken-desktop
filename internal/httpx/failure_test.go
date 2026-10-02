@@ -4765,3 +4765,73 @@ func TestTagLetterASCIIFoldsOnlyLetters(t *testing.T) {
 		t.Fatalf("tag letter fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsTagDigits(t *testing.T) {
+	secret := "tokenValue19"
+	digit := "tokenValue1\U000E0039"
+	encoded := "tokenValue1%F3%A0%80%B9"
+	inserted := "tokenValue\U000E003019"
+	mixedSecret := "code9/ver1"
+	mixed := "cod\U000E00659\U000E002Fv\U000E0065r\U000E0031"
+	text := "rejected " + digit + " " + encoded + " " + inserted + " " + mixed + " later"
+	got := SanitizeFailure(text, secret, mixedSecret, "tokenValue19tokenValue19")
+	for _, leaked := range []string{secret, digit, encoded, inserted, mixedSecret, mixed, "Value19", "ver1"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	stored := "tokenValue1\U000E0039"
+	got = SanitizeFailure("rejected "+secret+" later", stored)
+	for _, leaked := range []string{secret, stored, "Value19"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stored tag digit leaked %q in %q", leaked, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \U000E0030 later",
+		"see \U000E0039 later",
+		"see \U000E0001 later",
+		"see \U000E007F later",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("tag digit prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestTagDigitASCIIFoldsOnlyDigits(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xE0030, '0', true},
+		{0xE0039, '9', true},
+		{0xE002F, 0, false},
+		{0xE003A, 0, false},
+		{0xE0061, 0, false},
+		{0xE0041, 0, false},
+		{'0', 0, false},
+		{'9', 0, false},
+		{0xE0001, 0, false},
+		{0xE007F, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := tagDigitASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0xE007F; r++ {
+		if _, ok := tagDigitASCII(r); ok {
+			n++
+		}
+	}
+	if n != 10 {
+		t.Fatalf("tag digit fold count %d", n)
+	}
+}
