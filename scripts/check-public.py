@@ -75,6 +75,16 @@ DOT_LIKE = {
     ord('\u06f0'): '.',
     ord('\U0001ecae'): '.',
     ord('\U0001d16d'): '.',
+    # These NFKC-fold to '.' or to the ideographic full stop above. One dot
+    # leader, small full stop, and fullwidth full stop fold to '.'. Vertical
+    # ideographic full stop and halfwidth ideographic full stop fold to
+    # U+3002. The raw forms are listed so a reordered normalization cannot
+    # hide auth.json. Credential redaction does not run NFKC.
+    ord('\u2024'): '.',
+    ord('\uFE52'): '.',
+    ord('\uFF0E'): '.',
+    ord('\uFE12'): '.',
+    ord('\uFF61'): '.',
 }
 # These do not NFKC-fold to ':'. A following stream name must not hide auth.json.
 # Mongolian colon and Bamum colon are the same kind of separator.
@@ -586,6 +596,8 @@ def self_test():
         '\u202eauth.json', 'auth.json\u200e', 'id_rsa\u200f', 'credentials.json\u2066',
         'auth.json\r', 'auth.json\n', 'auth.json\x00', 'secrets.env\u00a0', 'notes.bak\u3000',
         'auth.json\u2024', 'auth.json\u3002', 'auth\uff0ejson', '\uff41\uff55\uff54\uff48.json', '\uff41\uff43\uff43\uff4f\uff55\uff4e\uff54\uff53\uff0e\uff4a\uff53\uff4f\uff4e',
+        'auth\u2024json', 'accounts\ufe52json', 'credentials\ufe12json', 'tokens\uff61json',
+        'nested/auth\u2024json/extra.txt', 'Copy of auth\ufe52json', 'auth\ufe12json.txt',
         'auth.json\uff1a$DATA', 'Copy of auth.json\u00a0', 'auth.json\u00a0.txt', 'auth .json',
         'Diagnostics\u00a0/capture.png', 'auth.json\u2028', 'accounts .json.gz',
         'auth.json.br', 'accounts.json.7z', 'credentials.json.tar', 'auth.json.tgz', 'tokens.json.lz4',
@@ -736,6 +748,7 @@ def self_test():
         'notes\U000114C1readme.txt', 'notes\U000119DFreadme.txt', 'notes\U00011A39readme.txt',
         'notes\U00011C3Ereadme.txt', 'script.go\u0903Zone.Identifier', 'id_rsa.pub\u0983extra',
         'notes\u06d4txt', 'script\u0701go', 'models\u1362json', 'id_rsa\u166epub', 'readme\u2e3cmd',
+        'notes\u2024txt', 'script\ufe52go', 'id_rsa\ufe12pub', 'readme\uff61md', 'models\u2024json',
         'notes..txt', 'script...go', 'models..json', 'id_rsa..pub', 'readme\u2026md',
         'notes\ua4f8txt', 'script\U00010a50go', 'models\uabecjson', 'id_rsa\ua4f8pub', 'readme\uabecmd',
         'notes\ua4fatxt', 'script\ua4fago', 'models\ua4fajson', 'id_rsa\ua4fapub', 'readme\ua4famd',
