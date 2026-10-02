@@ -1495,3 +1495,85 @@ func TestLowLineASCIIFoldsOnlyLowLines(t *testing.T) {
 		t.Fatalf("low line fold count %d", n)
 	}
 }
+
+func TestSanitizeFailureStripsSolidusAndTilde(t *testing.T) {
+	opaque := "tokenValue1tokenValue1tokenVal/x"
+	marked := strings.ReplaceAll(opaque, "/", "\uff0f")
+	encoded := strings.Replace(opaque, "/", "%EF%BC%8F", 1)
+	got := SanitizeFailure("rejected " + marked + " " + encoded + " later")
+	for _, item := range []string{opaque, marked, encoded, "tokenValue", "tokenVal"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	bearer := "Bearer abc.def~ghi/jkl+mnopqrstuvwxyz01"
+	markedBearer := strings.NewReplacer("/", "\uff0f", "~", "\uff5e").Replace(bearer)
+	encodedBearer := strings.NewReplacer("/", "%EF%BC%8F", "~", "%EF%BD%9E").Replace(bearer)
+	got = SanitizeFailure("rejected " + markedBearer + " " + encodedBearer + " later")
+	for _, item := range []string{bearer, markedBearer, encodedBearer, "abc.def", "mnopqrstuvwxyz", "Bearer"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("bearer leaked %q in %q", item, got)
+		}
+	}
+	secret := "code/ver~1"
+	markedSecret := strings.NewReplacer("/", "\uff0f", "~", "\uff5e").Replace(secret)
+	got = SanitizeFailure("rejected "+markedSecret+" later", secret)
+	for _, item := range []string{secret, markedSecret, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("short secret leaked %q in %q", item, got)
+		}
+	}
+	for _, prose := range []string{
+		"see \u2215 later",
+		"see \u2044 later",
+		"see \u223c later",
+		"see \u301c later",
+		"see \u02dc later",
+		"path \uff0f file",
+		"path \uff5e file",
+	} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("solidus prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
+	checks := []struct {
+		r    rune
+		want byte
+		ok   bool
+	}{
+		{0xFF0F, '/', true},
+		{0xFF5E, '~', true},
+		{'/', 0, false},
+		{'~', 0, false},
+		{0x2215, 0, false},
+		{0x2044, 0, false},
+		{0x29F8, 0, false},
+		{0xFF3C, 0, false},
+		{0xFE68, 0, false},
+		{0x223C, 0, false},
+		{0x2053, 0, false},
+		{0x301C, 0, false},
+		{0x02DC, 0, false},
+	}
+	for _, check := range checks {
+		got, ok := solidusTildeASCII(check.r)
+		if ok != check.ok || (check.ok && got != check.want) {
+			t.Fatalf("U+%04X folded to %q ok=%v, want %q ok=%v", check.r, string(got), ok, string(check.want), check.ok)
+		}
+	}
+	n := 0
+	for r := rune(0); r <= 0x2FFFF; r++ {
+		if _, ok := solidusTildeASCII(r); ok {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("solidus tilde fold count %d", n)
+	}
+}
