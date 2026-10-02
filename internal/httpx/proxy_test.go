@@ -146,3 +146,39 @@ func encodeEveryByte(s string) string {
 	}
 	return b.String()
 }
+
+func TestRedactHidesCompatibilityColon(t *testing.T) {
+	const password = "s3cret-proxy"
+	encodedColon := "%EF%BC%9A"
+	nestedColon := "%25EF%25BC%259A"
+	cases := []string{
+		"http://user" + "\uff1a" + password + "@127.0.0.1:7890",
+		"http://user" + "\ufe55" + password + "@127.0.0.1:7890",
+		"http://user" + "\ufe13" + password + "@127.0.0.1:7890",
+		"user" + "\uff1a" + password + "@127.0.0.1:7890",
+		"http://user" + encodedColon + password + "@127.0.0.1:7890",
+		"http://user" + nestedColon + password + "@127.0.0.1:7890",
+		"http://user" + "\uff1a" + password + "%zz@127.0.0.1:7890",
+	}
+	for _, in := range cases {
+		got := Redact(in)
+		for _, leaked := range []string{password, encodedColon + password, nestedColon + password} {
+			if strings.Contains(got, leaked) {
+				t.Fatalf("redact %q leaked %q in %q", in, leaked, got)
+			}
+		}
+		if !strings.Contains(got, "xxxxx") {
+			t.Fatalf("redact %q did not mask password: %q", in, got)
+		}
+		if again := Redact(got); strings.Contains(again, password) {
+			t.Fatalf("second redact leaked: %q", again)
+		}
+		if kept := PreserveProxy(in, " "+Redact(in)+" "); kept != in {
+			t.Fatalf("preserve %q -> %q", in, kept)
+		}
+	}
+	short := Redact("http://user\uff1aname@127.0.0.1:7890")
+	if strings.Contains(short, "\uff1a") || strings.Contains(short, "name") || !strings.Contains(short, "xxxxx") {
+		t.Fatalf("short secret kept a compatibility colon: %q", short)
+	}
+}
