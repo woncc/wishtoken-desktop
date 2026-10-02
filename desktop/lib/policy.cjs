@@ -556,6 +556,9 @@ function htmlProxyChar(cp) {
   if (!Number.isInteger(cp) || cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return '';
   const char = String.fromCodePoint(cp);
   if (PROXY_HTML_CHARS.has(char) || PROXY_MARK_CODES.has(cp) || isSupplementaryInvisible(cp)) return char;
+  // U+FE63 and U+FF0D fold to "-". A numeric reference has to yield the same
+  // character so the label fold can see it.
+  if (cp === 0xFE63 || cp === 0xFF0D) return char;
   return '';
 }
 const PROXY_MARK_CODES = new Set(Array.from(PROXY_MARK, char => char.codePointAt(0)));
@@ -744,11 +747,20 @@ function noteSecret(secrets, secret) {
 // "user:secret@my%2Dproxy:7890" and "user:secret@ex%252Dample.com" keep the
 // password. An encoded underscore is the other mark a single-label host
 // already allows. Otherwise "user:secret@my%5Fproxy:7890" keeps the password.
+// U+FE63 and U+FF0D fold to "-" under NFKC. Their literal and percent-encoded
+// forms kept the password too. A dash that does not fold to "-" stays as written.
 function decodeEncodedLabelPunct(text) {
-  return String(text).replace(/%(?:25){0,3}2[Dd]/g, '-').replace(/%(?:25){0,3}5[Ff]/g, '_');
+  return String(text)
+    .replace(/%(?:25){0,3}2[Dd]/g, '-')
+    .replace(/%(?:25){0,3}5[Ff]/g, '_')
+    .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb][Cc]%(?:25){0,3}8[Dd]/g, '-')
+    .replace(/%(?:25){0,3}[Ee][Ff]%(?:25){0,3}[Bb]9%(?:25){0,3}[Aa]3/g, '-');
+}
+function foldLabelHyphens(text) {
+  return text.replace(/[\uFE63\uFF0D]/g, '-');
 }
 function redactProxyCredentials(text) {
-  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text)))));
+  const decoded = foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
