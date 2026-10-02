@@ -191,13 +191,29 @@ def collapse_dots(value):
         value = value.replace('..', '.')
     return value
 
+def strip_marks(value):
+    # Variation selectors and enclosing marks do not add a base letter.
+    # A combining accent has to go before NFKC, or it composes into a
+    # different letter and auth.json no longer matches.
+    return ''.join(ch for ch in value if unicodedata.category(ch) not in {'Mn', 'Me'})
+
+def fold_separators(value, separators):
+    # Colon and dot lookalikes are translated before marks are removed.
+    # The musical augmentation dot is a spacing mark and must stay a dot.
+    value = value.translate(COLON_LIKE).translate(DOT_LIKE).translate(separators)
+    value = strip_marks(value)
+    value = unicodedata.normalize('NFKC', value)
+    value = value.translate(DOT_LIKE).translate(separators).translate(COLON_LIKE)
+    value = strip_marks(value)
+    return value
+
 def normalize_component(name):
     # Compatibility forms such as fullwidth letters and colons fold to ASCII.
     # Colon lookalikes are folded first: double colon equal expands to '::='
     # and would otherwise leave '=' glued to the following stream name.
     # Format, control, and line-separator characters can sit inside a name
     # without changing how a person reads it.
-    folded = unicodedata.normalize('NFKC', name.translate(COLON_LIKE)).translate(DOT_LIKE).translate(COLON_LIKE).casefold()
+    folded = fold_separators(name, {}).casefold()
     cleaned = ''.join(ch for ch in folded if unicodedata.category(ch) not in {'Cf', 'Cc', 'Zl', 'Zp'})
     return collapse_dots(cleaned)
 
@@ -322,9 +338,9 @@ SEPARATOR_LIKE = {
 
 def normalized_rel(rel):
     # Fold colon lookalikes before NFKC. Double colon equal expands to '::='
-    # and would otherwise glue '=' onto the following name.
-    folded = unicodedata.normalize('NFKC', rel.translate(COLON_LIKE)).translate(DOT_LIKE).translate(SEPARATOR_LIKE).translate(COLON_LIKE)
-    return folded.replace('\\', '/')
+    # and would otherwise glue '=' onto the following name. The same mark
+    # fold used for a single filename applies to the whole relative path.
+    return fold_separators(rel, SEPARATOR_LIKE).replace('\\', '/')
 
 def forbidden_suffix(name):
     if not name:
@@ -526,6 +542,11 @@ def self_test():
         'readme\u2237auth.json', 'notes\u2e2cid_rsa', 'file\u2237credentials.json',
         'docs\u2e2caccounts.json', 'nested/file\u2237.netrc', 'ID_RSA\u2e2cx',
         'auth.json\u2237secret', 'readme\u2e2c.env', 'file\u2237.netrc',
+        'auth.json\ufe0e', 'auth.json\ufe0f', 'auth\ufe0e.json', 'auth.\ufe0ejson',
+        'accounts.json\u0332', 'id_rsa\u20dd', '.netrc\u180b', 'credentials.json\u0489',
+        'tokens.json\u20e3', 'auth.json\u0301', 'a\u0301uth.json', 'auth\u180c.json',
+        'Copy of auth.json\ufe0f', 'nested/auth\ufe0e.json/extra.txt',
+        'accounts.json\u180d.txt', 'secrets.env\u20dd', 'id_rsa\ufe0f.txt',
     )
     allowed = (
         'internal/server/management_credentials_test.go', 'internal/basispoints/envelope.go',
@@ -578,6 +599,8 @@ def self_test():
         'notes\u1393readme.txt', 'models.json\U0001d108readme.txt', 'id_rsa.pub\U00011dd9extra',
         'notes\u2237readme.txt', 'models.json\u2e2creadme.txt', 'id_rsa.pub\u2237extra',
         'script.go\u2e2cZone.Identifier',
+        'script.go\ufe0e', 'id_rsa.pub\ufe0f', 'notes\u0301.txt', 'readme\u20dd.md',
+        'models.json\u0332', 'notes\u180b.txt',
     )
     for rel in blocked:
         if not path_reason(rel):
