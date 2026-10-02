@@ -471,6 +471,11 @@ const PROXY_HOST = `(?:(?:${MARK})*(?:\\[(?:[0-9A-Fa-f:.%]|${MARK})+\\]|${LOCAL_
 // "&ZeroWidthSpace;", "&zwnj;", "&zwj;", "&lrm;", "&rlm;", and "&shy;" are
 // invisible marks. The semicolon is required. Otherwise
 // "user:secret@my&ZeroWidthSpace;proxy:7890" keeps the password.
+// "&NoBreak;", "&af;", "&it;", "&ic;", and the Negative*Space names are the
+// same kind of mark. Otherwise "user:secret@my&NoBreak;proxy:7890" keeps
+// the password. "&shy" may omit the semicolon when the next character does
+// not continue a name. Otherwise "user:secret@my&shy-proxy:7890" keeps the
+// password. "&shyproxy" is not a reference and stays as written.
 const HTML_NAMED = new Map([
   ['amp', '&'],
   ['AMP', '&'],
@@ -505,7 +510,18 @@ const HTML_NAMED = new Map([
   ['zwj', '\u200D'],
   ['lrm', '\u200E'],
   ['rlm', '\u200F'],
-  ['shy', '\u00AD']
+  ['shy', '\u00AD'],
+  ['NoBreak', '\u2060'],
+  ['ApplyFunction', '\u2061'],
+  ['af', '\u2061'],
+  ['InvisibleTimes', '\u2062'],
+  ['it', '\u2062'],
+  ['InvisibleComma', '\u2063'],
+  ['ic', '\u2063'],
+  ['NegativeMediumSpace', '\u200B'],
+  ['NegativeThickSpace', '\u200B'],
+  ['NegativeThinSpace', '\u200B'],
+  ['NegativeVeryThinSpace', '\u200B']
 ]);
 const HTML_LEGACY = ['AMP', 'amp', 'middot', 'sup1', 'sup2', 'sup3'];
 const HTML_STRICT = [...HTML_NAMED.keys()].filter(name => !HTML_LEGACY.includes(name));
@@ -643,6 +659,9 @@ function acceptedProxyRef(literal, nextChar) {
   if (match && HTML_NAMED.has(match[1])) return HTML_NAMED.get(match[1]);
   match = /^&([A-Za-z0-9]+)$/.exec(literal);
   if (match && HTML_LEGACY.includes(match[1])) return HTML_NAMED.get(match[1]) || '';
+  // The named-character table includes "&shy" without a semicolon. A following
+  // name character or "=" means it is not a reference.
+  if (match && match[1] === 'shy' && !/[0-9A-Za-z=]/.test(nextChar || '')) return HTML_NAMED.get('shy') || '';
   return '';
 }
 const HTML_ATOM = /[A-Za-z0-9#xX;]/;
@@ -720,8 +739,16 @@ function decodeProxyHtml(text) {
 function noteSecret(secrets, secret) {
   if (secret) secrets.push(secret);
 }
+// A percent-encoded hyphen is still a hyphen inside a host label. The same
+// extra "25" depth already accepted for a port digit applies. Otherwise
+// "user:secret@my%2Dproxy:7890" and "user:secret@ex%252Dample.com" keep the
+// password. An encoded underscore is the other mark a single-label host
+// already allows. Otherwise "user:secret@my%5Fproxy:7890" keeps the password.
+function decodeEncodedLabelPunct(text) {
+  return String(text).replace(/%(?:25){0,3}2[Dd]/g, '-').replace(/%(?:25){0,3}5[Ff]/g, '_');
+}
 function redactProxyCredentials(text) {
-  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(String(text)))));
+  const decoded = foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedLabelPunct(text)))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
