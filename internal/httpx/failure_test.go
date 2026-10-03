@@ -1595,7 +1595,8 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1FB60, '/', true},
 		{0x1FB5F, '/', true},
 		{0x1FB5E, '/', true},
-		{0x1FB5D, 0, false},
+		{0x1FB5D, '/', true},
+		{0x1FBA4, 0, false},
 		{0x1FB5A, '/', true},
 		{0x1FB56, 0, false},
 		{0x1FB57, '/', true},
@@ -1603,7 +1604,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1FB59, '/', true},
 		{0x1FB5B, '/', true},
 		{0x1FB5C, '/', true},
-		{0x1FB5D, 0, false},
+		{0x1FB5D, '/', true},
 		{0x27CB, '/', true},
 		{0x2AFD, '/', true},
 		{0x1F67C, '/', true},
@@ -1643,7 +1644,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 57 {
+	if n != 58 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -2241,6 +2242,26 @@ func TestSanitizeFailureStripsOuterBlockDiagonal(t *testing.T) {
 	for _, prose := range []string{"see \U0001FB55 later", "see \U0001FB54 later", "see \U0001FB68 later", "see \U0001FB56 later"} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("outer block diagonal prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsShortLowerUpperLeftBlockDiagonal(t *testing.T) {
+	secret := "code/ver/1"
+	block := strings.ReplaceAll(secret, "/", "\U0001FB5D")
+	encoded := strings.ReplaceAll(secret, "/", "%F0%9F%AD%9D")
+	got := SanitizeFailure("rejected "+block+" "+encoded+" later", secret)
+	for _, item := range []string{secret, block, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001FB5D later", "see \U0001FBA4 later", "see \U0001FB68 later", "see \U0001FB5E later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("short lower upper left block diagonal prose changed: %q -> %q", prose, got)
 		}
 	}
 }
@@ -3276,6 +3297,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x1FB60, 0, false},
 		{0x1FB5F, 0, false},
 		{0x1FB5E, 0, false},
+		{0x1FB5D, 0, false},
 		{0x1FB3C, '\\', true},
 		{0x1FB3D, '\\', true},
 		{0x1FB3E, '\\', true},
