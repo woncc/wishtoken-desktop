@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -1613,8 +1614,13 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1F7B8, '/', true},
 		{0x1F7B9, '/', true},
 		{0x1F7BA, '/', true},
+		{0x1F7BB, '/', true},
+		{0x1F7BC, '/', true},
+		{0x1F7BD, '/', true},
+		{0x1F7BE, '/', true},
+		{0x1F7BF, '/', true},
 		{0x1F7A7, 0, false},
-		{0x1F7BB, 0, false},
+		{0x1F7C0, 0, false},
 		{0x1FBC1, 0, false},
 		{0x1FBC5, 0, false},
 		{0x1FBF0, 0, false},
@@ -1691,7 +1697,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 98 {
+	if n != 103 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -3173,6 +3179,47 @@ func TestSanitizeFailureStripsNegativeDiagonalCrossPath(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsEightSpokedAsteriskPaths(t *testing.T) {
+	secret := "code/ver/1"
+	marks := []struct {
+		name string
+		r    rune
+		next rune
+	}{
+		{"light", '\U0001F7BB', '\U0001F7BC'},
+		{"medium", '\U0001F7BC', '\U0001F7BD'},
+		{"bold", '\U0001F7BD', '\U0001F7BE'},
+		{"heavy", '\U0001F7BE', '\U0001F7BF'},
+		{"very heavy", '\U0001F7BF', '\U0001F7C0'},
+	}
+	for _, mark := range marks {
+		block := strings.ReplaceAll(secret, "/", string(mark.r))
+		var bytes []string
+		for _, b := range []byte(string(mark.r)) {
+			bytes = append(bytes, fmt.Sprintf("%%%02X", b))
+		}
+		encoded := strings.ReplaceAll(secret, "/", strings.Join(bytes, ""))
+		got := SanitizeFailure("rejected "+block+" "+encoded+" later", secret)
+		for _, item := range []string{secret, block, encoded, "code", "ver"} {
+			if strings.Contains(got, item) {
+				t.Fatalf("%s leaked %q in %q", mark.name, item, got)
+			}
+		}
+		if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+			t.Fatalf("%s lost context: %q", mark.name, got)
+		}
+		for _, prose := range []string{
+			"see " + string(mark.r) + " later",
+			"see " + string(mark.next) + " later",
+			"see \u2B59 later",
+		} {
+			if got := SanitizeFailure(prose); got != prose {
+				t.Fatalf("%s eight spoked asterisk prose changed: %q -> %q", mark.name, prose, got)
+			}
+		}
+	}
+}
+
 func TestSanitizeFailureStripsExtremelyHeavySixSpokedAsteriskPath(t *testing.T) {
 	secret := "code/ver/1"
 	block := strings.ReplaceAll(secret, "/", "\U0001F7BA")
@@ -4224,6 +4271,11 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x1F7B9, 0, false},
 		{0x1F7BA, 0, false},
 		{0x1F7BB, 0, false},
+		{0x1F7BC, 0, false},
+		{0x1F7BD, 0, false},
+		{0x1F7BE, 0, false},
+		{0x1F7BF, 0, false},
+		{0x1F7C0, 0, false},
 		{0x2613, 0, false},
 		{0x26DD, 0, false},
 		{0x2B59, 0, false},

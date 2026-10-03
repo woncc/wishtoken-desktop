@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -4857,6 +4858,45 @@ func TestManagementHidesSecretsSplitByNegativeDiagonalCrossPath(t *testing.T) {
 	}
 	if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
 		t.Fatalf("note was rewritten: %s", out)
+	}
+}
+
+func TestManagementHidesSecretsSplitByEightSpokedAsteriskPaths(t *testing.T) {
+	marks := []rune{'\U0001F7BB', '\U0001F7BC', '\U0001F7BD', '\U0001F7BE', '\U0001F7BF'}
+	for _, mark := range marks {
+		cfg := config.Default()
+		cfg.APIKey = "synthetic-local-management-key"
+		acc := testAccount("acct_one", "one@example.test")
+		acc.RefreshToken = "rt_Zz9q/Refresh/7f3a"
+		block := strings.ReplaceAll(acc.RefreshToken, "/", string(mark))
+		acc.Name = "note " + block
+		acc.LastError = "rejected " + block
+		f := newFixture(t, cfg, acc)
+		status, body := getRaw(t, f, "/api/accounts")
+		payload := strings.Split(acc.AccessToken, ".")[1]
+		for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, block, payload, "eyJ", "Zz9q", "Refresh", "7f3a"} {
+			if strings.Contains(body, leaked) {
+				t.Fatalf("U+%04X leaked %q: %d %s", mark, leaked, status, body)
+			}
+		}
+		if status != http.StatusOK || !strings.Contains(body, "note") || !strings.Contains(body, "[redacted]") || !strings.Contains(body, "one@example.test") || !strings.Contains(body, "rejected") {
+			t.Fatalf("U+%04X display context lost: %d %s", mark, status, body)
+		}
+		var bytes []string
+		for _, b := range []byte(string(mark)) {
+			bytes = append(bytes, fmt.Sprintf("%%%02X", b))
+		}
+		encoded := strings.ReplaceAll(acc.RefreshToken, "/", strings.Join(bytes, ""))
+		raw := `{"note":"see ` + encoded + `","access_token":"` + acc.AccessToken + `"}`
+		out := string(f.srv.redactManagementBody([]byte(raw)))
+		for _, leaked := range []string{acc.AccessToken, acc.RefreshToken, encoded, payload, "eyJ", "Zz9q", "Refresh"} {
+			if strings.Contains(out, leaked) {
+				t.Fatalf("U+%04X leaked %q in %s", mark, leaked, out)
+			}
+		}
+		if !strings.Contains(out, `"note"`) || !strings.Contains(out, "[redacted]") || !strings.Contains(out, "see") {
+			t.Fatalf("U+%04X note was rewritten: %s", mark, out)
+		}
 	}
 }
 
