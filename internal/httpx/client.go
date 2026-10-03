@@ -4419,7 +4419,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // stroke still splits a stored slash. It is a slash on its own pass.
 // The extremely heavy saltire puts both strokes in the cell. The
 // rising stroke still splits a stored slash. It is a slash on its own
-// pass. The five spoked asterisk stays out. The negative short
+// pass. The five spoked asterisk stays out. The saltire mark puts
+// both strokes in the cell. The rising stroke still splits a stored
+// slash. It is a slash on its own pass. The squared saltire stays out.
+// The negative short
 // diagonal folds to a
 // slash. The upper right block
 // diagonal from upper centre to lower right is that falling stroke as a
@@ -4521,7 +4524,8 @@ func numberSignASCII(r rune) (byte, bool) {
 // The heavy saltire is a slash on its own pass. The very heavy
 // saltire is a slash on its own pass. The extremely heavy saltire
 // is a slash on its own pass. The five spoked asterisk stays out.
-// Other letters and ideographs stay out.
+// The saltire mark is a slash on its own pass. The squared saltire
+// stays out. Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -4909,7 +4913,9 @@ func parenASCII(r rune) (byte, bool) {
 // The rising stroke still splits a stored slash. It stays one slash.
 // The extremely heavy saltire puts both strokes in the cell. The
 // rising stroke still splits a stored slash. It stays one slash. The
-// five spoked asterisk stays out. The modifier
+// five spoked asterisk stays out. The saltire mark puts both
+// strokes in the cell. The rising stroke still splits a stored slash.
+// It stays one slash. The squared saltire stays out. The modifier
 // letter dot
 // slash is that dotted stroke in small form and does not NFKC-fold to a
 // slash. It stays one slash. The dot vertical bar and the dot horizontal
@@ -5058,8 +5064,11 @@ func parenASCII(r rune) (byte, bool) {
 // The extremely heavy saltire puts both strokes in the cell. The
 // rising stroke still splits a stored slash. It stays one slash so
 // the path cannot glue the token back together. It does not NFKC-fold
-// to a slash either. The five spoked asterisk stays out. Other letters
-// stay out.
+// to a slash either. The five spoked asterisk stays out. The saltire
+// mark puts both strokes in the cell. The rising stroke still splits
+// a stored slash. It stays one slash so the path cannot glue the token
+// back together. It does not NFKC-fold to a slash either. The squared
+// saltire stays out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -5108,7 +5117,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBA4, 0x1FBA5, 0x1FBA6, 0x1FBA7, 0x1FBA8, 0x1FBAA, 0x1FBAB, 0x1FBAC, 0x1FBAD, 0x1FBAE, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBD, 0x1FBBE, 0x1FBBF, 0x1FBC0, 0x1FBCA, 0x1F7A8, 0x1F7A9, 0x1F7AA, 0x1F7AB, 0x1F7AC, 0x1F7AD, 0x1F7AE:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBA4, 0x1FBA5, 0x1FBA6, 0x1FBA7, 0x1FBA8, 0x1FBAA, 0x1FBAB, 0x1FBAC, 0x1FBAD, 0x1FBAE, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBD, 0x1FBBE, 0x1FBBF, 0x1FBC0, 0x1FBCA, 0x1F7A8, 0x1F7A9, 0x1F7AA, 0x1F7AB, 0x1F7AC, 0x1F7AD, 0x1F7AE, 0x2613:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
