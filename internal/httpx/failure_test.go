@@ -1596,8 +1596,9 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1F7AA, '/', true},
 		{0x1F7AB, '/', true},
 		{0x1F7AC, '/', true},
+		{0x1F7AD, '/', true},
 		{0x1F7A7, 0, false},
-		{0x1F7AD, 0, false},
+		{0x1F7AE, 0, false},
 		{0x1FBC1, 0, false},
 		{0x1FBC5, 0, false},
 		{0x1FBF0, 0, false},
@@ -1674,7 +1675,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 81 {
+	if n != 82 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -3156,6 +3157,26 @@ func TestSanitizeFailureStripsNegativeDiagonalCrossPath(t *testing.T) {
 	}
 }
 
+func TestSanitizeFailureStripsVeryHeavySaltirePath(t *testing.T) {
+	secret := "code/ver/1"
+	block := strings.ReplaceAll(secret, "/", "\U0001F7AD")
+	encoded := strings.ReplaceAll(secret, "/", "%F0%9F%9E%AD")
+	got := SanitizeFailure("rejected "+block+" "+encoded+" later", secret)
+	for _, item := range []string{secret, block, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001F7AD later", "see \U0001F7AC later", "see \U0001F7AE later", "see \U0001F7AB later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("very heavy saltire prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
 func TestSanitizeFailureStripsHeavySaltirePath(t *testing.T) {
 	secret := "code/ver/1"
 	block := strings.ReplaceAll(secret, "/", "\U0001F7AC")
@@ -3853,6 +3874,7 @@ func TestReverseSolidusASCIIFoldsOnlyReverseSolidus(t *testing.T) {
 		{0x1F7AB, 0, false},
 		{0x1F7AC, 0, false},
 		{0x1F7AD, 0, false},
+		{0x1F7AE, 0, false},
 		{0x1FBC1, 0, false},
 		{0x1FBF0, 0, false},
 		{0x1FB65, '\\', true},
