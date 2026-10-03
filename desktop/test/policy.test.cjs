@@ -4655,7 +4655,7 @@ test('renderer text drops proxy passwords hidden by a fullwidth letter', () => {
       `user:${password}@my${mark}proxy`,
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
     for (const input of unchanged) assert.equal(redactPublic(input), input, input);
@@ -4744,8 +4744,8 @@ test('renderer text drops proxy passwords hidden by a circled letter', () => {
       `user:${password}@my${mark}proxy`,
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
-      `user:${password}@my\u32CEproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\u00B5proxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
@@ -4832,16 +4832,16 @@ test('renderer text drops proxy passwords hidden by a letterlike symbol', () => 
       `user:${password}@my${mark}proxy`,
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\u00B5proxy:7890`,
       `user:${password}@my\u2100proxy:7890`,
       `user:${password}@my\u2103proxy:7890`,
       `user:${password}@my\u210Fproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\u2126proxy:7890`,
       `user:${password}@my\u212Bproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
     for (const input of unchanged) assert.equal(redactPublic(input), input, input);
@@ -4915,10 +4915,10 @@ test('renderer text drops proxy passwords hidden by a Latin compatibility letter
       `user:${password}@my${mark}proxy`,
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\u00B5proxy:7890`,
       `user:${password}@my\u00C6proxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
     for (const input of unchanged) assert.equal(redactPublic(input), input, input);
@@ -5013,7 +5013,7 @@ test('renderer text drops proxy passwords hidden by a modifier letter', () => {
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
       `user:${password}@my\u00B5proxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\uA7F8proxy:7890`,
       `user:${password}@my\u02B1proxy:7890`,
       `user:${password}@my%F0%90%9Eproxy:7890`,
@@ -5106,7 +5106,7 @@ test('renderer text drops proxy passwords hidden by a superscript or subscript l
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
       `user:${password}@my\u00B5proxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my%E2%81proxy:7890`,
       'http://user@127.0.0.1:7890'
     ];
@@ -5194,10 +5194,10 @@ test('renderer text drops proxy passwords hidden by a roman numeral', () => {
       `user:${password}@my${mark}proxy`,
       `user:${password}@10${mark}.0.0.1:7890`,
       `note ${mark} later`,
-      `user:${password}@my\u32CEproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
-      `user:${password}@my\u32CEproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
+      `user:${password}@my\u32CFproxy:7890`,
       `user:${password}@my\u00B5proxy:7890`,
       `user:${password}@my%E2%85proxy:7890`,
       'http://user@127.0.0.1:7890'
@@ -13406,7 +13406,7 @@ test('renderer text drops proxy passwords hidden by a tortoise shell bracketed S
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13488,7 +13488,7 @@ test('renderer text drops proxy passwords hidden by a squared CD', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13570,7 +13570,7 @@ test('renderer text drops proxy passwords hidden by a squared WZ', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13652,7 +13652,7 @@ test('renderer text drops proxy passwords hidden by a squared HV', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13733,7 +13733,7 @@ test('renderer text drops proxy passwords hidden by a squared MV', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13814,7 +13814,7 @@ test('renderer text drops proxy passwords hidden by a squared SD', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13895,7 +13895,7 @@ test('renderer text drops proxy passwords hidden by a squared SS', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -13976,7 +13976,7 @@ test('renderer text drops proxy passwords hidden by a squared PPV', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14057,7 +14057,7 @@ test('renderer text drops proxy passwords hidden by a squared WC', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14138,7 +14138,7 @@ test('renderer text drops proxy passwords hidden by a raised MC sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14219,7 +14219,7 @@ test('renderer text drops proxy passwords hidden by a raised MD sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14300,7 +14300,7 @@ test('renderer text drops proxy passwords hidden by a raised MR sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14382,7 +14382,7 @@ test('renderer text drops proxy passwords hidden by a squared DJ', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14464,7 +14464,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital ligature IJ'
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14546,7 +14546,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature ij', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14628,7 +14628,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter LJ', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14710,7 +14710,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter L wit
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14792,7 +14792,7 @@ test('renderer text drops proxy passwords hidden by a Latin small letter LJ', ()
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14874,7 +14874,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter NJ', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -14956,7 +14956,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter N wit
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15038,7 +15038,7 @@ test('renderer text drops proxy passwords hidden by a Latin small letter NJ', ()
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15120,7 +15120,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter DZ', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15202,7 +15202,7 @@ test('renderer text drops proxy passwords hidden by a Latin capital letter D wit
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15284,7 +15284,7 @@ test('renderer text drops proxy passwords hidden by a Latin small letter DZ', ()
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15366,7 +15366,7 @@ test('renderer text drops proxy passwords hidden by a rupee sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15448,7 +15448,7 @@ test('renderer text drops proxy passwords hidden by a numero sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15530,7 +15530,7 @@ test('renderer text drops proxy passwords hidden by a service mark', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15612,7 +15612,7 @@ test('renderer text drops proxy passwords hidden by a telephone sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15694,7 +15694,7 @@ test('renderer text drops proxy passwords hidden by a trade mark sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15776,7 +15776,7 @@ test('renderer text drops proxy passwords hidden by a facsimile sign', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15858,7 +15858,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral two', () => 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -15940,7 +15940,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral three', () =
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16022,7 +16022,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral four', () =>
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16104,7 +16104,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral six', () => 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16186,7 +16186,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral seven', () =
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16268,7 +16268,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral eight', () =
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16350,7 +16350,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral nine', () =>
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16432,7 +16432,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral eleven', () 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16514,7 +16514,7 @@ test('renderer text drops proxy passwords hidden by a roman numeral twelve', () 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16596,7 +16596,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral two', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16678,7 +16678,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral three'
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16760,7 +16760,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral four',
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16842,7 +16842,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral six', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -16924,7 +16924,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral seven'
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17006,7 +17006,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral eight'
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17088,7 +17088,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral nine',
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17170,7 +17170,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral eleven
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17252,7 +17252,7 @@ test('renderer text drops proxy passwords hidden by a small roman numeral twelve
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17334,7 +17334,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature ff', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17416,7 +17416,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature fi', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17498,7 +17498,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature fl', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17580,7 +17580,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature ffi',
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17662,7 +17662,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature ffl',
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17744,7 +17744,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature long 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17826,7 +17826,7 @@ test('renderer text drops proxy passwords hidden by a Latin small ligature st', 
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17908,7 +17908,7 @@ test('renderer text drops proxy passwords hidden by a squared Hg', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
@@ -17990,7 +17990,89 @@ test('renderer text drops proxy passwords hidden by a squared erg', () => {
     `note ${mark} later`,
     `user:${password}@10${mark}.0.0.1:7890`,
     `user:${password}@my-proxy:7${mark}0`,
-    `user:${password}@my\u32CEproxy:7890`,
+    `user:${password}@my\u32CFproxy:7890`,
+    `user:${password}@my%F0%9F%84%Aproxy:7890`,
+    `user:${password}@my&#x${hex}Aproxy:7890`,
+    'http://user@127.0.0.1:7890'
+  ];
+  for (const input of unchanged) assert.equal(redactPublic(input), input, input);
+  assert.equal(redactPublic(`user:${password}@proxy${mark}:7890`), `proxy${ascii}:7890`);
+  assert.equal(redactPublic(`user:${password}@${mark}${mark}.example:8080`), `${ascii}${ascii}.example:8080`);
+  const proxy = `http://user:${password}@my${mark}proxy:7890`;
+  const snap = publicSnapshot({
+    settings: { proxy_url: proxy, auto_refresh: false, usage_probe: true },
+    accounts: [{ id: 'acc-1', name: `note user:${password}@ex${mark}ample.com:8080`, email: 'a@example.test', last_error: `dial user:${password}@my&#${cp};proxy:7890 failed` }]
+  });
+  const delivered = rendererPayload(snap);
+  assert.equal(delivered.settings.proxy_url, proxy);
+  assert.equal(delivered.accounts[0].name, `note ex${ascii}ample.com:8080`);
+  assert.equal(delivered.accounts[0].email, 'a@example.test');
+  assert.equal(delivered.accounts[0].last_error, `dial my${ascii}proxy:7890 failed`);
+  assert.equal(delivered.accounts[0].last_error.includes('s3cret'), false);
+  assert.equal(snap.settings.proxy_url, proxy);
+});
+
+test('renderer text drops proxy passwords hidden by a squared eV', () => {
+  const password = 's3cret-token';
+  const nest = (token, extra) => {
+    let out = token;
+    for (let layer = 0; layer < extra; layer += 1) out = out.replace(/%/g, '%25');
+    return out;
+  };
+  const body = value => value.split('').map(char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`).join('');
+  const cp = 0x32CE;
+  const mark = String.fromCodePoint(cp);
+  const ascii = 'eV';
+  assert.equal(mark.normalize('NFKC'), 'eV');
+  const got = redactPublic(`user:${password}@my${mark}proxy:7890`);
+  assert.equal(got, `my${ascii}proxy:7890`);
+  assert.equal(got.toLowerCase().includes('s3cret'), false);
+  assert.equal(redactPublic(`user:${password}@ex${mark}ample.com:8080`), `ex${ascii}ample.com:8080`);
+  const encoded = encodeURIComponent(mark);
+  const hex = cp.toString(16).toUpperCase();
+  const dec = String(cp);
+  const cases = [
+    [`user:${password}@my${mark}${mark}proxy:7890`, `my${ascii}${ascii}proxy:7890`],
+    [`http://user:${password}@ex${mark}ample.com:8080/x`, `http://ex${ascii}ample.com:8080/x`],
+    [`http://us${mark}r:${password}@example.com:8080/x`, `http://example.com:8080/x`],
+    [`socks5://alice:${password}@my${mark}proxy:7890`, `socks5://my${ascii}proxy:7890`],
+    [`(user:${password}@my${mark}proxy:7890)`, `(my${ascii}proxy:7890)`],
+    [`user:${password}@${mark}x.example:8080`, `${ascii}x.example:8080`],
+    [`user:s${mark}cret@my-proxy:7890`, `my-proxy:7890`],
+    [`user:${password}@my${encoded}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${encoded.toLowerCase()}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${nest(encoded, 1)}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${nest(encoded, 3)}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my&#${dec};proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my&#x${hex};proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my&#x${hex}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my&#x${hex.toLowerCase()};proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my&amp;#${dec};proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my%26%23x${hex}%3Bproxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${nest(`%26%23x${hex}%3B`, 1)}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${body(`&#x${hex};`)}proxy:7890`, `my${ascii}proxy:7890`],
+    [`user:${password}@my${nest(body(`&#${dec};`), 3)}proxy:7890`, `my${ascii}proxy:7890`],
+    [`a=1&user:${password}@my&#${dec};proxy:7890&b=2`, `a=1&my${ascii}proxy:7890&b=2`],
+    [`note &#x${hex}; later user:${password}@10.1:8080`, `note ${ascii} later 10.1:8080`],
+    [`two user:${password}@my${mark}proxy:7890) and user:other-secret@10.1:8080.`, `two my${ascii}proxy:7890) and 10.1:8080.`],
+    [`invalid proxy url "http://user:s3cret/token@my&#${dec};proxy:7890": invalid port ":s3cret" after host`, `invalid proxy url "http://my${ascii}proxy:7890": invalid port ":[凭据已隐藏]" after host`]
+  ];
+  for (const [input, expected] of cases) {
+    const got = redactPublic(input);
+    assert.equal(got, expected, input);
+    assert.equal(redactPublic(got), got);
+    assert.equal(got.toLowerCase().includes('s3cret'), false);
+    assert.equal(got.includes('other-secret'), false);
+    assert.equal(got.includes(mark), false);
+  }
+  const unchanged = [
+    `Build v1${mark}2@beta`,
+    `file${mark}name.txt`,
+    `user:${password}@my${mark}proxy`,
+    `note ${mark} later`,
+    `user:${password}@10${mark}.0.0.1:7890`,
+    `user:${password}@my-proxy:7${mark}0`,
+    `user:${password}@my\u32CFproxy:7890`,
     `user:${password}@my%F0%9F%84%Aproxy:7890`,
     `user:${password}@my&#x${hex}Aproxy:7890`,
     'http://user@127.0.0.1:7890'
