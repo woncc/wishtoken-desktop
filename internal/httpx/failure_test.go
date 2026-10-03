@@ -1574,7 +1574,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x1FBA1, 0, false},
 		{0x1FBA2, 0, false},
 		{0x2573, '/', true},
-		{0x1FBA4, 0, false},
+		{0x1FBA4, '/', true},
 		{0x1FBBE, '/', true},
 		{0x1FBBF, 0, false},
 		{0xA718, '/', true},
@@ -1602,7 +1602,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 		{0x25A9, '/', true},
 		{0x25A6, 0, false},
 		{0x1FB99, '/', true},
-		{0x1FBA4, 0, false},
+		{0x1FBA4, '/', true},
 		{0x1FB5A, '/', true},
 		{0x1FB56, 0, false},
 		{0x1FB57, '/', true},
@@ -1650,7 +1650,7 @@ func TestSolidusTildeASCIIFoldsOnlyThose(t *testing.T) {
 			n++
 		}
 	}
-	if n != 62 {
+	if n != 63 {
 		t.Fatalf("solidus tilde fold count %d", n)
 	}
 }
@@ -2868,6 +2868,26 @@ func TestSanitizeFailureStripsLightDiagonalCross(t *testing.T) {
 	for _, prose := range []string{"see \u2573 later", "see \u25A9 later", "see \U0001FBA4 later", "see \u25A6 later"} {
 		if got := SanitizeFailure(prose); got != prose {
 			t.Fatalf("light diagonal cross prose changed: %q -> %q", prose, got)
+		}
+	}
+}
+
+func TestSanitizeFailureStripsLightDiagonalCorner(t *testing.T) {
+	secret := "code/ver/1"
+	block := strings.ReplaceAll(secret, "/", "\U0001FBA4")
+	encoded := strings.ReplaceAll(secret, "/", "%F0%9F%AE%A4")
+	got := SanitizeFailure("rejected "+block+" "+encoded+" later", secret)
+	for _, item := range []string{secret, block, encoded, "code", "ver"} {
+		if strings.Contains(got, item) {
+			t.Fatalf("leaked %q in %q", item, got)
+		}
+	}
+	if !strings.Contains(got, "rejected") || !strings.Contains(got, "later") {
+		t.Fatalf("lost context: %q", got)
+	}
+	for _, prose := range []string{"see \U0001FBA4 later", "see \u2573 later", "see \U0001FBA5 later", "see \U0001FBBF later"} {
+		if got := SanitizeFailure(prose); got != prose {
+			t.Fatalf("light diagonal corner prose changed: %q -> %q", prose, got)
 		}
 	}
 }

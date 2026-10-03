@@ -4371,8 +4371,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // not NFKC-fold to a backslash either. It stays one backslash so the
 // circle cannot glue the token back together. The circled division sign
 // and the combining enclosing circle backslash stay out. The light
-// diagonal cross is a slash on its own pass. The chevron diagonals and
-// the negative diamond stay out. The negative short diagonal folds to a
+// diagonal cross is a slash on its own pass. The light diagonal from
+// upper centre to middle left to lower centre is a slash on its own
+// pass. The other chevron diagonals and the negative diamond stay out.
+// The negative short diagonal folds to a
 // slash. The upper right block
 // diagonal from upper centre to lower right is that falling stroke as a
 // narrow block and does not NFKC-fold to a backslash. It stays one
@@ -4444,7 +4446,8 @@ func numberSignASCII(r rune) (byte, bool) {
 // backslash so the square cannot glue the token back together. The square
 // with upper right to lower left fill stays out. The diagonal crosshatch
 // is a slash on its own pass. The light diagonal cross is a slash on its
-// own pass.
+// own pass. The light diagonal from upper centre to middle left to lower
+// centre is a slash on its own pass.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -4785,8 +4788,11 @@ func parenASCII(r rune) (byte, bool) {
 // centre, is that same rising stroke in negative and does not NFKC-fold
 // to a slash. It stays one slash. The light diagonal cross puts both
 // strokes in the cell. The rising stroke still splits a stored slash.
-// It stays one slash. The chevron diagonals and the negative diamond
-// stay out. The modifier letter dot
+// It stays one slash. The light diagonal from upper centre to middle
+// left to lower centre turns a corner. Its rising half still splits a
+// stored slash. It stays one slash. The light diagonal from upper centre
+// to middle right to lower centre and the negative diamond stay out.
+// The modifier letter dot
 // slash is that dotted stroke in small form and does not NFKC-fold to a
 // slash. It stays one slash. The dot vertical bar and the dot horizontal
 // bar stay out. The upper left block diagonal from lower left to upper
@@ -4859,8 +4865,12 @@ func parenASCII(r rune) (byte, bool) {
 // It does not NFKC-fold to a slash either. The light diagonal cross puts
 // both strokes in the cell. The rising stroke still splits a stored slash.
 // It stays one slash so the cross cannot glue the token back together.
-// It does not NFKC-fold to a slash either. The light box-drawing diagonals
-// that turn a corner stay out. Other letters stay out.
+// It does not NFKC-fold to a slash either. The light diagonal from upper
+// centre to middle left to lower centre turns a corner. Its rising half
+// still splits a stored slash. It stays one slash so the corner cannot
+// glue the token back together. It does not NFKC-fold to a slash either.
+// The light diagonal from upper centre to middle right to lower centre
+// stays out. Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
 // the original rune.
@@ -4909,7 +4919,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBE:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBA4, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBE:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
