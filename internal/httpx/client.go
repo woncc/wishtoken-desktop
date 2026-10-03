@@ -4380,7 +4380,10 @@ func numberSignASCII(r rune) (byte, bool) {
 // slash on its own pass. The light diagonal from upper centre to middle
 // left and middle right to lower centre is a slash on its own pass. The
 // light diagonal from upper centre to middle right and middle left to
-// lower centre and the negative diamond stay out. The negative short
+// lower centre puts both falling strokes in the cell. Each falling
+// stroke still splits a stored backslash. It stays one backslash. The
+// light diagonal from upper centre to middle right to lower centre to
+// middle left and the negative diamond stay out. The negative short
 // diagonal folds to a
 // slash. The upper right block
 // diagonal from upper centre to lower right is that falling stroke as a
@@ -4461,8 +4464,11 @@ func numberSignASCII(r rune) (byte, bool) {
 // upper centre to middle right is a slash on its own pass. The light
 // diagonal from upper centre to middle left and middle right to lower
 // centre is a slash on its own pass. The light diagonal from upper
-// centre to middle right and middle left to lower centre stays out.
-// Other letters and ideographs stay out.
+// centre to middle right and middle left to lower centre puts both
+// falling strokes in the cell. Each falling stroke still splits a
+// stored backslash. It stays one backslash. The light diagonal from
+// upper centre to middle right to lower centre to middle left stays
+// out. Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
 	if len(in) == 0 {
@@ -4509,7 +4515,7 @@ func reverseSolidusFolded(s string) bool {
 
 func reverseSolidusASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x25A7, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FB3C, 0x1FB3D, 0x1FB3E, 0x1FB3F, 0x1FB40, 0x1FB4C, 0x1FB4D, 0x1FB4E, 0x1FB4F, 0x1FB50, 0x1FB51, 0x1FB52, 0x1FB53, 0x1FB54, 0x1FB55, 0x1FB56, 0x1FB62, 0x1FB63, 0x1FB64, 0x1FB65, 0x1FB66, 0x1FB67, 0x1FB98:
+	case 0x00A5, 0x20A9, 0x2216, 0x2340, 0x2342, 0x2349, 0x244A, 0x2572, 0x25A7, 0x27C8, 0x27CD, 0x29B8, 0x29C5, 0x29F5, 0x29F7, 0x29F9, 0x2F02, 0x3035, 0x31D4, 0x4E36, 0xFE68, 0xFF3C, 0x1D20F, 0x1D23A, 0x1D23B, 0x1F67D, 0x1FBA1, 0x1FBA2, 0x1FBA9, 0x1FB3C, 0x1FB3D, 0x1FB3E, 0x1FB3F, 0x1FB40, 0x1FB4C, 0x1FB4D, 0x1FB4E, 0x1FB4F, 0x1FB50, 0x1FB51, 0x1FB52, 0x1FB53, 0x1FB54, 0x1FB55, 0x1FB56, 0x1FB62, 0x1FB63, 0x1FB64, 0x1FB65, 0x1FB66, 0x1FB67, 0x1FB98:
 		return '\\', true
 	default:
 		return 0, false
@@ -4815,7 +4821,9 @@ func parenASCII(r rune) (byte, bool) {
 // middle right to lower centre puts both rising strokes in the cell.
 // Each rising stroke still splits a stored slash. It stays one slash.
 // The light diagonal from upper centre to middle right and middle left
-// to lower centre and the negative diamond stay out. The modifier
+// to lower centre is a backslash on its own pass. The light diagonal
+// from upper centre to middle right to lower centre to middle left and
+// the negative diamond stay out. The modifier
 // letter dot
 // slash is that dotted stroke in small form and does not NFKC-fold to a
 // slash. It stays one slash. The dot vertical bar and the dot horizontal
@@ -4908,7 +4916,9 @@ func parenASCII(r rune) (byte, bool) {
 // strokes in the cell. Each rising stroke still splits a stored slash.
 // It stays one slash so the pair cannot glue the token back together.
 // It does not NFKC-fold to a slash either. The light diagonal from upper
-// centre to middle right and middle left to lower centre stays out.
+// centre to middle right and middle left to lower centre is a backslash
+// on its own pass. The light diagonal from upper centre to middle right
+// to lower centre to middle left stays out.
 // Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
