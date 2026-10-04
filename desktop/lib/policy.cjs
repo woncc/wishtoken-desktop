@@ -595,12 +595,12 @@ function htmlProxyChar(cp) {
   // Thai digits, Lao digits, Tibetan digits, Myanmar digits, Myanmar Shan
   // digits, Khmer digits, Mongolian digits, Limbu digits, New Tai Lue
   // digits, Tai Tham Hora digits, Tai Tham Tham digits, Balinese digits,
-  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits, and circled numbers ten through twenty, twenty-one through thirty-five, and thirty-six through fifty, and parenthesized numbers one through twenty, and digit full stops one through twenty, and parenthesized letters a through z, and parenthesized capitals A through Z, and a digit zero full stop, and a digit zero comma, and a digit one comma, and digit commas two through nine, and a tortoise shell bracketed S, and a squared CD, and a squared WZ, and a squared HV, and a squared MV, and a squared SD, and a squared SS, and a squared PPV, and a squared WC, and a raised MC sign, and a raised MD sign, and a raised MR sign, and a squared DJ, and a Latin capital ligature IJ, and a Latin small ligature ij, and a Latin capital letter LJ, and a Latin capital letter L with small letter J, and a Latin small letter LJ, and a Latin capital letter NJ, and a Latin capital letter N with small letter J, and a Latin small letter NJ, and a Latin capital letter DZ, and a Latin capital letter D with small letter Z, and a Latin small letter DZ, and a rupee sign, and a numero sign, and a service mark, and a telephone sign, and a trade mark sign, and a facsimile sign, and a roman numeral two, and a roman numeral three, and a roman numeral four, and a roman numeral six, and a roman numeral seven, and a roman numeral eight, and a roman numeral nine, and a roman numeral eleven, and a roman numeral twelve, and a small roman numeral two, and a small roman numeral three, and a small roman numeral four, and a small roman numeral six, and a small roman numeral seven, and a small roman numeral eight, and a small roman numeral nine, and a small roman numeral eleven, and a small roman numeral twelve, and a Latin small ligature ff, and a Latin small ligature fi, and a Latin small ligature fl, and a Latin small ligature ffi, and a Latin small ligature ffl, and a Latin small ligature long s t, and a Latin small ligature st, and a squared Hg, and a squared erg, and a squared eV, and a limited liability sign, and a squared hPa, and a squared da, and a squared AU, and a squared bar, and a squared oV, and a squared pc, and a squared dm, and a squared dm squared, and a squared dm cubed, and a squared IU, and a squared pa amps, and a squared na, and a squared ma, and a squared ka, and a squared kb, and a squared mb, and a squared gb, and a squared cal, and a squared kcal, and a squared pf, and a squared nf, and a squared mg, and a squared kg, and a squared Hz, and a squared kHz, do too.
+  // Sundanese digits, Lepcha digits, Ol Chiki digits, Vai digits, Saurashtra digits, Kayah Li digits, Javanese digits, Myanmar Tai Laing digits, Cham digits, Meetei Mayek digits, Osmanya digits, Hanifi Rohingya digits, Garay digits, Brahmi digits, and Sora Sompeng digits, and Chakma digits, and Sharada digits, and Khudawadi digits, and Newa digits, and Tirhuta digits, and Modi digits, and Takri digits, and Ahom digits, and Warang Citi digits, and Dives Akuru digits, and Bhaiksuki digits, and Masaram Gondi digits, and Gunjala Gondi digits, and Tolong Siki digits, and Kawi digits, and Gurung Khema digits, and Mro digits, and Tangsa digits, and Pahawh Hmong digits, and Kirat Rai digits, and Nyiakeng Puachue Hmong digits, and Wancho digits, and Nag Mundari digits, and Ol Onal digits, and Adlam digits, and Myanmar Pao digits, and Myanmar Eastern Pwo Karen digits, and Sunuwar digits, and circled numbers ten through twenty, twenty-one through thirty-five, and thirty-six through fifty, and parenthesized numbers one through twenty, and digit full stops one through twenty, and parenthesized letters a through z, and parenthesized capitals A through Z, and a digit zero full stop, and a digit zero comma, and a digit one comma, and digit commas two through nine, and a tortoise shell bracketed S, and a squared CD, and a squared WZ, and a squared HV, and a squared MV, and a squared SD, and a squared SS, and a squared PPV, and a squared WC, and a raised MC sign, and a raised MD sign, and a raised MR sign, and a squared DJ, and a Latin capital ligature IJ, and a Latin small ligature ij, and a Latin capital letter LJ, and a Latin capital letter L with small letter J, and a Latin small letter LJ, and a Latin capital letter NJ, and a Latin capital letter N with small letter J, and a Latin small letter NJ, and a Latin capital letter DZ, and a Latin capital letter D with small letter Z, and a Latin small letter DZ, and a rupee sign, and a numero sign, and a service mark, and a telephone sign, and a trade mark sign, and a facsimile sign, and a roman numeral two, and a roman numeral three, and a roman numeral four, and a roman numeral six, and a roman numeral seven, and a roman numeral eight, and a roman numeral nine, and a roman numeral eleven, and a roman numeral twelve, and a small roman numeral two, and a small roman numeral three, and a small roman numeral four, and a small roman numeral six, and a small roman numeral seven, and a small roman numeral eight, and a small roman numeral nine, and a small roman numeral eleven, and a small roman numeral twelve, and a Latin small ligature ff, and a Latin small ligature fi, and a Latin small ligature fl, and a Latin small ligature ffi, and a Latin small ligature ffl, and a Latin small ligature long s t, and a Latin small ligature st, and a squared Hg, and a squared erg, and a squared eV, and a limited liability sign, and a squared hPa, and a squared da, and a squared AU, and a squared bar, and a squared oV, and a squared pc, and a squared dm, and a squared dm squared, and a squared dm cubed, and a squared IU, and a squared pa amps, and a squared na, and a squared ma, and a squared ka, and a squared kb, and a squared mb, and a squared gb, and a squared cal, and a squared kcal, and a squared pf, and a squared nf, and a squared mg, and a squared kg, and a squared Hz, and a squared kHz, and a squared MHz, do too.
   // A numeric reference has to yield the same character so the label fold
   // can see it.
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return char;
   if (cp >= 0x24B6 && cp <= 0x24E9) return char;
-  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp) || isMyanmarShanDigit(cp) || isKhmerDigit(cp) || isMongolianDigit(cp) || isLimbuDigit(cp) || isNewTaiLueDigit(cp) || isTaiThamHoraDigit(cp) || isTaiThamThamDigit(cp) || isBalineseDigit(cp) || isSundaneseDigit(cp) || isLepchaDigit(cp) || isOlChikiDigit(cp) || isVaiDigit(cp) || isSaurashtraDigit(cp) || isKayahLiDigit(cp) || isJavaneseDigit(cp) || isMyanmarTaiLaingDigit(cp) || isChamDigit(cp) || isMeeteiMayekDigit(cp) || isOsmanyaDigit(cp) || isHanifiRohingyaDigit(cp) || isGarayDigit(cp) || isBrahmiDigit(cp) || isSoraSompengDigit(cp) || isChakmaDigit(cp) || isSharadaDigit(cp) || isKhudawadiDigit(cp) || isNewaDigit(cp) || isTirhutaDigit(cp) || isModiDigit(cp) || isTakriDigit(cp) || isAhomDigit(cp) || isWarangCitiDigit(cp) || isDivesAkuruDigit(cp) || isBhaiksukiDigit(cp) || isMasaramGondiDigit(cp) || isGunjalaGondiDigit(cp) || isTolongSikiDigit(cp) || isKawiDigit(cp) || isGurungKhemaDigit(cp) || isMroDigit(cp) || isTangsaDigit(cp) || isPahawhHmongDigit(cp) || isKiratRaiDigit(cp) || isNyiakengPuachueHmongDigit(cp) || isWanchoDigit(cp) || isNagMundariDigit(cp) || isOlOnalDigit(cp) || isAdlamDigit(cp) || isMyanmarPaoDigit(cp) || isEasternPwoKarenDigit(cp) || isSunuwarDigit(cp) || isCircledNumber(cp) || isParenthesizedNumber(cp) || isDigitFullStop(cp) || isParenthesizedLetter(cp) || isParenthesizedCapital(cp) || isDigitZeroFullStop(cp) || isDigitZeroComma(cp) || isDigitOneComma(cp) || isDigitCommaFromTwo(cp) || isTortoiseShellS(cp) || isSquaredCd(cp) || isSquaredWz(cp) || isSquaredHv(cp) || isSquaredMv(cp) || isSquaredSd(cp) || isSquaredSs(cp) || isSquaredPpv(cp) || isSquaredWc(cp) || isRaisedMc(cp) || isRaisedMd(cp) || isRaisedMr(cp) || isSquaredDj(cp) || isCapitalLigatureIj(cp) || isSmallLigatureIj(cp) || isCapitalLetterLj(cp) || isCapitalLWithSmallJ(cp) || isSmallLetterLj(cp) || isCapitalLetterNj(cp) || isCapitalNWithSmallJ(cp) || isSmallLetterNj(cp) || isCapitalLetterDz(cp) || isCapitalDWithSmallZ(cp) || isSmallLetterDz(cp) || isRupeeSign(cp) || isNumeroSign(cp) || isServiceMark(cp) || isTelephoneSign(cp) || isTradeMarkSign(cp) || isFacsimileSign(cp) || isRomanNumeralTwo(cp) || isRomanNumeralThree(cp) || isRomanNumeralFour(cp) || isRomanNumeralSix(cp) || isRomanNumeralSeven(cp) || isRomanNumeralEight(cp) || isRomanNumeralNine(cp) || isRomanNumeralEleven(cp) || isRomanNumeralTwelve(cp) || isSmallRomanNumeralTwo(cp) || isSmallRomanNumeralThree(cp) || isSmallRomanNumeralFour(cp) || isSmallRomanNumeralSix(cp) || isSmallRomanNumeralSeven(cp) || isSmallRomanNumeralEight(cp) || isSmallRomanNumeralNine(cp) || isSmallRomanNumeralEleven(cp) || isSmallRomanNumeralTwelve(cp) || isSmallLigatureFf(cp) || isSmallLigatureFi(cp) || isSmallLigatureFl(cp) || isSmallLigatureFfi(cp) || isSmallLigatureFfl(cp) || isSmallLigatureLongSt(cp) || isSmallLigatureSt(cp) || isSquaredHg(cp) || isSquaredErg(cp) || isSquaredEv(cp) || isLimitedLiabilitySign(cp) || isSquaredHpa(cp) || isSquaredDa(cp) || isSquaredAu(cp) || isSquaredBar(cp) || isSquaredOv(cp) || isSquaredPc(cp) || isSquaredDm(cp) || isSquaredDmSquared(cp) || isSquaredDmCubed(cp) || isSquaredIu(cp) || isSquaredPaAmps(cp) || isSquaredNa(cp) || isSquaredMa(cp) || isSquaredKa(cp) || isSquaredKb(cp) || isSquaredMb(cp) || isSquaredGb(cp) || isSquaredCal(cp) || isSquaredKcal(cp) || isSquaredPf(cp) || isSquaredNf(cp) || isSquaredMg(cp) || isSquaredKg(cp) || isSquaredHz(cp) || isSquaredKhz(cp)) return char;
+  if (isLetterlikeLetter(cp) || isLatinCompatLetter(cp) || isModifierLetter(cp) || isSupSubLetter(cp) || isRomanLetter(cp) || isMathLetter(cp) || isEnclosedLetter(cp) || isOutlinedLetter(cp) || isOutlinedDigit(cp) || isCircledDigit(cp) || isMathDigit(cp) || isSegmentedDigit(cp) || isArabicDigit(cp) || isNkoDigit(cp) || isDevanagariDigit(cp) || isBengaliDigit(cp) || isGurmukhiDigit(cp) || isGujaratiDigit(cp) || isOriyaDigit(cp) || isTamilDigit(cp) || isTeluguDigit(cp) || isKannadaDigit(cp) || isMalayalamDigit(cp) || isSinhalaDigit(cp) || isThaiDigit(cp) || isLaoDigit(cp) || isTibetanDigit(cp) || isMyanmarDigit(cp) || isMyanmarShanDigit(cp) || isKhmerDigit(cp) || isMongolianDigit(cp) || isLimbuDigit(cp) || isNewTaiLueDigit(cp) || isTaiThamHoraDigit(cp) || isTaiThamThamDigit(cp) || isBalineseDigit(cp) || isSundaneseDigit(cp) || isLepchaDigit(cp) || isOlChikiDigit(cp) || isVaiDigit(cp) || isSaurashtraDigit(cp) || isKayahLiDigit(cp) || isJavaneseDigit(cp) || isMyanmarTaiLaingDigit(cp) || isChamDigit(cp) || isMeeteiMayekDigit(cp) || isOsmanyaDigit(cp) || isHanifiRohingyaDigit(cp) || isGarayDigit(cp) || isBrahmiDigit(cp) || isSoraSompengDigit(cp) || isChakmaDigit(cp) || isSharadaDigit(cp) || isKhudawadiDigit(cp) || isNewaDigit(cp) || isTirhutaDigit(cp) || isModiDigit(cp) || isTakriDigit(cp) || isAhomDigit(cp) || isWarangCitiDigit(cp) || isDivesAkuruDigit(cp) || isBhaiksukiDigit(cp) || isMasaramGondiDigit(cp) || isGunjalaGondiDigit(cp) || isTolongSikiDigit(cp) || isKawiDigit(cp) || isGurungKhemaDigit(cp) || isMroDigit(cp) || isTangsaDigit(cp) || isPahawhHmongDigit(cp) || isKiratRaiDigit(cp) || isNyiakengPuachueHmongDigit(cp) || isWanchoDigit(cp) || isNagMundariDigit(cp) || isOlOnalDigit(cp) || isAdlamDigit(cp) || isMyanmarPaoDigit(cp) || isEasternPwoKarenDigit(cp) || isSunuwarDigit(cp) || isCircledNumber(cp) || isParenthesizedNumber(cp) || isDigitFullStop(cp) || isParenthesizedLetter(cp) || isParenthesizedCapital(cp) || isDigitZeroFullStop(cp) || isDigitZeroComma(cp) || isDigitOneComma(cp) || isDigitCommaFromTwo(cp) || isTortoiseShellS(cp) || isSquaredCd(cp) || isSquaredWz(cp) || isSquaredHv(cp) || isSquaredMv(cp) || isSquaredSd(cp) || isSquaredSs(cp) || isSquaredPpv(cp) || isSquaredWc(cp) || isRaisedMc(cp) || isRaisedMd(cp) || isRaisedMr(cp) || isSquaredDj(cp) || isCapitalLigatureIj(cp) || isSmallLigatureIj(cp) || isCapitalLetterLj(cp) || isCapitalLWithSmallJ(cp) || isSmallLetterLj(cp) || isCapitalLetterNj(cp) || isCapitalNWithSmallJ(cp) || isSmallLetterNj(cp) || isCapitalLetterDz(cp) || isCapitalDWithSmallZ(cp) || isSmallLetterDz(cp) || isRupeeSign(cp) || isNumeroSign(cp) || isServiceMark(cp) || isTelephoneSign(cp) || isTradeMarkSign(cp) || isFacsimileSign(cp) || isRomanNumeralTwo(cp) || isRomanNumeralThree(cp) || isRomanNumeralFour(cp) || isRomanNumeralSix(cp) || isRomanNumeralSeven(cp) || isRomanNumeralEight(cp) || isRomanNumeralNine(cp) || isRomanNumeralEleven(cp) || isRomanNumeralTwelve(cp) || isSmallRomanNumeralTwo(cp) || isSmallRomanNumeralThree(cp) || isSmallRomanNumeralFour(cp) || isSmallRomanNumeralSix(cp) || isSmallRomanNumeralSeven(cp) || isSmallRomanNumeralEight(cp) || isSmallRomanNumeralNine(cp) || isSmallRomanNumeralEleven(cp) || isSmallRomanNumeralTwelve(cp) || isSmallLigatureFf(cp) || isSmallLigatureFi(cp) || isSmallLigatureFl(cp) || isSmallLigatureFfi(cp) || isSmallLigatureFfl(cp) || isSmallLigatureLongSt(cp) || isSmallLigatureSt(cp) || isSquaredHg(cp) || isSquaredErg(cp) || isSquaredEv(cp) || isLimitedLiabilitySign(cp) || isSquaredHpa(cp) || isSquaredDa(cp) || isSquaredAu(cp) || isSquaredBar(cp) || isSquaredOv(cp) || isSquaredPc(cp) || isSquaredDm(cp) || isSquaredDmSquared(cp) || isSquaredDmCubed(cp) || isSquaredIu(cp) || isSquaredPaAmps(cp) || isSquaredNa(cp) || isSquaredMa(cp) || isSquaredKa(cp) || isSquaredKb(cp) || isSquaredMb(cp) || isSquaredGb(cp) || isSquaredCal(cp) || isSquaredKcal(cp) || isSquaredPf(cp) || isSquaredNf(cp) || isSquaredMg(cp) || isSquaredKg(cp) || isSquaredHz(cp) || isSquaredKhz(cp) || isSquaredMhz(cp)) return char;
   if (cp === 0x02D7 || cp === 0x058A || cp === 0x1400 || cp === 0x1806 || cp === 0x2010 || cp === 0x207B || cp === 0x208B || cp === 0x2011 || cp === 0x2012 || cp === 0x2013 || cp === 0x2014 || cp === 0x2015 || cp === 0x2212 || cp === 0x2E17 || cp === 0x2E1A || cp === 0x2E3A || cp === 0x2E3B || cp === 0x2E40 || cp === 0x2E5D || cp === 0xFE31 || cp === 0xFE32 || cp === 0xFE33 || cp === 0xFE34 || cp === 0xFE4D || cp === 0xFE4E || cp === 0xFE4F || cp === 0xFE58 || cp === 0xFE63 || cp === 0xFF0D || cp === 0xFF3F) return char;
   return '';
 }
@@ -1279,7 +1279,7 @@ function foldSupSubLetters(text) {
 // Their literal, percent-encoded, and numeric forms kept the password.
 // Otherwise "user:secret@my\u2160proxy:7890" and
 // "user:secret@ex\u2170mple.com:8080" keep the password. A numeral that
-// expands to more than one letter, such as U+3392, stays as written. A
+// expands to more than one letter, such as U+3393, stays as written. A
 // squared cal is folded separately. The
 // micro sign stays as written. A dingbat circled sans-serif digit zero, such as U+1F10B, stays as written.
 const ROMAN_LETTER_ASCII = new Map([
@@ -4989,7 +4989,7 @@ function foldSmallLigatureLongSt(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\uFB06proxy:7890" and
 // "user:secret@ex\uFB06ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function smallLigatureStAscii(cp) {
   if (cp === 0xFB06) return 'st';
   return '';
@@ -5043,7 +5043,7 @@ function foldSmallLigatureSt(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u32CCproxy:7890" and
 // "user:secret@ex\u32CCample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredHgAscii(cp) {
   if (cp === 0x32CC) return 'Hg';
   return '';
@@ -5097,7 +5097,7 @@ function foldSquaredHg(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u32CDproxy:7890" and
 // "user:secret@ex\u32CDample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredErgAscii(cp) {
   if (cp === 0x32CD) return 'erg';
   return '';
@@ -5151,7 +5151,7 @@ function foldSquaredErg(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u32CEproxy:7890" and
 // "user:secret@ex\u32CEample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredEvAscii(cp) {
   if (cp === 0x32CE) return 'eV';
   return '';
@@ -5205,7 +5205,7 @@ function foldSquaredEv(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u32CFproxy:7890" and
 // "user:secret@ex\u32CFample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function limitedLiabilitySignAscii(cp) {
   if (cp === 0x32CF) return 'LTD';
   return '';
@@ -5259,7 +5259,7 @@ function foldLimitedLiabilitySign(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3371proxy:7890" and
 // "user:secret@ex\u3371ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredHpaAscii(cp) {
   if (cp === 0x3371) return 'hPa';
   return '';
@@ -5313,7 +5313,7 @@ function foldSquaredHpa(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3372proxy:7890" and
 // "user:secret@ex\u3372ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredDaAscii(cp) {
   if (cp === 0x3372) return 'da';
   return '';
@@ -5367,7 +5367,7 @@ function foldSquaredDa(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3373proxy:7890" and
 // "user:secret@ex\u3373ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredAuAscii(cp) {
   if (cp === 0x3373) return 'AU';
   return '';
@@ -5420,7 +5420,7 @@ function foldSquaredAu(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3374proxy:7890" and
 // "user:secret@ex\u3374ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredBarAscii(cp) {
   if (cp === 0x3374) return 'bar';
   return '';
@@ -5473,7 +5473,7 @@ function foldSquaredBar(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3375proxy:7890" and
 // "user:secret@ex\u3375ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredOvAscii(cp) {
   if (cp === 0x3375) return 'oV';
   return '';
@@ -5526,7 +5526,7 @@ function foldSquaredOv(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3376proxy:7890" and
 // "user:secret@ex\u3376ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredPcAscii(cp) {
   if (cp === 0x3376) return 'pc';
   return '';
@@ -5579,7 +5579,7 @@ function foldSquaredPc(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3377proxy:7890" and
 // "user:secret@ex\u3377ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredDmAscii(cp) {
   if (cp === 0x3377) return 'dm';
   return '';
@@ -5632,7 +5632,7 @@ function foldSquaredDm(text) {
 // literal, percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3378proxy:7890" and
 // "user:secret@ex\u3378ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters and that digit. A squared kHz is folded separately.
+// host uses those ASCII letters and that digit. A squared MHz is folded separately.
 function squaredDmSquaredAscii(cp) {
   if (cp === 0x3378) return 'dm2';
   return '';
@@ -5685,7 +5685,7 @@ function foldSquaredDmSquared(text) {
 // literal, percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3379proxy:7890" and
 // "user:secret@ex\u3379ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters and that digit. A squared kHz is folded separately.
+// host uses those ASCII letters and that digit. A squared MHz is folded separately.
 function squaredDmCubedAscii(cp) {
   if (cp === 0x3379) return 'dm3';
   return '';
@@ -5738,7 +5738,7 @@ function foldSquaredDmCubed(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u337Aproxy:7890" and
 // "user:secret@ex\u337Aample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredIuAscii(cp) {
   if (cp === 0x337A) return 'IU';
   return '';
@@ -5791,7 +5791,7 @@ function foldSquaredIu(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3380proxy:7890" and
 // "user:secret@ex\u3380ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredPaAmpsAscii(cp) {
   if (cp === 0x3380) return 'pA';
   return '';
@@ -5845,7 +5845,7 @@ function foldSquaredPaAmps(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3381proxy:7890" and
 // "user:secret@ex\u3381ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredNaAscii(cp) {
   if (cp === 0x3381) return 'nA';
   return '';
@@ -5899,7 +5899,7 @@ function foldSquaredNa(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3383proxy:7890" and
 // "user:secret@ex\u3383ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredMaAscii(cp) {
   if (cp === 0x3383) return 'mA';
   return '';
@@ -5953,7 +5953,7 @@ function foldSquaredMa(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3384proxy:7890" and
 // "user:secret@ex\u3384ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredKaAscii(cp) {
   if (cp === 0x3384) return 'kA';
   return '';
@@ -6007,7 +6007,7 @@ function foldSquaredKa(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3385proxy:7890" and
 // "user:secret@ex\u3385ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredKbAscii(cp) {
   if (cp === 0x3385) return 'KB';
   return '';
@@ -6061,7 +6061,7 @@ function foldSquaredKb(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3386proxy:7890" and
 // "user:secret@ex\u3386ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredMbAscii(cp) {
   if (cp === 0x3386) return 'MB';
   return '';
@@ -6115,7 +6115,7 @@ function foldSquaredMb(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3387proxy:7890" and
 // "user:secret@ex\u3387ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredGbAscii(cp) {
   if (cp === 0x3387) return 'GB';
   return '';
@@ -6169,7 +6169,7 @@ function foldSquaredGb(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3388proxy:7890" and
 // "user:secret@ex\u3388ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredCalAscii(cp) {
   if (cp === 0x3388) return 'cal';
   return '';
@@ -6222,7 +6222,7 @@ function foldSquaredCal(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3389proxy:7890" and
 // "user:secret@ex\u3389ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredKcalAscii(cp) {
   if (cp === 0x3389) return 'kcal';
   return '';
@@ -6275,7 +6275,7 @@ function foldSquaredKcal(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u338Aproxy:7890" and
 // "user:secret@ex\u338Aample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredPfAscii(cp) {
   if (cp === 0x338A) return 'pF';
   return '';
@@ -6328,7 +6328,7 @@ function foldSquaredPf(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u338Bproxy:7890" and
 // "user:secret@ex\u338Bample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredNfAscii(cp) {
   if (cp === 0x338B) return 'nF';
   return '';
@@ -6381,7 +6381,7 @@ function foldSquaredNf(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u338Eproxy:7890" and
 // "user:secret@ex\u338Eample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredMgAscii(cp) {
   if (cp === 0x338E) return 'mg';
   return '';
@@ -6434,7 +6434,7 @@ function foldSquaredMg(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u338Fproxy:7890" and
 // "user:secret@ex\u338Fample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredKgAscii(cp) {
   if (cp === 0x338F) return 'kg';
   return '';
@@ -6487,7 +6487,7 @@ function foldSquaredKg(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3390proxy:7890" and
 // "user:secret@ex\u3390ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared kHz is folded separately.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredHzAscii(cp) {
   if (cp === 0x3390) return 'Hz';
   return '';
@@ -6540,8 +6540,7 @@ function foldSquaredHz(text) {
 // percent-encoded, and numeric forms kept the password too. Otherwise
 // "user:secret@my\u3391proxy:7890" and
 // "user:secret@ex\u3391ample.com:8080" keep the password. The redacted
-// host uses those ASCII letters. A squared MHz, such as
-// U+3392, stays as written.
+// host uses those ASCII letters. A squared MHz is folded separately.
 function squaredKhzAscii(cp) {
   if (cp === 0x3391) return 'kHz';
   return '';
@@ -6586,6 +6585,60 @@ function foldSquaredKhz(text) {
   let out = '';
   for (const char of text) {
     out += squaredKhzAscii(char.codePointAt(0)) || char;
+  }
+  return out;
+}
+// Squared MHz U+3392 folds to "MHz" under NFKC. A single-label
+// host and a dotted host already allow those letters. Its literal,
+// percent-encoded, and numeric forms kept the password too. Otherwise
+// "user:secret@my\u3392proxy:7890" and
+// "user:secret@ex\u3392ample.com:8080" keep the password. The redacted
+// host uses those ASCII letters. A squared GHz, such as
+// U+3393, stays as written.
+function squaredMhzAscii(cp) {
+  if (cp === 0x3392) return 'MHz';
+  return '';
+}
+function isSquaredMhz(cp) {
+  return squaredMhzAscii(cp) !== '';
+}
+function readEncodedSquaredMhz(text, index) {
+  if (text[index] !== '%') return null;
+  const bytes = [];
+  let cursor = index;
+  for (let count = 0; count < 3; count += 1) {
+    const next = readEncodedByte(text, cursor);
+    if (!next) return null;
+    bytes.push(next.value);
+    cursor = next.next;
+  }
+  const lead = bytes[0];
+  if (lead < 0xE0 || lead > 0xEF) return null;
+  for (let count = 1; count < 3; count += 1) {
+    if (bytes[count] < 0x80 || bytes[count] > 0xBF) return null;
+  }
+  const cp = decodeUtf8Scalar(bytes);
+  if (cp == null || !isSquaredMhz(cp)) return null;
+  return { char: String.fromCodePoint(cp), next: cursor };
+}
+function decodeEncodedSquaredMhz(text) {
+  let out = '';
+  for (let index = 0; index < text.length;) {
+    const letter = readEncodedSquaredMhz(text, index);
+    if (letter) {
+      out += letter.char;
+      index = letter.next;
+      continue;
+    }
+    out += text[index];
+    index += 1;
+  }
+  return out;
+}
+function foldSquaredMhz(text) {
+  let out = '';
+  for (const char of text) {
+    out += squaredMhzAscii(char.codePointAt(0)) || char;
   }
   return out;
 }
@@ -10464,7 +10517,7 @@ function foldGarayDigits(text) {
 }
 
 function redactProxyCredentials(text) {
-  const decoded = foldSquaredKhz(foldSquaredHz(foldSquaredKg(foldSquaredMg(foldSquaredNf(foldSquaredPf(foldSquaredKcal(foldSquaredCal(foldSquaredGb(foldSquaredMb(foldSquaredKb(foldSquaredKa(foldSquaredMa(foldSquaredNa(foldSquaredPaAmps(foldSquaredIu(foldSquaredDmCubed(foldSquaredDmSquared(foldSquaredDm(foldSquaredPc(foldSquaredOv(foldSquaredBar(foldSquaredAu(foldSquaredDa(foldSquaredHpa(foldLimitedLiabilitySign(foldSquaredEv(foldSquaredErg(foldSquaredHg(foldSmallLigatureSt(foldSmallLigatureLongSt(foldSmallLigatureFfl(foldSmallLigatureFfi(foldSmallLigatureFl(foldSmallLigatureFi(foldSmallLigatureFf(foldSmallRomanNumeralTwelve(foldSmallRomanNumeralEleven(foldSmallRomanNumeralNine(foldSmallRomanNumeralEight(foldSmallRomanNumeralSeven(foldSmallRomanNumeralSix(foldSmallRomanNumeralFour(foldSmallRomanNumeralThree(foldSmallRomanNumeralTwo(foldRomanNumeralTwelve(foldRomanNumeralEleven(foldRomanNumeralNine(foldRomanNumeralEight(foldRomanNumeralSeven(foldRomanNumeralSix(foldRomanNumeralFour(foldRomanNumeralThree(foldRomanNumeralTwo(foldFacsimileSign(foldTradeMarkSign(foldTelephoneSign(foldServiceMark(foldNumeroSign(foldRupeeSign(foldSmallLetterDz(foldCapitalDWithSmallZ(foldCapitalLetterDz(foldSmallLetterNj(foldCapitalNWithSmallJ(foldCapitalLetterNj(foldSmallLetterLj(foldCapitalLWithSmallJ(foldCapitalLetterLj(foldSmallLigatureIj(foldCapitalLigatureIj(foldSquaredDj(foldRaisedMr(foldRaisedMd(foldRaisedMc(foldSquaredWc(foldSquaredPpv(foldSquaredSs(foldSquaredSd(foldSquaredMv(foldSquaredHv(foldSquaredWz(foldSquaredCd(foldTortoiseShellS(foldDigitCommasFromTwo(foldDigitOneCommas(foldDigitZeroCommas(foldDigitZeroFullStops(foldParenthesizedCapitals(foldParenthesizedLetters(foldDigitFullStops(foldParenthesizedNumbers(foldCircledNumbers(foldSunuwarDigits(foldEasternPwoKarenDigits(foldMyanmarPaoDigits(foldAdlamDigits(foldOlOnalDigits(foldNagMundariDigits(foldWanchoDigits(foldNyiakengPuachueHmongDigits(foldKiratRaiDigits(foldPahawhHmongDigits(foldTangsaDigits(foldMroDigits(foldGurungKhemaDigits(foldKawiDigits(foldTolongSikiDigits(foldGunjalaGondiDigits(foldMasaramGondiDigits(foldBhaiksukiDigits(foldDivesAkuruDigits(foldWarangCitiDigits(foldAhomDigits(foldTakriDigits(foldModiDigits(foldTirhutaDigits(foldNewaDigits(foldKhudawadiDigits(foldSharadaDigits(foldChakmaDigits(foldSoraSompengDigits(foldBrahmiDigits(foldGarayDigits(foldHanifiRohingyaDigits(foldOsmanyaDigits(foldMeeteiMayekDigits(foldChamDigits(foldMyanmarTaiLaingDigits(foldJavaneseDigits(foldKayahLiDigits(foldSaurashtraDigits(foldVaiDigits(foldOlChikiDigits(foldLepchaDigits(foldSundaneseDigits(foldBalineseDigits(foldTaiThamThamDigits(foldTaiThamHoraDigits(foldNewTaiLueDigits(foldLimbuDigits(foldMongolianDigits(foldKhmerDigits(foldMyanmarShanDigits(foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedMyanmarShanDigits(decodeEncodedKhmerDigits(decodeEncodedMongolianDigits(decodeEncodedLimbuDigits(decodeEncodedNewTaiLueDigits(decodeEncodedTaiThamHoraDigits(decodeEncodedTaiThamThamDigits(decodeEncodedBalineseDigits(decodeEncodedSundaneseDigits(decodeEncodedLepchaDigits(decodeEncodedOlChikiDigits(decodeEncodedVaiDigits(decodeEncodedSaurashtraDigits(decodeEncodedKayahLiDigits(decodeEncodedJavaneseDigits(decodeEncodedMyanmarTaiLaingDigits(decodeEncodedChamDigits(decodeEncodedMeeteiMayekDigits(decodeEncodedOsmanyaDigits(decodeEncodedSquaredKhz(decodeEncodedSquaredHz(decodeEncodedSquaredKg(decodeEncodedSquaredMg(decodeEncodedSquaredNf(decodeEncodedSquaredPf(decodeEncodedSquaredKcal(decodeEncodedSquaredCal(decodeEncodedSquaredGb(decodeEncodedSquaredMb(decodeEncodedSquaredKb(decodeEncodedSquaredKa(decodeEncodedSquaredMa(decodeEncodedSquaredNa(decodeEncodedSquaredPaAmps(decodeEncodedSquaredIu(decodeEncodedSquaredDmCubed(decodeEncodedSquaredDmSquared(decodeEncodedSquaredDm(decodeEncodedSquaredPc(decodeEncodedSquaredOv(decodeEncodedSquaredBar(decodeEncodedSquaredAu(decodeEncodedSquaredDa(decodeEncodedSquaredHpa(decodeEncodedLimitedLiabilitySign(decodeEncodedSquaredEv(decodeEncodedSquaredErg(decodeEncodedSquaredHg(decodeEncodedSmallLigatureSt(decodeEncodedSmallLigatureLongSt(decodeEncodedSmallLigatureFfl(decodeEncodedSmallLigatureFfi(decodeEncodedSmallLigatureFl(decodeEncodedSmallLigatureFi(decodeEncodedSmallLigatureFf(decodeEncodedSmallRomanNumeralTwelve(decodeEncodedSmallRomanNumeralEleven(decodeEncodedSmallRomanNumeralNine(decodeEncodedSmallRomanNumeralEight(decodeEncodedSmallRomanNumeralSeven(decodeEncodedSmallRomanNumeralSix(decodeEncodedSmallRomanNumeralFour(decodeEncodedSmallRomanNumeralThree(decodeEncodedSmallRomanNumeralTwo(decodeEncodedRomanNumeralTwelve(decodeEncodedRomanNumeralEleven(decodeEncodedRomanNumeralNine(decodeEncodedRomanNumeralEight(decodeEncodedRomanNumeralSeven(decodeEncodedRomanNumeralSix(decodeEncodedRomanNumeralFour(decodeEncodedRomanNumeralThree(decodeEncodedRomanNumeralTwo(decodeEncodedFacsimileSign(decodeEncodedTradeMarkSign(decodeEncodedTelephoneSign(decodeEncodedServiceMark(decodeEncodedNumeroSign(decodeEncodedRupeeSign(decodeEncodedSmallLetterDz(decodeEncodedCapitalDWithSmallZ(decodeEncodedCapitalLetterDz(decodeEncodedSmallLetterNj(decodeEncodedCapitalNWithSmallJ(decodeEncodedCapitalLetterNj(decodeEncodedSmallLetterLj(decodeEncodedCapitalLWithSmallJ(decodeEncodedCapitalLetterLj(decodeEncodedSmallLigatureIj(decodeEncodedCapitalLigatureIj(decodeEncodedSquaredDj(decodeEncodedRaisedMr(decodeEncodedRaisedMd(decodeEncodedRaisedMc(decodeEncodedSquaredWc(decodeEncodedSquaredPpv(decodeEncodedSquaredSs(decodeEncodedSquaredSd(decodeEncodedSquaredMv(decodeEncodedSquaredHv(decodeEncodedSquaredWz(decodeEncodedSquaredCd(decodeEncodedTortoiseShellS(decodeEncodedDigitCommasFromTwo(decodeEncodedDigitOneCommas(decodeEncodedDigitZeroCommas(decodeEncodedDigitZeroFullStops(decodeEncodedParenthesizedCapitals(decodeEncodedParenthesizedLetters(decodeEncodedDigitFullStops(decodeEncodedParenthesizedNumbers(decodeEncodedCircledNumbers(decodeEncodedSunuwarDigits(decodeEncodedEasternPwoKarenDigits(decodeEncodedMyanmarPaoDigits(decodeEncodedAdlamDigits(decodeEncodedOlOnalDigits(decodeEncodedNagMundariDigits(decodeEncodedWanchoDigits(decodeEncodedNyiakengPuachueHmongDigits(decodeEncodedKiratRaiDigits(decodeEncodedPahawhHmongDigits(decodeEncodedTangsaDigits(decodeEncodedMroDigits(decodeEncodedGurungKhemaDigits(decodeEncodedKawiDigits(decodeEncodedTolongSikiDigits(decodeEncodedGunjalaGondiDigits(decodeEncodedMasaramGondiDigits(decodeEncodedBhaiksukiDigits(decodeEncodedDivesAkuruDigits(decodeEncodedWarangCitiDigits(decodeEncodedAhomDigits(decodeEncodedTakriDigits(decodeEncodedModiDigits(decodeEncodedTirhutaDigits(decodeEncodedNewaDigits(decodeEncodedKhudawadiDigits(decodeEncodedSharadaDigits(decodeEncodedChakmaDigits(decodeEncodedSoraSompengDigits(decodeEncodedBrahmiDigits(decodeEncodedGarayDigits(decodeEncodedHanifiRohingyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  const decoded = foldSquaredMhz(foldSquaredKhz(foldSquaredHz(foldSquaredKg(foldSquaredMg(foldSquaredNf(foldSquaredPf(foldSquaredKcal(foldSquaredCal(foldSquaredGb(foldSquaredMb(foldSquaredKb(foldSquaredKa(foldSquaredMa(foldSquaredNa(foldSquaredPaAmps(foldSquaredIu(foldSquaredDmCubed(foldSquaredDmSquared(foldSquaredDm(foldSquaredPc(foldSquaredOv(foldSquaredBar(foldSquaredAu(foldSquaredDa(foldSquaredHpa(foldLimitedLiabilitySign(foldSquaredEv(foldSquaredErg(foldSquaredHg(foldSmallLigatureSt(foldSmallLigatureLongSt(foldSmallLigatureFfl(foldSmallLigatureFfi(foldSmallLigatureFl(foldSmallLigatureFi(foldSmallLigatureFf(foldSmallRomanNumeralTwelve(foldSmallRomanNumeralEleven(foldSmallRomanNumeralNine(foldSmallRomanNumeralEight(foldSmallRomanNumeralSeven(foldSmallRomanNumeralSix(foldSmallRomanNumeralFour(foldSmallRomanNumeralThree(foldSmallRomanNumeralTwo(foldRomanNumeralTwelve(foldRomanNumeralEleven(foldRomanNumeralNine(foldRomanNumeralEight(foldRomanNumeralSeven(foldRomanNumeralSix(foldRomanNumeralFour(foldRomanNumeralThree(foldRomanNumeralTwo(foldFacsimileSign(foldTradeMarkSign(foldTelephoneSign(foldServiceMark(foldNumeroSign(foldRupeeSign(foldSmallLetterDz(foldCapitalDWithSmallZ(foldCapitalLetterDz(foldSmallLetterNj(foldCapitalNWithSmallJ(foldCapitalLetterNj(foldSmallLetterLj(foldCapitalLWithSmallJ(foldCapitalLetterLj(foldSmallLigatureIj(foldCapitalLigatureIj(foldSquaredDj(foldRaisedMr(foldRaisedMd(foldRaisedMc(foldSquaredWc(foldSquaredPpv(foldSquaredSs(foldSquaredSd(foldSquaredMv(foldSquaredHv(foldSquaredWz(foldSquaredCd(foldTortoiseShellS(foldDigitCommasFromTwo(foldDigitOneCommas(foldDigitZeroCommas(foldDigitZeroFullStops(foldParenthesizedCapitals(foldParenthesizedLetters(foldDigitFullStops(foldParenthesizedNumbers(foldCircledNumbers(foldSunuwarDigits(foldEasternPwoKarenDigits(foldMyanmarPaoDigits(foldAdlamDigits(foldOlOnalDigits(foldNagMundariDigits(foldWanchoDigits(foldNyiakengPuachueHmongDigits(foldKiratRaiDigits(foldPahawhHmongDigits(foldTangsaDigits(foldMroDigits(foldGurungKhemaDigits(foldKawiDigits(foldTolongSikiDigits(foldGunjalaGondiDigits(foldMasaramGondiDigits(foldBhaiksukiDigits(foldDivesAkuruDigits(foldWarangCitiDigits(foldAhomDigits(foldTakriDigits(foldModiDigits(foldTirhutaDigits(foldNewaDigits(foldKhudawadiDigits(foldSharadaDigits(foldChakmaDigits(foldSoraSompengDigits(foldBrahmiDigits(foldGarayDigits(foldHanifiRohingyaDigits(foldOsmanyaDigits(foldMeeteiMayekDigits(foldChamDigits(foldMyanmarTaiLaingDigits(foldJavaneseDigits(foldKayahLiDigits(foldSaurashtraDigits(foldVaiDigits(foldOlChikiDigits(foldLepchaDigits(foldSundaneseDigits(foldBalineseDigits(foldTaiThamThamDigits(foldTaiThamHoraDigits(foldNewTaiLueDigits(foldLimbuDigits(foldMongolianDigits(foldKhmerDigits(foldMyanmarShanDigits(foldMyanmarDigits(foldTibetanDigits(foldLaoDigits(foldThaiDigits(foldSinhalaDigits(foldMalayalamDigits(foldKannadaDigits(foldTeluguDigits(foldTamilDigits(foldOriyaDigits(foldGujaratiDigits(foldGurmukhiDigits(foldBengaliDigits(foldDevanagariDigits(foldNkoDigits(foldArabicDigits(foldSegmentedDigits(foldMathDigits(foldCircledDigits(foldOutlinedDigits(foldOutlinedLetters(foldEnclosedLetters(foldMathLetters(foldRomanLetters(foldSupSubLetters(foldModifierLetters(foldLatinCompatLetters(foldLetterlikeLetters(foldCircledLetters(foldFullwidthLetters(foldLabelHyphens(foldProxyInvisibles(decodeProxyHtml(foldProxyInvisibles(decodeEncodedProxyMarks(decodeEncodedSegmentedDigits(decodeEncodedMathDigits(decodeEncodedCircledDigits(decodeEncodedOutlinedDigits(decodeEncodedOutlinedLetters(decodeEncodedEnclosedLetters(decodeEncodedMathLetters(decodeEncodedRomanLetters(decodeEncodedSupSubLetters(decodeEncodedModifierLetters(decodeEncodedLatinCompatLetters(decodeEncodedLetterlikeLetters(decodeEncodedCircledLetters(decodeEncodedFullwidthLetters(decodeEncodedArabicDigits(decodeEncodedNkoDigits(decodeEncodedDevanagariDigits(decodeEncodedBengaliDigits(decodeEncodedGurmukhiDigits(decodeEncodedGujaratiDigits(decodeEncodedOriyaDigits(decodeEncodedTamilDigits(decodeEncodedTeluguDigits(decodeEncodedKannadaDigits(decodeEncodedMalayalamDigits(decodeEncodedSinhalaDigits(decodeEncodedThaiDigits(decodeEncodedLaoDigits(decodeEncodedTibetanDigits(decodeEncodedMyanmarDigits(decodeEncodedMyanmarShanDigits(decodeEncodedKhmerDigits(decodeEncodedMongolianDigits(decodeEncodedLimbuDigits(decodeEncodedNewTaiLueDigits(decodeEncodedTaiThamHoraDigits(decodeEncodedTaiThamThamDigits(decodeEncodedBalineseDigits(decodeEncodedSundaneseDigits(decodeEncodedLepchaDigits(decodeEncodedOlChikiDigits(decodeEncodedVaiDigits(decodeEncodedSaurashtraDigits(decodeEncodedKayahLiDigits(decodeEncodedJavaneseDigits(decodeEncodedMyanmarTaiLaingDigits(decodeEncodedChamDigits(decodeEncodedMeeteiMayekDigits(decodeEncodedOsmanyaDigits(decodeEncodedSquaredMhz(decodeEncodedSquaredKhz(decodeEncodedSquaredHz(decodeEncodedSquaredKg(decodeEncodedSquaredMg(decodeEncodedSquaredNf(decodeEncodedSquaredPf(decodeEncodedSquaredKcal(decodeEncodedSquaredCal(decodeEncodedSquaredGb(decodeEncodedSquaredMb(decodeEncodedSquaredKb(decodeEncodedSquaredKa(decodeEncodedSquaredMa(decodeEncodedSquaredNa(decodeEncodedSquaredPaAmps(decodeEncodedSquaredIu(decodeEncodedSquaredDmCubed(decodeEncodedSquaredDmSquared(decodeEncodedSquaredDm(decodeEncodedSquaredPc(decodeEncodedSquaredOv(decodeEncodedSquaredBar(decodeEncodedSquaredAu(decodeEncodedSquaredDa(decodeEncodedSquaredHpa(decodeEncodedLimitedLiabilitySign(decodeEncodedSquaredEv(decodeEncodedSquaredErg(decodeEncodedSquaredHg(decodeEncodedSmallLigatureSt(decodeEncodedSmallLigatureLongSt(decodeEncodedSmallLigatureFfl(decodeEncodedSmallLigatureFfi(decodeEncodedSmallLigatureFl(decodeEncodedSmallLigatureFi(decodeEncodedSmallLigatureFf(decodeEncodedSmallRomanNumeralTwelve(decodeEncodedSmallRomanNumeralEleven(decodeEncodedSmallRomanNumeralNine(decodeEncodedSmallRomanNumeralEight(decodeEncodedSmallRomanNumeralSeven(decodeEncodedSmallRomanNumeralSix(decodeEncodedSmallRomanNumeralFour(decodeEncodedSmallRomanNumeralThree(decodeEncodedSmallRomanNumeralTwo(decodeEncodedRomanNumeralTwelve(decodeEncodedRomanNumeralEleven(decodeEncodedRomanNumeralNine(decodeEncodedRomanNumeralEight(decodeEncodedRomanNumeralSeven(decodeEncodedRomanNumeralSix(decodeEncodedRomanNumeralFour(decodeEncodedRomanNumeralThree(decodeEncodedRomanNumeralTwo(decodeEncodedFacsimileSign(decodeEncodedTradeMarkSign(decodeEncodedTelephoneSign(decodeEncodedServiceMark(decodeEncodedNumeroSign(decodeEncodedRupeeSign(decodeEncodedSmallLetterDz(decodeEncodedCapitalDWithSmallZ(decodeEncodedCapitalLetterDz(decodeEncodedSmallLetterNj(decodeEncodedCapitalNWithSmallJ(decodeEncodedCapitalLetterNj(decodeEncodedSmallLetterLj(decodeEncodedCapitalLWithSmallJ(decodeEncodedCapitalLetterLj(decodeEncodedSmallLigatureIj(decodeEncodedCapitalLigatureIj(decodeEncodedSquaredDj(decodeEncodedRaisedMr(decodeEncodedRaisedMd(decodeEncodedRaisedMc(decodeEncodedSquaredWc(decodeEncodedSquaredPpv(decodeEncodedSquaredSs(decodeEncodedSquaredSd(decodeEncodedSquaredMv(decodeEncodedSquaredHv(decodeEncodedSquaredWz(decodeEncodedSquaredCd(decodeEncodedTortoiseShellS(decodeEncodedDigitCommasFromTwo(decodeEncodedDigitOneCommas(decodeEncodedDigitZeroCommas(decodeEncodedDigitZeroFullStops(decodeEncodedParenthesizedCapitals(decodeEncodedParenthesizedLetters(decodeEncodedDigitFullStops(decodeEncodedParenthesizedNumbers(decodeEncodedCircledNumbers(decodeEncodedSunuwarDigits(decodeEncodedEasternPwoKarenDigits(decodeEncodedMyanmarPaoDigits(decodeEncodedAdlamDigits(decodeEncodedOlOnalDigits(decodeEncodedNagMundariDigits(decodeEncodedWanchoDigits(decodeEncodedNyiakengPuachueHmongDigits(decodeEncodedKiratRaiDigits(decodeEncodedPahawhHmongDigits(decodeEncodedTangsaDigits(decodeEncodedMroDigits(decodeEncodedGurungKhemaDigits(decodeEncodedKawiDigits(decodeEncodedTolongSikiDigits(decodeEncodedGunjalaGondiDigits(decodeEncodedMasaramGondiDigits(decodeEncodedBhaiksukiDigits(decodeEncodedDivesAkuruDigits(decodeEncodedWarangCitiDigits(decodeEncodedAhomDigits(decodeEncodedTakriDigits(decodeEncodedModiDigits(decodeEncodedTirhutaDigits(decodeEncodedNewaDigits(decodeEncodedKhudawadiDigits(decodeEncodedSharadaDigits(decodeEncodedChakmaDigits(decodeEncodedSoraSompengDigits(decodeEncodedBrahmiDigits(decodeEncodedGarayDigits(decodeEncodedHanifiRohingyaDigits(decodeEncodedLabelPunct(text))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   const redacted = scrubProxyCredentials(decoded);
   // A non-proxy such as "user&#58;secret@internal" must stay as written.
   // Decoding it first would only make the secret easier to read.
