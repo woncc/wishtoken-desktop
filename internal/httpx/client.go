@@ -4537,7 +4537,9 @@ func numberSignASCII(r rune) (byte, bool) {
 // The rising stroke still splits a stored slash. It is a slash on its own
 // pass. The multiplication sign in left half circle puts both strokes in the cell.
 // The rising stroke still splits a stored slash. It is a slash on its own
-// pass. The multiplication sign in right half circle stays out. The smash product stays out. The large orange circle stays out.
+// pass. The multiplication sign in right half circle puts both strokes in the cell.
+// The rising stroke still splits a stored slash. It is a slash on its own
+// pass. The circled multiplication sign with circumflex accent stays out. The smash product stays out. The large orange circle stays out.
 // The negative short
 // diagonal folds to a
 // slash. The upper right block
@@ -4696,7 +4698,8 @@ func numberSignASCII(r rune) (byte, bool) {
 // pass. The multiplication sign with dot above is a slash on its own
 // pass. The multiplication sign with underbar is a slash on its own
 // pass. The multiplication sign in left half circle is a slash on its own
-// pass. The multiplication sign in right half circle stays out. The smash product stays out. The large orange circle stays out.
+// pass. The multiplication sign in right half circle is a slash on its own
+// pass. The circled multiplication sign with circumflex accent stays out. The smash product stays out. The large orange circle stays out.
 // Other letters and ideographs stay out.
 // One output piece covers the original rune.
 func foldReverseSolidusPieces(in []secretPiece) []secretPiece {
@@ -5201,6 +5204,8 @@ func parenASCII(r rune) (byte, bool) {
 // a stored slash. It stays one slash. The multiplication sign in left half circle
 // puts both strokes in the cell. The rising stroke still splits
 // a stored slash. It stays one slash. The multiplication sign in right half circle
+// puts both strokes in the cell. The rising stroke still splits
+// a stored slash. It stays one slash. The circled multiplication sign with circumflex accent
 // stays out. The smash product
 // stays out. The large orange circle
 // stays out. The modifier
@@ -5532,7 +5537,10 @@ func parenASCII(r rune) (byte, bool) {
 // either. The multiplication sign in left half circle puts both strokes in the cell.
 // The rising stroke still splits a stored slash. It stays one slash so the
 // path cannot glue the token back together. It does not NFKC-fold to a slash
-// either. The multiplication sign in right half circle stays out. The smash product stays out. The large orange circle stays out.
+// either. The multiplication sign in right half circle puts both strokes in the cell.
+// The rising stroke still splits a stored slash. It stays one slash so the
+// path cannot glue the token back together. It does not NFKC-fold to a slash
+// either. The circled multiplication sign with circumflex accent stays out. The smash product stays out. The large orange circle stays out.
 // Other letters stay out.
 // Tilde operator, swung dash, and wave dash do not fold to '~'. Small tilde
 // expands to a space plus a mark, so it stays out. One output piece covers
@@ -5582,7 +5590,7 @@ func solidusTildeFolded(s string) bool {
 
 func solidusTildeASCII(r rune) (byte, bool) {
 	switch r {
-	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBA4, 0x1FBA5, 0x1FBA6, 0x1FBA7, 0x1FBA8, 0x1FBAA, 0x1FBAB, 0x1FBAC, 0x1FBAD, 0x1FBAE, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBD, 0x1FBBE, 0x1FBBF, 0x1FBC0, 0x1FBCA, 0x1F7A8, 0x1F7A9, 0x1F7AA, 0x1F7AB, 0x1F7AC, 0x1F7AD, 0x1F7AE, 0x2613, 0x26DD, 0x2B59, 0x1F7AF, 0x1F7B0, 0x1F7B1, 0x1F7B2, 0x1F7B3, 0x1F7B4, 0x1F7B5, 0x1F7B6, 0x1F7B7, 0x1F7B8, 0x1F7B9, 0x1F7BA, 0x1F7BB, 0x1F7BC, 0x1F7BD, 0x1F7BE, 0x1F7BF, 0x1F7C0, 0x1F7C1, 0x1F7C2, 0x1F7C3, 0x1F7C4, 0x1F7C5, 0x1F7C6, 0x1F7C7, 0x1F7C8, 0x1F7C9, 0x1F7CA, 0x1F7CB, 0x1F7CC, 0x1F7CD, 0x1F7CE, 0x1F7CF, 0x1F7D0, 0x1F7D1, 0x1F7D2, 0x1F7D3, 0x1F7D4, 0x1F7D5, 0x1F7D6, 0x1F7D7, 0x1F7D8, 0x1F7D9, 0x2715, 0x2716, 0x2717, 0x2718, 0x274C, 0x274E, 0x1F5D9, 0x00D7, 0x2A2F, 0x2A30, 0x2A31, 0x2A34:
+	case 0x1735, 0x2041, 0x2044, 0x2215, 0x2298, 0x233F, 0x2341, 0x2571, 0x2573, 0x27C9, 0x27CB, 0x29C4, 0x25A8, 0x25A9, 0x29F6, 0x29F8, 0x2AFB, 0x2AFD, 0x2CC6, 0x2CC7, 0x2E4A, 0xA718, 0x2F03, 0x3033, 0x3034, 0x30CE, 0x31D2, 0x31D3, 0x32E8, 0x3328, 0x3329, 0x4E3F, 0xFF0F, 0xFF89, 0x1F67C, 0x1FBA0, 0x1FBA3, 0x1FBA4, 0x1FBA5, 0x1FBA6, 0x1FBA7, 0x1FBA8, 0x1FBAA, 0x1FBAB, 0x1FBAC, 0x1FBAD, 0x1FBAE, 0x1FB41, 0x1FB42, 0x1FB43, 0x1FB44, 0x1FB45, 0x1FB46, 0x1FB47, 0x1FB48, 0x1FB49, 0x1FB4A, 0x1FB4B, 0x1FB5D, 0x1FB5E, 0x1FB5F, 0x1FB60, 0x1FB61, 0x1FB57, 0x1FB58, 0x1FB59, 0x1FB5A, 0x1FB5B, 0x1FB5C, 0x1FB99, 0x1FBBD, 0x1FBBE, 0x1FBBF, 0x1FBC0, 0x1FBCA, 0x1F7A8, 0x1F7A9, 0x1F7AA, 0x1F7AB, 0x1F7AC, 0x1F7AD, 0x1F7AE, 0x2613, 0x26DD, 0x2B59, 0x1F7AF, 0x1F7B0, 0x1F7B1, 0x1F7B2, 0x1F7B3, 0x1F7B4, 0x1F7B5, 0x1F7B6, 0x1F7B7, 0x1F7B8, 0x1F7B9, 0x1F7BA, 0x1F7BB, 0x1F7BC, 0x1F7BD, 0x1F7BE, 0x1F7BF, 0x1F7C0, 0x1F7C1, 0x1F7C2, 0x1F7C3, 0x1F7C4, 0x1F7C5, 0x1F7C6, 0x1F7C7, 0x1F7C8, 0x1F7C9, 0x1F7CA, 0x1F7CB, 0x1F7CC, 0x1F7CD, 0x1F7CE, 0x1F7CF, 0x1F7D0, 0x1F7D1, 0x1F7D2, 0x1F7D3, 0x1F7D4, 0x1F7D5, 0x1F7D6, 0x1F7D7, 0x1F7D8, 0x1F7D9, 0x2715, 0x2716, 0x2717, 0x2718, 0x274C, 0x274E, 0x1F5D9, 0x00D7, 0x2A2F, 0x2A30, 0x2A31, 0x2A34, 0x2A35:
 		return '/', true
 	case 0xFF5E:
 		return '~', true
